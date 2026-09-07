@@ -837,7 +837,7 @@ function drawFace(ctx,bw,bh,D){
   /* ตา/ปาก: วาดอาร์ตดิบ ไม่แมปสีเลย — ลูกตาต้องดำสนิทและไฮไลท์ต้องขาวเสมอ
      ห้ามส่งเข้า gradMap ด้วยวัสดุผิว (พอตัวเป็นทอง ตากลายเป็นน้ำตาลอ่อน = จางตามสีตัว) */
   const em=META.eye, eyeC=A.eye;
-  FACE.eyes.forEach(E=>{
+  if(!pose.noEyes) FACE.eyes.forEach(E=>{
     const d=bh*E.hR, ew=d*(E.ar||1);
     ctx.save(); ctx.translate(E.u*bw, E.v*bh); ctx.rotate((E.rot||0)*Math.PI/180);
     ctx.drawImage(eyeC, -ew/2, -d/2, ew, d); ctx.restore();
@@ -1292,7 +1292,7 @@ const ready = Promise.all(Object.entries(SRC).map(([k,s])=> new Promise(res=>{
 }))).then(()=>{ PROF = profile(A.body); return true; });
 function randGene(){ const o={}; GENES.forEach(G=>{ const R=gr(G.k);
   o[G.k]=Math.round(R.min+Math.random()*(R.max-R.min)); }); return o; }
-return { ready, slugParts, drawSlug, derived, GENES, randGene, hex, FACE, GILL_SETS, GRANGE, gr, colorName, GILL_STOPS, BODY_ANCH, GILL_ANCH, clearCache(){SPR.clear(); GM.clear();},
+return { ready, slugParts, drawSlug, derived, GENES, randGene, hex, FACE, eyeImage:A.eye, GILL_SETS, GRANGE, gr, colorName, GILL_STOPS, BODY_ANCH, GILL_ANCH, clearCache(){SPR.clear(); GM.clear();},
          get MAT(){return MAT;}, set MAT(v){MAT=v;},
          get ANIM(){return ANIM;}, set ANIM(v){ANIM=v;} };
 })();

@@ -140,7 +140,7 @@ function tankSlugSprite(s, P, sa, walking, lifted){
     const x=s._tsX;
     x.setTransform(DPR,0,0,DPR,0,0);
     x.clearRect(0,0,w,h);
-    const pose=lifted ? Object.assign({},s,{noBob:true}) : s;
+    const pose=lifted ? Object.assign({},s,{noBob:true,noEyes:true}) : Object.assign({},s,{noEyes:true});
     SlugEngine.drawSlug(x, P, w/2, h/2, false, (s.ph||0)*120, sa, false, walking, pose);
     s._tsT=now; s._tsSa=sa; s._tsWalk=walking; s._tsPose=poseKey; _tsprBudget--;
   }
@@ -532,8 +532,7 @@ function drawHeldFace(P, cx, cy, flip, k, base){
     const u=Math.max(0,Math.min(1,(localX-P.L)/(P.R-P.L)));
     const eyeSag=k*(P.B-P.T)*0.105*Math.pow(Math.abs(u*2-1),2.15);
     const x=cx+sgn*k*(localX-ox), y=cy+k*(E.v*P.bh-oy)+eyeSag, r=k*P.bh*E.hR*0.5;
-    tctx.fillStyle=base;                                  // กลบตากลมเดิมด้วยสีลำตัว
-    tctx.beginPath(); tctx.arc(x,y,r*1.18,0,6.283); tctx.fill();
+    
     tctx.strokeStyle='#11181b'; tctx.lineWidth=Math.max(1.1, r*0.40);
     const w=r*0.8, h=r*0.72, d=(i===0?-1:1)*sgn;          // ตาซ้าย ＞ · ตาขวา ＜ = ＞＜
     tctx.beginPath();
@@ -548,8 +547,7 @@ function drawSleepFace(P, cx, cy, flip, k, base){
   (SlugEngine.FACE.eyes||[]).forEach(E=>{
     const x=cx+sgn*k*(E.u*P.bw-ox), y=cy+k*(E.v*P.bh-oy);
     const r=k*P.bh*E.hR*0.5, rw=r*(E.ar||0.68);
-    tctx.fillStyle=base;
-    tctx.beginPath(); tctx.ellipse(x,y,rw*1.75,r*1.6,0,0,6.283); tctx.fill();   // กลบตากลมเดิมให้มิด
+    
     tctx.strokeStyle='#11181b'; tctx.lineWidth=Math.max(1.1,r*0.28);
     tctx.beginPath();
     tctx.moveTo(x-rw*0.82,y); tctx.lineTo(x+rw*0.82,y); tctx.stroke();
@@ -564,7 +562,7 @@ function drawDashFace(P, cx, cy, flip, k, base, charge){
   (SlugEngine.FACE.eyes||[]).forEach((E,i)=>{
     const localX=E.u*P.bw;
     const x=cx+sgn*k*(localX-ox), y=cy+k*(E.v*P.bh-oy)-k*P.bh*rise, r=k*P.bh*E.hR*0.5;
-    tctx.fillStyle=base; tctx.beginPath(); tctx.arc(x,y,r*1.22,0,6.283); tctx.fill();
+    
     tctx.strokeStyle='#11181b'; tctx.lineWidth=Math.max(1.1,r*0.38);
     const w=r*0.8,h=r*0.66,d=(i===0?-1:1)*sgn;
     tctx.beginPath(); tctx.moveTo(x-w*d,y-h); tctx.lineTo(x+w*d,y); tctx.lineTo(x-w*d,y+h); tctx.stroke();
@@ -578,10 +576,30 @@ function drawSmileFace(P, cx, cy, flip, k, base){
   (SlugEngine.FACE.eyes||[]).forEach(E=>{
     const x=cx+sgn*k*(E.u*P.bw-ox), y=cy+k*(E.v*P.bh-oy);
     const r=k*P.bh*E.hR*0.5, rw=r*(E.ar||0.68);
-    tctx.fillStyle=base;
-    tctx.beginPath(); tctx.ellipse(x,y,rw*1.75,r*1.6,0,0,6.283); tctx.fill();
+    
     tctx.strokeStyle='#11181b'; tctx.lineWidth=Math.max(1.1,r*0.30);
     tctx.beginPath(); tctx.arc(x,y-r*0.18,rw*1.0,0.15*Math.PI,0.85*Math.PI); tctx.stroke();  // เส้นโค้งยิ้ม
+  });
+  tctx.restore();
+}
+/* ตากลมปกติ — วาดเป็นเลเยอร์บนตัว (สไปรต์ไม่มีตาอบมาแล้ว) ให้เหมือนตาที่เอนจินเคยอบ
+   ใช้รูปตาจากเอนจิน (SlugEngine.eyeImage) วางที่ตำแหน่ง FACE.eyes เดียวกับที่โค้ดเคยใช้กลบ
+   พอมีแอคชั่นสลับตา ก็แค่ไม่เรียกอันนี้ (ตากลมหาย) จบแอคชั่นเรียกใหม่ = ตากลมกลับมา */
+function drawDefaultEyes(P, cx, cy, flip, k){
+  if(!P) return;
+  const sgn=flip?-1:1, ox=(P.L+P.R)/2, oy=(P.T+P.B)/2;
+  const img=(typeof SlugEngine!=='undefined')?SlugEngine.eyeImage:null;
+  const ready=img && img.complete && img.naturalWidth>0;
+  tctx.save(); tctx.lineCap='round'; tctx.lineJoin='round';
+  (SlugEngine.FACE.eyes||[]).forEach(E=>{
+    const x=cx+sgn*k*(E.u*P.bw-ox), y=cy+k*(E.v*P.bh-oy);
+    const d=k*P.bh*E.hR, ew=d*(E.ar||1);
+    if(ready){
+      tctx.save(); tctx.translate(x,y); tctx.scale(sgn,1); tctx.rotate((E.rot||0)*Math.PI/180);
+      tctx.drawImage(img, -ew/2, -d/2, ew, d); tctx.restore();
+    } else {
+      tctx.fillStyle='#12181b'; tctx.beginPath(); tctx.ellipse(x,y,ew*0.5,d*0.5,0,0,6.283); tctx.fill();
+    }
   });
   tctx.restore();
 }
@@ -594,6 +612,7 @@ function drawWallActionFace(s,P,sa){
   if(s.state==='sleep') drawSleepFace(P,0,0,false,k,base);
   else if(s.state==='dashCharge'||s.state==='dash') drawDashFace(P,0,0,false,k,base,s.charge);
   else if((s.state==='rest'||s.state==='greet'||s.state==='wake'||s.state==='stretch') && smileNow(s)) drawSmileFace(P,0,0,false,k,base);
+  else drawDefaultEyes(P,0,0,false,k);
 }
 /* ยิ้มไหมตอนนี้ — แต่ละตัวมีจังหวะสุ่มเป็นของตัวเอง ยิ้ม ~2.2 วิ ทุก ~14 วิ */
 function smileNow(s){
@@ -1570,6 +1589,7 @@ function drawTank(){
       else if(s.state==='sleep') drawSleepFace(P, p.x, cy, s.flip, P.s*sa, slugBaseHex(s.genes));
       else if(s.state==='dashCharge'||s.state==='dash') drawDashFace(P,p.x,cy,s.flip,P.s*sa,slugBaseHex(s.genes),s.charge);
       else if((s.state==='rest'||s.state==='greet'||s.state==='wake'||s.state==='stretch') && smileNow(s)) drawSmileFace(P,p.x,cy,s.flip,P.s*sa,slugBaseHex(s.genes));
+      else drawDefaultEyes(P,p.x,cy,s.flip,P.s*sa);
       if(s.state==='sneeze') drawSneezeBubbles(s,p,bodyLen);
       if(!lifted) drawSlugMood(s,p,bodyLen,P,cy,sa);
       s._hit={ x:p.x, y:cy, r:Math.max(26,bodyLen*0.62) };
