@@ -39,7 +39,27 @@ function catModel(o){
  const result={key,faces};catModelCache.set(o,result);return faces;
 }
 // Furniture depth masks use the real L, including its empty seller corner.
-personFurnitureFaces=function(){const out=[];for(const o of G.objs){if(o===moving)continue;const blocks=o._key==='counter'?[counterBlock(o,0,10,20,10),counterBlock(o,10,0,10,10)]:[{x:o.cx,y:o.cy,w:oW(o),h:oH(o)}],top=(o.type==='tank'?tankStandH(o.def):decoH(o))/ZUNIT;if(!Number.isFinite(top)||top<=0)continue;for(const q of blocks){const {x,y,w,h}=q,a=[x,y,0],b=[x+w,y,0],c=[x+w,y+h,0],d=[x,y+h,0],A=[x,y,top],B=[x+w,y,top],C=[x+w,y+h,top],D=[x,y+h,top];out.push([A,B,C,D],[a,b,B,A],[b,c,C,B],[c,d,D,C],[d,a,A,D]);}}return out;};
+personFurnitureFaces=function(){
+ const out=[];
+ const boxTo=(bx,by,bw,bh,top)=>{ if(!(top>0))return;
+  const a=[bx,by,0],b=[bx+bw,by,0],c=[bx+bw,by+bh,0],d=[bx,by+bh,0];
+  const A=[bx,by,top],B=[bx+bw,by,top],C=[bx+bw,by+bh,top],D=[bx,by+bh,top];
+  out.push([A,B,C,D],[a,b,B,A],[b,c,C,B],[c,d,D,C],[d,a,A,D]);
+ };
+ for(const o of G.objs){
+  if(o===moving)continue;
+  if(o._key==='counter'){
+   const top=decoH(o)/ZUNIT; // ผิวเคาน์เตอร์ (ราว 14)
+   for(const q of [counterBlock(o,0,10,20,10),counterBlock(o,10,0,10,10)]) boxTo(q.x,q.y,q.w,q.h,top);
+   // แมวแคชเชียร์นั่งมุมว่างของตัว L — เพิ่มกล่องบังสูงถึงหัวแมว ให้บังลูกค้าที่ยืนด้านหลัง
+   const cat=counterBlock(o,1,1,8,8); boxTo(cat.x,cat.y,cat.w,cat.h,24);
+   continue;
+  }
+  const top=(o.type==='tank'?tankStandH(o.def):decoH(o))/ZUNIT;
+  if(!(top>0))continue;
+  boxTo(o.cx,o.cy,oW(o),oH(o),top);
+ }
+ return out;};
 
 const catSpriteCache=new WeakMap();
 // The image includes furniture/glass occlusion, so layout changes invalidate it.
