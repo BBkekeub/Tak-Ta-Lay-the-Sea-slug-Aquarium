@@ -49,7 +49,8 @@
         id: 'breed-' + (opt.tag || 'x') + '-' + Date.now(),
         type: 'online',
         title: icon + ' ' + title,
-        body: detail
+        body: detail,
+        repeating: true   // แจ้งเตือนสถานะผสมพันธุ์ = ภารกิจวนซ้ำ (เด้งได้ทุกรอบ ไม่ติด ledger)
       });
     }
     if (opt.desktop !== false) notifyDesktop('ร้านทากทะเล — ' + title, detail, opt.tag);

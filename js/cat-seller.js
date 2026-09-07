@@ -144,7 +144,7 @@ function drawCounterComputer(o){const shifted=shiftedCounter(o,2,-3);shifted.rot
 function computerInbox(){return G.computerInbox ||= [];}
 function receiveComputerMessage(message){
  if(!message||!['quest','online'].includes(message.type)||!message.id||!message.title)return false;
- const items=computerInbox();if(items.some(m=>m.id===String(message.id)))return false;
+ const _id=String(message.id),_rep=message.repeating===true;G.mailSent||={};if(!_rep&&G.mailSent[_id])return false;const items=computerInbox();if(items.some(m=>m.id===_id))return false;if(!_rep)G.mailSent[_id]=true;
  items.push({id:String(message.id),type:message.type,title:String(message.title),body:String(message.body||''),read:false});
  saveGame();if(computerDialog.open)renderComputer();return true;
 }
@@ -217,6 +217,6 @@ function checkFiveMinuteMail(){
  receiveComputerMessage({id:'five-minute-gift',type:'online',title:'เศษเงินจากผู้หวังดี',body:'ว้าววววววววววววววว ร้านกระจอกจริง ๆ เลย!\n\nอะ ๆ เอาเศษเงินไปพัฒนาร้านซะ อย่าให้เป็นภาระสังคัง… เอ๊ย สังคม!\n\n— ผู้หวังดีที่รวยกว่า\n\nเงินแนบ: 500 เหรียญ'});
 }
 function claimFiveMinuteGift(){
- const mail=computerInbox().find(m=>m.id==='five-minute-gift');if(!mail||mail.claimed)return false;
+ const mail=computerInbox().find(m=>m.id==='five-minute-gift');if(!mail||mail.claimed)return false;G.claimed||={};if(G.claimed['five-minute-gift']){mail.claimed=true;if(typeof saveGame==='function')saveGame();return false;}G.claimed['five-minute-gift']=true;
  mail.claimed=true;mail.read=true;G.coin+=500;syncHUD();saveGame();toast('รับเงินจากผู้หวังดี +500 เหรียญ','good');return true;
 }
