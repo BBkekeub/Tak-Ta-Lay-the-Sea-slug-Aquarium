@@ -8,6 +8,7 @@ const FOOD_TYPES={
 for(const food of Object.values(FOOD_TYPES))for(const spec of food.levels){if(spec.gillAura!=null)spec.vigor=Math.max(spec.vigor||0,spec.gillAura);delete spec.gillAura;spec.cost=Math.max(1,Math.round(spec.sat*spec.cap*FOOD_COST_PER_SAT));}   // ราคา = ค่าอิ่ม × จำนวนคำ × อัตราใน config.js
 const FOOD_IMAGES={};
 let foodChoice=null,foodHover=null,foodSeq=0;
+let foodMode=false;   // โหมดวางอาหาร: เปิดค้างไว้ วางได้เรื่อย ๆ · ย้ายอาหารเดิมได้เฉพาะตอนเปิดโหมดนี้
 const foodClamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /* อิ่มเกินค่านี้ = ไม่เดินไปกิน (เดิมกินทุกชิ้นแม้อิ่มเต็ม ค่าอิ่มส่วนเกินถูกทิ้ง) */
 const FOOD_HUNGRY=90;
@@ -178,18 +179,33 @@ function drawFood(f){
  if(im&&im.complete&&im.naturalWidth)tctx.drawImage(f.preview?im:foodBitten(f,im),p.x-w/2,p.y-h*0.88,w,h);
  tctx.textAlign='center';tctx.font='12px sans-serif';tctx.fillStyle='#fff3df';
  const spoiling=Date.now()-(f._placedAt||Date.now())>FOOD_SPOIL_MS*0.7;
- tctx.fillText('Lv.'+f.level+' · '+(f.spec.cap-f.eaten.length)+' คำ'+(spoiling?' · เริ่มเน่า':''),p.x,p.y+14);tctx.restore();
+ tctx.fillStyle=f.preview&&f.invalid?'#ff9d8a':'#fff3df';
+ tctx.fillText(f.preview?(f.invalid?'วางตรงนี้ไม่ได้':'คลิกเพื่อวาง'):'Lv.'+f.level+' · '+(f.spec.cap-f.eaten.length)+' คำ'+(spoiling?' · เริ่มเน่า':''),p.x,p.y+14);tctx.restore();
 }
 function foodAt(mx,my){   // อาหารหน้าสุดที่คลิกโดน (ไว้ลากย้าย)
  let best=null;
  (curTank&&curTank.foods||[]).forEach(f=>{const b=f._hit;if(b&&mx>=b.x&&mx<=b.x+b.w&&my>=b.y&&my<=b.y+b.h){if(!best||f.fy>best.fy)best=f;}});
  return best;
 }
+/* เช็กอย่างเดียว ไม่หักเหรียญ — ใช้ทั้งตอนวางจริงและตอนวาดโกสต์ตามเมาส์ */
+function foodCanPlace(type,level,fx,fy){
+ const tank=curTank; if(!tank) return {ok:false,why:'ยังไม่ได้เข้าตู้'};
+ const spec=FOOD_TYPES[type].levels[level-1],solid=decorSolidSet(tank.decor);
+ if(fx<1||fy<1||fx>tank.def.w-1||fy>tank.def.h-1||solid.has(ptKey(fx,fy))) return {ok:false,why:'วางอาหารบนพื้นที่ว่างในตู้ครับ'};
+ if((tank.foods||[]).length>=8) return {ok:false,why:'วางอาหารได้พร้อมกันไม่เกิน 8 ชิ้น'};
+ if(G.coin<spec.cost) return {ok:false,why:'เหรียญไม่พอ ('+spec.cost+')'};
+ return {ok:true,why:''};
+}
+/* โกสต์ติดเมาส์ตอนเปิดโหมด — คืนวัตถุหน้าตาเหมือนอาหารจริงให้ drawFood วาดแบบจาง */
+function foodGhostItem(){
+ if(!foodMode||!foodChoice||!foodHover) return null;
+ return {preview:true,invalid:!foodHover.ok,type:foodChoice.type,level:foodChoice.level,
+         spec:FOOD_TYPES[foodChoice.type].levels[foodChoice.level-1],fx:foodHover.fx,fy:foodHover.fy,eaten:[],reserved:{}};
+}
 function foodPlace(type,level,fx,fy){
- const spec=FOOD_TYPES[type].levels[level-1],tank=curTank,solid=decorSolidSet(tank.decor);
- if(fx<1||fy<1||fx>tank.def.w-1||fy>tank.def.h-1||solid.has(ptKey(fx,fy))){toast('วางอาหารบนพื้นที่ว่างในตู้ครับ','bad');return false;}
- if((tank.foods||[]).length>=8){toast('วางอาหารได้พร้อมกันไม่เกิน 8 ชิ้น','bad');return false;}
- if(G.coin<spec.cost){toast('เหรียญไม่พอ ('+spec.cost+')','bad');return false;}
+ const spec=FOOD_TYPES[type].levels[level-1],tank=curTank;
+ const chk=foodCanPlace(type,level,fx,fy);
+ if(!chk.ok){toast(chk.why,'bad');return false;}
  G.coin-=spec.cost;toast('วาง'+FOOD_TYPES[type].name+' −'+spec.cost,'good');if(typeof syncHUD==='function')syncHUD();
  (tank.foods||(tank.foods=[])).push({id:'food'+Date.now()+'-'+foodSeq++,type,level,spec,fx,fy,eaten:[],reserved:{}});return true;
 }
@@ -199,16 +215,46 @@ function foodUI(){
  ov.insertBefore(bar,ov.querySelector('.ov-bottom'));const type=bar.querySelector('#foodType'),level=bar.querySelector('#foodLevel'),info=bar.querySelector('#foodInfo');
  for(const [k,v]of Object.entries(FOOD_TYPES)){const op=document.createElement('option');op.value=k;op.textContent=v.icon+' '+v.name;type.appendChild(op);const im=new Image();im.src='assets/food/'+k+'.png';FOOD_IMAGES[k]=im;}
  const preview=document.createElement('img');preview.style.cssText='width:48px;height:48px;object-fit:contain';bar.prepend(preview);
- function update(){const sp=FOOD_TYPES[type.value].levels[Number(level.value)-1];preview.src='assets/food/'+type.value+'.png';info.textContent=sp.cost+' เหรียญ · อิ่ม +'+sp.sat+' · '+sp.cap+' คำ · '+sp.h+' ชม. · '+foodDescription(sp);}
- function levels(){level.innerHTML='';FOOD_TYPES[type.value].levels.forEach((sp,i)=>{const op=document.createElement('option');op.value=i+1;op.textContent='ระดับ '+(i+1);level.appendChild(op);});foodChoice=null;update();}
- type.onchange=levels;level.onchange=()=>{foodChoice=null;update();};levels();
- bar.querySelector('#foodChoose').onclick=()=>{foodChoice={type:type.value,level:Number(level.value)};info.textContent='คลิกพื้นที่ว่างในตู้เพื่อวาง · Esc ยกเลิก';};
- bar.querySelector('#foodCancel').onclick=()=>{foodChoice=null;foodHover=null;update();};
- for(const id of ['ovBack','ovBuild'])document.getElementById(id).addEventListener('click',()=>{foodChoice=null;update();});
+ const chooseBtn=bar.querySelector('#foodChoose'),cancelBtn=bar.querySelector('#foodCancel');
+ function update(){const sp=FOOD_TYPES[type.value].levels[Number(level.value)-1];preview.src='assets/food/'+type.value+'.png';
+  info.textContent=(foodMode?'คลิกพื้นที่ว่างในตู้เพื่อวาง · วางต่อได้เรื่อย ๆ · ลากอาหารเดิมเพื่อย้าย · Esc ปิดโหมด\n':'')
+   +sp.cost+' เหรียญ · อิ่ม +'+sp.sat+' · '+sp.cap+' คำ · '+sp.h+' ชม. · '+foodDescription(sp);}
+ const syncChoice=()=>{foodChoice=foodMode?{type:type.value,level:Number(level.value)}:null;};
+ function levels(){level.innerHTML='';FOOD_TYPES[type.value].levels.forEach((sp,i)=>{const op=document.createElement('option');op.value=i+1;op.textContent='ระดับ '+(i+1);level.appendChild(op);});syncChoice();update();}
+ /* เปิด/ปิดโหมดวางอาหาร — ปิดแล้วอาหารในตู้จะลากย้ายไม่ได้ (กันเผลอลากตอนดูทาก) */
+ function foodModeSet(on){
+  foodMode=!!on&&!!curTank; syncChoice(); foodHover=null;
+  chooseBtn.textContent=foodMode?'✓ ปิดโหมดวางอาหาร':'🌸 เปิดโหมดวางอาหาร';
+  chooseBtn.setAttribute('aria-pressed',String(foodMode));
+  cancelBtn.hidden=!foodMode;
+  const sum=bar.closest('details')&&bar.closest('details').querySelector('summary');
+  if(sum)sum.textContent=foodMode?'🌸 กำลังวางอาหาร':'🌸 ให้อาหาร';
+  if(typeof tankCv!=='undefined')tankCv.style.cursor=foodMode?'crosshair':'';
+  update();
+ }
+ window.foodModeSet=foodModeSet;
+ type.onchange=levels;level.onchange=()=>{syncChoice();update();};levels();
+ chooseBtn.onclick=()=>foodModeSet(!foodMode);
+ cancelBtn.onclick=()=>foodModeSet(false);
+ for(const id of ['ovBack','ovBuild'])document.getElementById(id).addEventListener('click',()=>foodModeSet(false));
+ foodModeSet(false);
  let placingPointer=false;
- tankCv.addEventListener('pointerdown',e=>{if(!foodChoice||!curTank)return;placingPointer=true;e.preventDefault();e.stopImmediatePropagation();const q=tankXY(e),p=tankFloorAt(q.mx,q.my);if(foodPlace(foodChoice.type,foodChoice.level,p.fx,p.fy)){foodChoice=null;foodHover=null;update();}},true);
+ tankCv.addEventListener('pointerdown',e=>{
+  if(!foodMode||!foodChoice||!curTank)return;
+  const q=tankXY(e);
+  if(typeof foodAt==='function'&&foodAt(q.mx,q.my))return;      // กดโดนอาหารเดิม = ปล่อยให้ tank-view ลากย้าย
+  placingPointer=true;e.preventDefault();e.stopImmediatePropagation();
+  const p=tankFloorAt(q.mx,q.my);
+  foodPlace(foodChoice.type,foodChoice.level,p.fx,p.fy);        // วางเสร็จยังอยู่ในโหมด วางต่อได้เลย
+ },true);
  tankCv.addEventListener('pointerup',e=>{if(placingPointer){placingPointer=false;e.preventDefault();e.stopImmediatePropagation();}},true);
- window.addEventListener('keydown',e=>{if(e.key==='Escape'){foodChoice=null;foodHover=null;update();}});
+ tankCv.addEventListener('pointermove',e=>{
+  if(!foodMode||!foodChoice||!curTank){foodHover=null;return;}
+  const q=tankXY(e),p=tankFloorAt(q.mx,q.my),chk=foodCanPlace(foodChoice.type,foodChoice.level,p.fx,p.fy);
+  foodHover={fx:p.fx,fy:p.fy,ok:chk.ok,why:chk.why};
+ },true);
+ tankCv.addEventListener('pointerleave',()=>{foodHover=null;});
+ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&foodMode){e.preventDefault();e.stopPropagation();foodModeSet(false);}},true);
 }
 /* ความหิว: ความอิ่มค่อย ๆ ลดตามเวลาจริง — อิ่มเต็ม 100 → 0 ใน ~5 ชม. */
 const FOOD_DECAY_PER_SEC=100/(5*3600);

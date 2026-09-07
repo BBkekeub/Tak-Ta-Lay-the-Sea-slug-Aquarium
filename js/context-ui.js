@@ -4,7 +4,7 @@
  const sections=[...rail.querySelectorAll(':scope > .sec')];
  const help=document.createElement('dialog');help.className='help-dialog';
  help.innerHTML='<form method="dialog"><button class="tbtn" aria-label="ปิดวิธีเล่น">✕</button></form><h2>วิธีเล่น</h2>';
- const instructions=[['กล้อง','ลากพื้นเพื่อเลื่อนกล้อง · ล้อเมาส์เพื่อซูม'],['ก่อสร้าง','เลือกของแล้วคลิกวาง · R หมุน · Esc ยกเลิก · ประตูวางบนกำแพง'],['ทางเดิน','หน้าตู้ต้องมีช่วงว่างต่อเนื่อง 50 ซม. และทางเดินลึก 100 ซม.'],['ดูตู้','คลิกตู้เพื่อเข้าไปดู · คลิกทากเพื่อเลือกและดูยีน'],['จัดของในตู้','เปิดจัดของ แล้วเลือกของเพื่อวาง · F พลิก · Esc วางมือ'],['ข้อเสนอ','เลือกดูตัวทากหรือเปลี่ยนตัวที่จะขายได้ ขายเมื่อกดยอมรับเท่านั้น']];
+ const instructions=[['กล้อง','ลากพื้นเพื่อเลื่อนกล้อง · ล้อเมาส์เพื่อซูม'],['ก่อสร้าง','เลือกของแล้วคลิกวาง · R หมุน · Esc ยกเลิก · ประตูวางบนกำแพง'],['ทางเดิน','หน้าตู้ต้องมีช่วงว่างต่อเนื่อง 50 ซม. และทางเดินลึก 100 ซม.'],['ดูตู้','คลิกตู้เพื่อเข้าไปดู · คลิกทากเพื่อเลือกและดูยีน'],['จัดของในตู้','เปิดจัดของ แล้วเลือกของเพื่อวาง · R พลิก · Esc วางมือ'],['ข้อเสนอ','เลือกดูตัวทากหรือเปลี่ยนตัวที่จะขายได้ ขายเมื่อกดยอมรับเท่านั้น']];
  for(const [title,body] of instructions){const d=document.createElement('details');const summary=document.createElement('summary');summary.textContent=title;const p=document.createElement('p');p.textContent=body;d.append(summary,p);help.append(d);}
  document.body.append(help);
  window.addEventListener('keydown',e=>{if(help.open&&e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();help.close();}},true);

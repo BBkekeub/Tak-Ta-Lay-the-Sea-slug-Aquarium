@@ -994,7 +994,7 @@ function flipDecor(){
 }
 window.addEventListener('keydown', e=>{
   if(!tankMode || !tankBuildMode) return;
-  if(e.key==='f'||e.key==='F'||e.key==='ฟ'){ e.preventDefault(); flipDecor(); return; }
+  if(e.key==='r'||e.key==='R'||e.key==='พ'){ e.preventDefault(); flipDecor(); return; }
   if(e.key==='Escape'){                            // เลิกถือ / เลิกเลือก
     if(selDecorKey){ selDecorKey=null; decorHover=null; toast('วางมือแล้ว','good'); }
     else selDecor=null;
@@ -1015,8 +1015,8 @@ function syncDecorBar(){
     fl.disabled = !can;
     fl.classList.toggle('on', can && cur!==0);
     /* ความยาวข้อความต้องคงที่เป๊ะ — ถ้ายาว-สั้นสลับกัน แถบล่างจะจัดบรรทัดใหม่
-       ความสูงแถบเปลี่ยน → แคนวาสเปลี่ยนขนาด → resizeTank() จัดกล้องใหม่ = ภาพกระตุกทุกครั้งที่กด F */
-    fl.textContent = '🔄 พลิก (F) ' + (can ? FLIP_SYM[cur] : '–');
+       ความสูงแถบเปลี่ยน → แคนวาสเปลี่ยนขนาด → resizeTank() จัดกล้องใหม่ = ภาพกระตุกทุกครั้งที่กด R */
+    fl.textContent = '🔄 พลิก (R) ' + (can ? FLIP_SYM[cur] : '–');
   }
 }
 document.getElementById('ovAdd').onclick=()=>{
@@ -1552,6 +1552,7 @@ function drawTank(){
   const masks=(curTank.decor||[]).map(d=>({ d, behind:decorCellSet(d,'behind'), front:decorCellSet(d,'front') }));
   const items=[];
   (curTank.foods||[]).forEach(f=>items.push({sortY:f.fy,kind:'food',f}));
+  if(typeof foodGhostItem==='function'){const _g=foodGhostItem();if(_g)items.push({sortY:_g.fy,kind:'food',f:_g});}
   (curTank.decor||[]).forEach(d=> items.push({sortY:d.fy, kind:'decor', d}));
   [...slugs,...breederVisualSlugs(curTank)].forEach(s=>{ let sy=s.fy; const k=ptKey(s.fx,s.fy);   // อยู่หลังหิน→วาดก่อน(ไกล) · อยู่หน้า→วาดหลัง(ใกล้)
     for(const m of masks){ if(m.behind.has(k)){ sy=m.d.fy+0.05; break; } if(m.front.has(k)){ sy=m.d.fy-0.05; break; } }
@@ -1675,7 +1676,8 @@ tankCv.addEventListener('pointerdown', e=>{
   dragDecor=null; tDrag=false; cancelHold(); pendSlug=null;
   if(!tankBuildMode){
     const {mx,my}=tankXY(e);
-    const fHit=(typeof foodAt==='function')?foodAt(mx,my):null;   // กดโดนตัวอาหาร = ลากย้ายก่อน (อาหารมาก่อนทาก เพราะทากที่มากินบังการกดอาหารไว้)
+    const feedMode=(typeof foodMode!=='undefined'&&foodMode);      // ย้ายอาหารได้เฉพาะตอนเปิดโหมดวางอาหาร
+    const fHit=(feedMode&&typeof foodAt==='function')?foodAt(mx,my):null;   // กดโดนตัวอาหาร = ลากย้ายก่อน (อาหารมาก่อนทาก เพราะทากที่มากินบังการกดอาหารไว้)
     if(fHit){ dragFood=fHit; dragFoodMoved=false; return; }
     const s=slugAt(mx,my);                             // ไม่โดนอาหาร = กดโดนตัวทาก จองไว้ก่อน
     if(s){ pendSlug=s;                                 // ขยับเมาส์เมื่อไหร่ = ยกทันที
@@ -1722,7 +1724,9 @@ tankCv.addEventListener('pointermove', e=>{
                 fy:snapCell(Math.max(DCELL,Math.min(curTank.def.h-DCELL, f.fy))) };
   }
   if(tDrag && tMoved){ tankCam.ox+=e.clientX-tlx; tankCam.oy+=e.clientY-tly; clampTankPan(); tankCv.style.cursor='grabbing'; }
-  else if(!tankBuildMode && !tDrag){ const q=tankXY(e); tankCv.style.cursor = (slugAt(q.mx,q.my)||(typeof foodAt==='function'&&foodAt(q.mx,q.my)))?'grab':''; }
+  else if(!tankBuildMode && !tDrag){ const q=tankXY(e), feed=(typeof foodMode!=='undefined'&&foodMode);
+    const onFood=feed&&typeof foodAt==='function'&&foodAt(q.mx,q.my);
+    tankCv.style.cursor = onFood?'grab':feed?'crosshair':(slugAt(q.mx,q.my)?'grab':''); }
   tlx=e.clientX; tly=e.clientY;
 });
 tankCv.addEventListener('pointerup', e=>{
@@ -1762,7 +1766,7 @@ tankCv.addEventListener('pointerup', e=>{
     curTank.decor=curTank.decor||[];
     curTank.decor.push({ key:selDecorKey, fx:nx, fy:ny, flip:placeFlip|0 });
     nudgeSlugsOutOfSolid(curTank.slugs, curTank.def.w, curTank.def.h, curTank.decor);
-    /* วางแล้วยัง "ถือ" ชิ้นเดิมอยู่ — วางรัว ๆ ได้ และกด F พลิกของในมือได้ทันที
+    /* วางแล้วยัง "ถือ" ชิ้นเดิมอยู่ — วางรัว ๆ ได้ และกด R พลิกของในมือได้ทันที
        ไม่เด้งไปเลือกชิ้นที่เพิ่งวาง (เดิมทำแบบนั้น กด F เลยไปพลิกก้อนที่วางไปแล้วแทน) */
     selDecor=null; syncDecorBar(); return;
   }

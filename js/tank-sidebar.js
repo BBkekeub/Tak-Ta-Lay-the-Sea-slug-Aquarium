@@ -10,7 +10,8 @@
  #ov #foodBar{padding:10px!important;background:transparent!important;gap:7px!important;border-top:1px solid #ffffff15}
  #foodBar select{max-width:100%;width:100%;padding:6px;background:#24383b;color:#eee;border:1px solid #607477;border-radius:5px}
  #foodBar>span:first-of-type{display:none}#foodBar>img{width:35px!important;height:35px!important}
- #foodInfo{line-height:1.6;color:#abbabd}#foodCancel{font-size:12px}
+ #foodInfo{line-height:1.6;color:#abbabd;white-space:pre-line}#foodCancel{font-size:12px}
+ #foodChoose[aria-pressed="true"]{border-color:#e6c173;background:#3d4a38;color:#f3d99a}
  #ov #breederPanel{background:transparent!important;padding:10px!important;max-height:none!important;border-top:1px solid #ffffff15!important;line-height:1.8;font-size:12px!important}
  #ov #breederPanel>div:first-child{overflow-wrap:anywhere;color:#b9c9c9}
  #ov #ovDecor{padding:8px;background:rgba(15,28,31,.95);max-height:55vh;overflow:auto;flex-direction:column;border-radius:8px}
@@ -26,10 +27,11 @@
  right.append(document.getElementById('ovBuild'),document.getElementById('ovDecor'));
  const updateBreed=()=>{breed.hidden=breederPanel.hidden;if(!breed.hidden){const b=breederState(curTank);breed.querySelector('summary').textContent=b.phase==='mating'?'🥚 ผสม · '+Math.ceil(b.left)+' วิ':b.phase==='eggs'?'🥚 รอฟัก · '+Math.ceil(b.left)+' วิ':b.phase==='hatching'?'🥚 พร้อมฟัก':'🥚 ผสมพันธุ์';}};
  new MutationObserver(updateBreed).observe(breederPanel,{attributes:true,childList:true,subtree:true});updateBreed();
- document.getElementById('foodChoose').addEventListener('click',()=>{food.open=false;});
+ /* ยุบแผงให้เห็นตู้เฉพาะตอน "เปิด" โหมด — ตอนปิดโหมดปล่อยให้แผงคาไว้ จะได้เลือกอาหารต่อได้ */
+ document.getElementById('foodChoose').addEventListener('click',()=>{if(foodMode)food.open=false;});
  document.getElementById('foodCancel').addEventListener('click',()=>{food.open=false;food.querySelector('summary').textContent='🌸 ให้อาหาร';});
  document.getElementById('ovBuild').addEventListener('click',()=>{food.open=false;});
  tankCv.addEventListener('pointerup',()=>{if(!foodChoice)food.querySelector('summary').textContent='🌸 ให้อาหาร';});
  const originalGeneCard=drawGeneCard;drawGeneCard=function(slug,x,y){const r=left.getBoundingClientRect(),c=tankCv.getBoundingClientRect();return originalGeneCard(slug,x,Math.max(y,r.bottom-c.top+10));};
- const originalEnter=enterTank;enterTank=function(...args){food.open=false;breed.open=false;originalEnter(...args);renderBreederUI();updateBreed();};
+ const originalEnter=enterTank;enterTank=function(...args){food.open=false;breed.open=false;if(typeof foodModeSet==='function')foodModeSet(false);originalEnter(...args);renderBreederUI();updateBreed();};
 })();
