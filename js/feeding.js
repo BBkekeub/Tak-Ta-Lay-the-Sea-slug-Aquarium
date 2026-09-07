@@ -210,8 +210,8 @@ function foodUI(){
  tankCv.addEventListener('pointerup',e=>{if(placingPointer){placingPointer=false;e.preventDefault();e.stopImmediatePropagation();}},true);
  window.addEventListener('keydown',e=>{if(e.key==='Escape'){foodChoice=null;foodHover=null;update();}});
 }
-/* ความหิว: ความอิ่มค่อย ๆ ลดตามเวลาจริง — อิ่มเต็ม 100 → 0 ใน ~2 ชม. */
-const FOOD_DECAY_PER_SEC=100/(2*3600);
+/* ความหิว: ความอิ่มค่อย ๆ ลดตามเวลาจริง — อิ่มเต็ม 100 → 0 ใน ~5 ชม. */
+const FOOD_DECAY_PER_SEC=100/(5*3600);
 function foodDecay(slugs,dt){
  for(const s of slugs){foodStats(s);s.satiety=foodClamp(s.satiety-FOOD_DECAY_PER_SEC*dt,0,100);}
 }
