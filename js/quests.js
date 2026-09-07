@@ -26,25 +26,26 @@
  function snapshot(){ return {fed:S().fed, cleaned:S().cleaned, bred:S().bred, ordered:S().ordered, sold:S().sold, decor:decorCount(), tank:tankCount(), area:area()}; }
 
  const ORIGINAL_QUESTS=[
-  {t:'ให้อาหารทากทะเล', h:'คลิกเข้าตู้ แล้วลองวางอาหารให้ทากสักตัว', cond:b=>S().fed>b.fed, reward:{coin:50, rep:0, txt:'ปลดล็อกอาหารที่ดีขึ้น'}},
-  {t:'ทำความสะอาดตู้', h:'ในตู้มีปุ่มทำความสะอาด ลองขัดคราบสาหร่ายให้เอี่ยม', cond:b=>S().cleaned>b.cleaned, reward:{coin:40, rep:0, txt:'ได้แปรงขัดตู้'}},
-  {t:'แต่งร้านสักหน่อย', h:'เข้าโหมดก่อสร้าง (🔧) ซื้อของตกแต่งมาวางในร้าน 1 ชิ้น', cond:b=>decorCount()>b.decor, reward:{coin:40, rep:0, txt:'ปลดล็อกชุดตกแต่งใหม่'}},
-  {t:'ทำประตูเข้าร้าน', h:'โหมดก่อสร้าง → ปุ่ม 🚪 ประตู เลือกตำแหน่งบนกำแพง วางประตูให้ลูกค้าเดินเข้าได้', cond:b=>!!G.door, reward:{coin:40, rep:0, txt:'ลูกค้าเดินเข้าร้านได้แล้ว'}},
-  {t:'เพิ่มความดึงดูดของร้าน', h:'ซื้อของตกแต่งเพิ่ม (และมีทากอยู่ในตู้) ให้ค่าความดึงดูดแตะ 6', cond:b=>attraction()>=6, reward:{coin:1200, rep:0, txt:'ร้านน่าเข้า ลูกค้าเริ่มแวะ — ได้ทุนก้อนไปเปิดตู้เพาะพันธุ์!'}},
-  {t:'สร้างโต๊ะเพาะพันธุ์', h:'ในร้านค้า (โหมดก่อสร้าง) มีตู้เพาะพันธุ์ 3 ส่วน วางลงไป', cond:b=>breederExists(), reward:{coin:0, rep:2, txt:'ปลดล็อกการเพาะพันธุ์'}},
-  {t:'ผสมพันธุ์ทากคู่แรก', h:'เข้าตู้เพาะ เลือกทากว่าง 2 ตัว แล้วเริ่มผสมพันธุ์', cond:b=>S().bred>b.bred, reward:{coin:80, rep:1, txt:'รอลูกทากตัวแรกได้เลย'}},
-  {t:'วางเคาน์เตอร์ขายทาก', h:'โหมดก่อสร้าง → วางเคาน์เตอร์ (ฟรี) ไว้ให้ลูกค้ามาเสนอราคาซื้อทาก', cond:b=>(G.objs||[]).some(o=>o&&o.type==='deco'&&o._key==='counter'), reward:{coin:0, rep:1, txt:'พร้อมขายทากแล้ว'}},
-  {t:'ขายทากให้ลูกค้า', h:'รอลูกค้าเดินมาที่เคาน์เตอร์เสนอราคา แล้วกดขาย — ขายลูกที่เพาะได้ อย่าขายคู่พ่อแม่', cond:b=>S().sold>b.sold, reward:{coin:100, rep:1, txt:'นี่คือรายได้หลักของร้าน'}},
-  {t:'ขายทากอีกตัว', h:'ทากที่ผสมจนหมดพลังก็ยังขายได้ ลองปล่อยของอีกตัว', cond:b=>S().sold>b.sold, reward:{coin:800, rep:1, txt:'ทุนก้อนไว้สั่งกล่องทากตัวต่อไป'}},
-  {t:'สั่งกล่องทากจากคอม', h:'คลิกคอมพิวเตอร์บนเคาน์เตอร์ → สั่งกล่องทาก แล้วรอส่ง ~1 นาที', cond:b=>S().ordered>b.ordered, reward:{coin:0, rep:2, txt:'ปลดล็อกกล่องยีนกว้างขึ้น'}},
-  {t:'ซื้อตู้ใหม่', h:'ทากเริ่มเยอะ ซื้อตู้เพิ่มไว้เก็บอีกใบ', cond:b=>tankCount()>b.tank, reward:{coin:150, rep:0, txt:'ปลดล็อกตู้ขนาดอื่น'}},
-  {t:'ขยายร้าน', h:'โหมดก่อสร้าง → เลือกช่องขยายร้าน เพิ่มพื้นที่', cond:b=>area()>b.area, reward:{coin:200, rep:0, txt:'พื้นที่มากขึ้น วางของได้เยอะขึ้น'}},
-  {t:'ขายทากให้ครบ 5 ตัว', h:'ระบายทากส่วนเกินที่เพาะไว้ให้ลูกค้า', cond:b=>S().sold>=b.sold+5, reward:{coin:100, rep:2, txt:'ปลดล็อกพ่อค้ารับเหมา (เร็ว ๆ นี้)'}},
+  {t:'ให้อาหารทากทะเล', h:'คลิกเข้าตู้ แล้วลองวางอาหารให้ทากสักตัว', cond:b=>S().fed>b.fed, reward:{coin:50, rep:0, txt:'ปลดล็อกอาหารที่ดีขึ้น'}, btn:'#mView'},
+  {t:'ทำความสะอาดตู้', h:'ในตู้มีปุ่มทำความสะอาด ลองขัดคราบสาหร่ายให้เอี่ยม', cond:b=>S().cleaned>b.cleaned, reward:{coin:40, rep:0, txt:'ได้แปรงขัดตู้'}, btn:'#mView'},
+  {t:'แต่งร้านสักหน่อย', h:'เข้าโหมดก่อสร้าง (🔧) ซื้อของตกแต่งมาวางในร้าน 1 ชิ้น', cond:b=>decorCount()>b.decor, reward:{coin:40, rep:0, txt:'ปลดล็อกชุดตกแต่งใหม่'}, btn:'#mBuild'},
+  {t:'ทำประตูเข้าร้าน', h:'โหมดก่อสร้าง → ปุ่ม 🚪 ประตู เลือกตำแหน่งบนกำแพง วางประตูให้ลูกค้าเดินเข้าได้', cond:b=>!!G.door, reward:{coin:40, rep:0, txt:'ลูกค้าเดินเข้าร้านได้แล้ว'}, btn:'button[onclick^="placeEntrance"]'},
+  {t:'เพิ่มความดึงดูดของร้าน', h:'ซื้อของตกแต่งเพิ่ม (และมีทากอยู่ในตู้) ให้ค่าความดึงดูดแตะ 6', cond:b=>attraction()>=6, reward:{coin:1200, rep:0, txt:'ร้านน่าเข้า ลูกค้าเริ่มแวะ — ได้ทุนก้อนไปเปิดตู้เพาะพันธุ์!'}, btn:'#mBuild'},
+  {t:'สร้างโต๊ะเพาะพันธุ์', h:'ในร้านค้า (โหมดก่อสร้าง) มีตู้เพาะพันธุ์ 3 ส่วน วางลงไป', cond:b=>breederExists(), reward:{coin:0, rep:2, txt:'ปลดล็อกการเพาะพันธุ์'}, btn:'#mBuild'},
+  {t:'ผสมพันธุ์ทากคู่แรก', h:'เข้าตู้เพาะ เลือกทากว่าง 2 ตัว แล้วเริ่มผสมพันธุ์', cond:b=>S().bred>b.bred, reward:{coin:80, rep:1, txt:'รอลูกทากตัวแรกได้เลย'}, btn:'#mView'},
+  {t:'วางเคาน์เตอร์ขายทาก', h:'โหมดก่อสร้าง → วางเคาน์เตอร์ (ฟรี) ไว้ให้ลูกค้ามาเสนอราคาซื้อทาก', cond:b=>(G.objs||[]).some(o=>o&&o.type==='deco'&&o._key==='counter'), reward:{coin:0, rep:1, txt:'พร้อมขายทากแล้ว'}, btn:'#mBuild'},
+  {t:'ขายทากให้ลูกค้า', h:'รอลูกค้าเดินมาที่เคาน์เตอร์เสนอราคา แล้วกดขาย — ขายลูกที่เพาะได้ อย่าขายคู่พ่อแม่', cond:b=>S().sold>b.sold, reward:{coin:100, rep:1, txt:'นี่คือรายได้หลักของร้าน'}, btn:'#mView'},
+  {t:'ขายทากอีกตัว', h:'ทากที่ผสมจนหมดพลังก็ยังขายได้ ลองปล่อยของอีกตัว', cond:b=>S().sold>b.sold, reward:{coin:800, rep:1, txt:'ทุนก้อนไว้สั่งกล่องทากตัวต่อไป'}, btn:'#mView'},
+  {t:'สั่งกล่องทากจากคอม', h:'คลิกคอมพิวเตอร์บนเคาน์เตอร์ → สั่งกล่องทาก แล้วรอส่ง ~1 นาที', cond:b=>S().ordered>b.ordered, reward:{coin:0, rep:2, txt:'ปลดล็อกกล่องยีนกว้างขึ้น'}, btn:'#mView'},
+  {t:'ซื้อตู้ใหม่', h:'ทากเริ่มเยอะ ซื้อตู้เพิ่มไว้เก็บอีกใบ', cond:b=>tankCount()>b.tank, reward:{coin:150, rep:0, txt:'ปลดล็อกตู้ขนาดอื่น'}, btn:'#mBuild'},
+  {t:'ขยายร้าน', h:'โหมดก่อสร้าง → เลือกช่องขยายร้าน เพิ่มพื้นที่', cond:b=>area()>b.area, reward:{coin:200, rep:0, txt:'พื้นที่มากขึ้น วางของได้เยอะขึ้น'}, btn:'#mBuild'},
+  {t:'ขายทากให้ครบ 5 ตัว', h:'ระบายทากส่วนเกินที่เพาะไว้ให้ลูกค้า', cond:b=>S().sold>=b.sold+5, reward:{coin:100, rep:2, txt:'ปลดล็อกพ่อค้ารับเหมา (เร็ว ๆ นี้)'}, btn:'#mView'},
+  {t:'เปิดร้านรับลูกค้า', h:'กดปุ่ม 👥 ลูกค้า ที่แถบบนขวา เพื่อเปิดร้านให้ลูกค้าเดินเข้ามาซื้อ', cond:b=>shopOpen(), reward:{coin:0, rep:1, box:0, txt:'เปิดร้านแล้ว! รับกล่องสุ่มทากไปเริ่มต้น 1 กล่อง'}, btn:'#bPeople'},
  ];
 
  // Stable IDs preserve earned rewards when tutorial order changes.
  ORIGINAL_QUESTS.forEach((q,i)=>q.id='tutorial-'+i);
- const QUESTS=[3,7,0,2,4,5,6,8,9,10,11,12,1,13].map(i=>ORIGINAL_QUESTS[i]);
+ const QUESTS=[3,14,7,0,2,4,5,6,8,9,10,11,12,1,13].map(i=>ORIGINAL_QUESTS[i]);
  if(G.questOrderVersion!==2){
   const oldIndex=Math.max(0,Math.min(ORIGINAL_QUESTS.length,G.questIndex||0)),oldId=ORIGINAL_QUESTS[oldIndex]?.id;
   G.questCompleted=ORIGINAL_QUESTS.slice(0,G.questDone?ORIGINAL_QUESTS.length:oldIndex).map(q=>q.id);
@@ -52,6 +53,11 @@
   G.questDone=G.questIndex<0;if(G.questDone)G.questIndex=QUESTS.length;
   else if(QUESTS[G.questIndex].id!==oldId)G.questBase=snapshot();
   G.questOrderVersion=2;
+ }
+ if(G.questOrderVersion===2){
+  G.questIndex=QUESTS.findIndex(q=>!G.questCompleted.includes(q.id));
+  G.questDone=G.questIndex<0; if(G.questDone)G.questIndex=QUESTS.length; else G.questBase=snapshot();
+  G.questOrderVersion=3;
  }
  if(!Array.isArray(G.questCompleted))G.questCompleted=[];
  if(!G.questBase || typeof G.questBase!=='object') G.questBase=snapshot();
@@ -79,7 +85,14 @@
  let questCollapsed=false; try{ questCollapsed=localStorage.getItem('questCardCollapsed')==='1'; }catch(e){}
  function questHeader(label){ return '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between"><span style="font-size:11px;letter-spacing:.5px;opacity:.75">'+label+'</span><button id="questToggle" title="ย่อ/ขยาย" style="all:unset;cursor:pointer;color:#f1c66d;font-weight:700;font-size:16px;line-height:1;padding:0 4px">'+(questCollapsed?'▸':'▾')+'</button></div>'; }
  function bindToggle(){ const b=card.querySelector('#questToggle'); if(b) b.onclick=()=>{ questCollapsed=!questCollapsed; try{localStorage.setItem('questCardCollapsed',questCollapsed?'1':'0');}catch(e){} renderCard(); }; }
+ /* ---- ไฟกะพริบรอบปุ่มของเควสปัจจุบัน (หยุดเมื่อกดปุ่ม หรือจบเควส) ---- */
+ let _glowEl=null,_glowSel=null,_glowHandler=null,_glowPressedQuest=null;
+ (function(){ if(document.getElementById('questGlowCSS'))return; const st=document.createElement('style'); st.id='questGlowCSS'; st.textContent='@keyframes questGlowPulse{0%,100%{box-shadow:0 0 0 0 rgba(241,198,109,.65),0 0 8px 2px rgba(241,198,109,.5)}50%{box-shadow:0 0 0 4px rgba(241,198,109,.12),0 0 18px 7px rgba(241,198,109,.9)}}.quest-glow{animation:questGlowPulse 1.05s ease-in-out infinite;border-color:#f1c66d !important;position:relative;z-index:6}'; document.head.appendChild(st); })();
+ function clearGlow(){ if(_glowEl){ _glowEl.classList.remove('quest-glow'); if(_glowHandler)_glowEl.removeEventListener('pointerdown',_glowHandler); } _glowEl=null;_glowSel=null;_glowHandler=null; }
+ function applyGlow(sel,qid){ if(sel===_glowSel&&_glowEl&&document.body.contains(_glowEl))return; clearGlow(); const el=document.querySelector(sel); if(!el)return; el.classList.add('quest-glow'); _glowEl=el;_glowSel=sel; _glowHandler=function(){ _glowPressedQuest=qid; clearGlow(); }; el.addEventListener('pointerdown',_glowHandler,{once:true}); }
+ function updateQuestGlow(){ const cq=G.questDone?null:QUESTS[G.questIndex]; if(cq&&cq.btn&&_glowPressedQuest!==cq.id) applyGlow(cq.btn,cq.id); else clearGlow(); }
  function renderCard(){
+  updateQuestGlow();
   if(G.questDone){ card.innerHTML=questHeader('เควส')+(questCollapsed?'':'<div style="font-weight:600;color:#f1c66d;margin-top:3px">🎉 จบบทเรียนเริ่มต้น</div><div style="opacity:.85;margin-top:3px">เปิดร้านเพาะทากได้เต็มตัวแล้ว ลุยเลย!</div>'); bindToggle(); return; }
   const i=G.questIndex, q=QUESTS[i]; if(!q){ G.questDone=true; renderCard(); return; }
   if(questCollapsed){ card.innerHTML=questHeader('เควส '+(i+1)+' / '+QUESTS.length+' · '+q.t); bindToggle(); return; }
@@ -95,6 +108,7 @@
   const r=q.reward||{};
   if(r.coin) G.coin=(G.coin||0)+r.coin;
   if(r.rep)  G.rep =(G.rep||0)+r.rep;
+  if(Number.isFinite(r.box)&&typeof SLUG_BOXES!=='undefined'&&typeof rollBoxGenes==='function'){const _bx=SLUG_BOXES[r.box];if(_bx){const _has=(G.objs||[]).some(o=>o&&o._key==='counter');if(_has&&typeof slugDeliveries==='function')slugDeliveries().push({id:'quest'+Date.now()+'_'+Math.floor(Math.random()*10000),boxIndex:r.box,name:_bx.name,readyAt:Date.now()+1500,genes:rollBoxGenes(_bx),alerted:false});else if(Array.isArray(G.inv)&&typeof makeSlug==='function')G.inv.push(makeSlug(rollBoxGenes(_bx)));}}
   const parts=[]; if(r.coin)parts.push('+'+r.coin+' เหรียญ'); if(r.rep)parts.push('+'+r.rep+' ชื่อเสียง');
   if(typeof toast==='function') toast('✅ เควสสำเร็จ: '+q.t+(parts.length?' · '+parts.join(' · '):'')+(r.txt?' · '+r.txt:''),'good');
   if(typeof syncHUD==='function') syncHUD();
@@ -105,6 +119,7 @@
   G.questIndex++;
   while(G.questIndex<QUESTS.length&&G.questCompleted.includes(QUESTS[G.questIndex].id))G.questIndex++;
   if(G.questIndex>=QUESTS.length) G.questDone=true; else G.questBase=snapshot();
+  _glowPressedQuest=null;
   if(typeof saveGame==='function') saveGame();
   renderCard();
  }
