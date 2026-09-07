@@ -1,6 +1,8 @@
 /* Offers are temporary; only accepted sales alter the saved collection. */
 const TRADE_GENES={bodyDepth:'ร่องสีตัว',gillDepth:'ร่องสีหงอน',girth:'ขนาดตัว',len:'ความยาว',gillLen:'ความยาวเหงือก',tentLen:'ความยาวหนวด',vigor:'ความแข็งแรง'};
 const TRADE_OFFERS=[];
+const BASE_SELL=100; // ราคาพื้นฐานทากที่ไม่ตรงยีนผู้ซื้อ (ขายได้ทุกตัว)
+function totalShopSlugs(){let n=(G.inv||[]).length;for(const o of [...(G.objs||[]),...(G.shelter||[])])if(o.type==='tank')n+=(o.slugs||[]).length;return n;}
 let tradeSeq=0,tradeHudTime=0;
 function tradeConditionPrice(a,b){return Math.round(Math.max(100,1000/(1+Math.abs(b-a)/5)));}
 function makeBuyerPreferences(){
@@ -36,7 +38,7 @@ function tryCustomerOffer(p,tank){
     const bid=priceSlugOffer(slug,p.preferences);
     if(bid.price&&(!best||bid.price>best.price))best={slug,...bid};
   }
-  if(!best)return false;
+  if(!best){const free=tank.slugs.find(s=>!TRADE_OFFERS.some(o=>o.slug===s));if(!free)return false;best={slug:free,matched:[],price:BASE_SELL};}
   for(const counter of G.objs.filter(c=>c._key==='counter'&&c!==moving)){
     if(TRADE_OFFERS.some(o=>o.counter===counter))continue;
     const target=freeSpot([counterFront(counter)],p);if(!target)continue;
@@ -53,9 +55,10 @@ function finishTrade(id,accept=false){
   if(accept){
     if(!o.arrived||!PEOPLE.includes(o.p)||!G.objs.includes(o.counter)||o.counter===moving||o.cx!==o.counter.cx||o.cy!==o.counter.cy||o.rot!==o.counter.rot||!G.objs.includes(o.tank)||!o.tank.slugs.includes(o.slug)){finishTrade(id);return;}
     if(typeof heldSlug!=='undefined'&&heldSlug===o.slug){toast('วางทากกลับตู้ก่อน');return;}
+    if(totalShopSlugs()<=2){toast('ต้องเหลือทากในร้านอย่างน้อย 2 ตัว จึงยังขายไม่ได้','bad');return;}
     const bid=priceSlugOffer(o.slug,o.p.preferences);
-    if(!bid.price){toast('ทากไม่ตรงเงื่อนไขแล้ว','bad');finishTrade(id);return;}
-    if(bid.price!==o.price){o.price=bid.price;o.matched=bid.matched;renderTradeOffers(true);toast('ราคาเปลี่ยน กรุณาตรวจราคาก่อนยืนยัน','bad');return;}
+    const price=bid.price||BASE_SELL;
+    if(price!==o.price){o.price=price;o.matched=bid.matched;renderTradeOffers(true);toast('ราคาเปลี่ยน กรุณาตรวจราคาก่อนยืนยัน','bad');return;}
     o.tank.slugs.splice(o.tank.slugs.indexOf(o.slug),1);G.coin+=o.price;if(G.stats)G.stats.sold=(G.stats.sold||0)+1;
     if(typeof selSlug!=='undefined'&&selSlug===o.slug)selSlug=null;
     toast('ขายทาก +'+o.price+' เหรียญ','good');
@@ -79,16 +82,16 @@ function tradeAlternatives(o){
   for(const tank of G.objs){if(tank.type!=='tank'||tank===moving)continue;
     for(const slug of tank.slugs){
       if(TRADE_OFFERS.some(other=>other!==o&&other.slug===slug))continue;
-      const bid=priceSlugOffer(slug,o.p.preferences);if(bid.price)choices.push({tank,slug,...bid});
+      const bid=priceSlugOffer(slug,o.p.preferences);choices.push({tank,slug,matched:bid.matched,price:bid.price||BASE_SELL});
     }
   }return choices.sort((a,b)=>b.price-a.price);
 }
 function chooseTradeSlug(id,index){
   const o=TRADE_OFFERS.find(o=>o.id===id),choice=o?.choices?.[index];if(!o||!choice)return;
   if(!G.objs.includes(choice.tank)||!choice.tank.slugs.includes(choice.slug)||TRADE_OFFERS.some(q=>q!==o&&q.slug===choice.slug)){toast('ทากตัวนี้ไม่พร้อมขายแล้ว','bad');renderTradeOffers(true);return;}
-  const bid=priceSlugOffer(choice.slug,o.p.preferences);if(!bid.price)return;
+  const bid=priceSlugOffer(choice.slug,o.p.preferences);
   o.requestedId ||= o.slug.id;
-  o.slug=choice.slug;o.tank=choice.tank;o.price=bid.price;o.matched=bid.matched;
+  o.slug=choice.slug;o.tank=choice.tank;o.price=bid.price||BASE_SELL;o.matched=bid.matched;
   renderTradeOffers(true);
 }
 function inspectTradeSlug(id){
