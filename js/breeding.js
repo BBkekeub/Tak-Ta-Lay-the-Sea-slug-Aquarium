@@ -107,7 +107,7 @@ function renderBreederUI(){
  breederPanel.querySelector('#startBreeder').onclick=()=>openBreedingPicker(o);breederPanel.querySelectorAll('[data-egg]').forEach(el=>el.onclick=()=>hatchBreedingEgg(o,+el.dataset.egg));
 }
 document.getElementById('tankCv').addEventListener('pointerdown',e=>{if(!tankMode||!isBreeder(curTank))return;const r=e.currentTarget.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;const b=breederState(curTank),i=b.eggs.findIndex(egg=>!egg.open&&egg._hit&&egg._hit.points?.some(p=>Math.hypot(x-p.x,y-p.y)<egg._hit.r));if(i>=0&&b.phase==='hatching'){e.stopImmediatePropagation();e.preventDefault();hatchBreedingEgg(curTank,i);}},true);
-let breedingLast=performance.now();setInterval(()=>{const now=performance.now(),dt=Math.min(1,(now-breedingLast)/1000);breedingLast=now;for(const o of [...G.objs,...G.shelter])if(isBreeder(o))tickBreeder(o,dt);renderBreederUI();},250);
+let breedingLast=performance.now();setInterval(()=>{const now=performance.now(),dt=Math.min(1,(now-breedingLast)/1000);breedingLast=now;if(typeof tankCleanliness!=='function')return;for(const o of [...G.objs,...G.shelter])if(isBreeder(o))tickBreeder(o,dt);renderBreederUI();},250);
 
 function walkBreedingZone(s,dt){
  if(s===heldSlug)return;
