@@ -832,12 +832,12 @@ const FACE = {
      ถ้าจะเอากลับ ใส่ {u:0.1365, v:0.8778, hR:0.017, ar:1, rot:0, flip:false} */
   mouth: null
 };
-function drawFace(ctx,bw,bh,D){
+function drawFace(ctx,bw,bh,D,noEyes){
   ctx.save();
   /* ตา/ปาก: วาดอาร์ตดิบ ไม่แมปสีเลย — ลูกตาต้องดำสนิทและไฮไลท์ต้องขาวเสมอ
      ห้ามส่งเข้า gradMap ด้วยวัสดุผิว (พอตัวเป็นทอง ตากลายเป็นน้ำตาลอ่อน = จางตามสีตัว) */
   const em=META.eye, eyeC=A.eye;
-  FACE.eyes.forEach(E=>{
+  if(!noEyes) FACE.eyes.forEach(E=>{
     const d=bh*E.hR, ew=d*(E.ar||1);
     ctx.save(); ctx.translate(E.u*bw, E.v*bh); ctx.rotate((E.rot||0)*Math.PI/180);
     ctx.drawImage(eyeC, -ew/2, -d/2, ew, d); ctx.restore();
@@ -1244,7 +1244,7 @@ function drawSlug(ctx, P, cx, cy, flip, phase, scale, detail, moving, pose){
   (P.stalksBack||P.stalks.filter(o=>o.back)).forEach(stalk);
   (P.rhinosBack||P.rhinos.filter(o=>o.back)).forEach(rhino);
   ctx.drawImage(P.bodyC, 0, 0);
-  drawFace(ctx, P.bw, P.bh, D);
+  drawFace(ctx, P.bw, P.bh, D, pose.noEyes);
   (P.stalksFront||P.stalks.filter(o=>!o.back).sort((a,b)=>a.d-b.d)).forEach(stalk);
   /* ออร่ารอบพุ่มหงอนใช้ radial gradient หลายชั้น แพงเกินจะทำทุกเฟรมกับการ์ดหลายสิบใบ
      เปิดเฉพาะฉากใหญ่ (อ่างผสม) ที่เห็นผลจริง — บนการ์ด 108 px แทบมองไม่ออกอยู่แล้ว */
