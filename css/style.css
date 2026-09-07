@@ -259,3 +259,6 @@ kbd{font-family:"IBM Plex Mono",monospace; font-size:10.5px; background:#0C0C0F;
 #tradeOffers .trade-condition.matched{border-color:#6ed2a4;background:#123d32b3;color:#c0ffdb}
 #tradeOffers .trade-actions{display:flex;gap:8px;margin-top:8px}#tradeOffers .trade-actions .tbtn{min-height:43px}
 #tradeOffers .trade-accept{flex:1;background:#d5b260;border:1px solid #ffe2a0;color:#192928;font-weight:750;box-shadow:0 2px 5px #0003}#tradeOffers .trade-accept:hover{background:#ebc978}#tradeOffers .trade-accept:disabled{opacity:.45;cursor:default}
+
+/* คอมพิวเตอร์ร้าน — ปุ่มแท็บห้ามตัดคำกลางปุ่ม จะได้เรียงเป็นแถวเดียว */
+#counterComputer .tbtn{white-space:nowrap}

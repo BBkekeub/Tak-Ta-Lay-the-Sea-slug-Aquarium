@@ -208,7 +208,7 @@ function drawCounterComputerAt(o,actual){
  if(computerUnread()||TRADE_OFFERS.some(t=>t.counter===actual&&t.arrived)||(typeof slugDeliveryReadyCount==='function'&&slugDeliveryReadyCount()>0)){const q=counterLocal(o.def,o.rot,12,14),p=P(o.cx+q[0],o.cy+q[1],24*ZUNIT),pulse=Math.sin(performance.now()/260);ctx.save();ctx.translate(p.x,p.y-3*pulse);ctx.fillStyle='#f1c66d';ctx.beginPath();ctx.arc(0,0,Math.max(14,20*cam.zoom),0,Math.PI*2);ctx.fill();ctx.fillStyle='#56352a';ctx.font='bold '+Math.max(18,26*cam.zoom)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('!!',0,1);ctx.restore();}
 }
 let computerTab='inbox';   // แท็บที่เปิดอยู่ในคอมพิวเตอร์ร้าน: 'inbox' | 'log'
-const computerDialog=document.createElement('dialog');computerDialog.id='counterComputer';computerDialog.style.cssText='width:min(640px,90vw);max-height:80vh;overflow:auto;padding:22px;background:#172b2e;color:#e5dcc4;border:1px solid #b59859;border-radius:14px;color-scheme:dark';document.body.append(computerDialog);
+const computerDialog=document.createElement('dialog');computerDialog.id='counterComputer';computerDialog.style.cssText='width:min(900px,94vw);max-height:80vh;overflow:auto;padding:22px;background:#172b2e;color:#e5dcc4;border:1px solid #b59859;border-radius:14px;color-scheme:dark';document.body.append(computerDialog);
 function openCounterComputer(){renderComputer();if(!computerDialog.open)computerDialog.showModal();}
 function renderComputer(){
  const _inUnread=computerInbox().filter(m=>!m.read).length;
