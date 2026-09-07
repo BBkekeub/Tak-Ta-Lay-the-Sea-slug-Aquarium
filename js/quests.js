@@ -29,11 +29,11 @@
   {t:'ให้อาหารทากทะเล', h:'คลิกเข้าตู้ แล้วลองวางอาหารให้ทากสักตัว', cond:b=>S().fed>b.fed, reward:{coin:50, rep:0, txt:'ปลดล็อกอาหารที่ดีขึ้น'}, btn:'#mView'},
   {t:'ทำความสะอาดตู้', h:'ในตู้มีปุ่มทำความสะอาด ลองขัดคราบสาหร่ายให้เอี่ยม', cond:b=>S().cleaned>b.cleaned, reward:{coin:40, rep:0, txt:'ได้แปรงขัดตู้'}, btn:'#mView'},
   {t:'แต่งร้านสักหน่อย', h:'เข้าโหมดก่อสร้าง (🔧) ซื้อของตกแต่งมาวางในร้าน 1 ชิ้น', cond:b=>decorCount()>b.decor, reward:{coin:40, rep:0, txt:'ปลดล็อกชุดตกแต่งใหม่'}, btn:'#mBuild'},
-  {t:'ทำประตูเข้าร้าน', h:'โหมดก่อสร้าง → ปุ่ม 🚪 ประตู เลือกตำแหน่งบนกำแพง วางประตูให้ลูกค้าเดินเข้าได้', cond:b=>!!G.door, reward:{coin:40, rep:0, txt:'ลูกค้าเดินเข้าร้านได้แล้ว'}, btn:'button[onclick^="placeEntrance"]'},
+  {t:'ทำประตูเข้าร้าน', h:'โหมดก่อสร้าง → ปุ่ม 🚪 ประตู เลือกตำแหน่งบนกำแพง วางประตูให้ลูกค้าเดินเข้าได้', cond:b=>!!G.door, reward:{coin:40, rep:0, txt:'ลูกค้าเดินเข้าร้านได้แล้ว'}, btn:['button[onclick^="placeEntrance"]','#mBuild']},
   {t:'เพิ่มความดึงดูดของร้าน', h:'ซื้อของตกแต่งเพิ่ม (และมีทากอยู่ในตู้) ให้ค่าความดึงดูดแตะ 6', cond:b=>attraction()>=6, reward:{coin:1200, rep:0, txt:'ร้านน่าเข้า ลูกค้าเริ่มแวะ — ได้ทุนก้อนไปเปิดตู้เพาะพันธุ์!'}, btn:'#mBuild'},
   {t:'สร้างโต๊ะเพาะพันธุ์', h:'ในร้านค้า (โหมดก่อสร้าง) มีตู้เพาะพันธุ์ 3 ส่วน วางลงไป', cond:b=>breederExists(), reward:{coin:0, rep:2, txt:'ปลดล็อกการเพาะพันธุ์'}, btn:'#mBuild'},
   {t:'ผสมพันธุ์ทากคู่แรก', h:'เข้าตู้เพาะ เลือกทากว่าง 2 ตัว แล้วเริ่มผสมพันธุ์', cond:b=>S().bred>b.bred, reward:{coin:80, rep:1, txt:'รอลูกทากตัวแรกได้เลย'}, btn:'#mView'},
-  {t:'วางเคาน์เตอร์ขายทาก', h:'โหมดก่อสร้าง → วางเคาน์เตอร์ (ฟรี) ไว้ให้ลูกค้ามาเสนอราคาซื้อทาก', cond:b=>(G.objs||[]).some(o=>o&&o.type==='deco'&&o._key==='counter'), reward:{coin:0, rep:1, txt:'พร้อมขายทากแล้ว'}, btn:'#mBuild'},
+  {t:'วางเคาน์เตอร์ขายทาก', h:'โหมดก่อสร้าง → วางเคาน์เตอร์ (ฟรี) ไว้ให้ลูกค้ามาเสนอราคาซื้อทาก', cond:b=>(G.objs||[]).some(o=>o&&o.type==='deco'&&o._key==='counter'), reward:{coin:0, rep:1, txt:'พร้อมขายทากแล้ว'}, btn:['button[onclick^="placeTradeCounter"]','#mBuild']},
   {t:'ขายทากให้ลูกค้า', h:'รอลูกค้าเดินมาที่เคาน์เตอร์เสนอราคา แล้วกดขาย — ขายลูกที่เพาะได้ อย่าขายคู่พ่อแม่', cond:b=>S().sold>b.sold, reward:{coin:100, rep:1, txt:'นี่คือรายได้หลักของร้าน'}, btn:'#mView'},
   {t:'ขายทากอีกตัว', h:'ทากที่ผสมจนหมดพลังก็ยังขายได้ ลองปล่อยของอีกตัว', cond:b=>S().sold>b.sold, reward:{coin:800, rep:1, txt:'ทุนก้อนไว้สั่งกล่องทากตัวต่อไป'}, btn:'#mView'},
   {t:'สั่งกล่องทากจากคอม', h:'คลิกคอมพิวเตอร์บนเคาน์เตอร์ → สั่งกล่องทาก แล้วรอส่ง ~1 นาที', cond:b=>S().ordered>b.ordered, reward:{coin:0, rep:2, txt:'ปลดล็อกกล่องยีนกว้างขึ้น'}, btn:'#mView'},
@@ -87,9 +87,26 @@
  function bindToggle(){ const b=card.querySelector('#questToggle'); if(b) b.onclick=()=>{ questCollapsed=!questCollapsed; try{localStorage.setItem('questCardCollapsed',questCollapsed?'1':'0');}catch(e){} renderCard(); }; }
  /* ---- ไฟกะพริบรอบปุ่มของเควสปัจจุบัน (หยุดเมื่อกดปุ่ม หรือจบเควส) ---- */
  let _glowEl=null,_glowSel=null,_glowHandler=null,_glowPressedQuest=null;
- (function(){ if(document.getElementById('questGlowCSS'))return; const st=document.createElement('style'); st.id='questGlowCSS'; st.textContent='@keyframes questGlowPulse{0%,100%{box-shadow:0 0 0 0 rgba(241,198,109,.65),0 0 8px 2px rgba(241,198,109,.5)}50%{box-shadow:0 0 0 4px rgba(241,198,109,.12),0 0 18px 7px rgba(241,198,109,.9)}}.quest-glow{animation:questGlowPulse 1.05s ease-in-out infinite;border-color:#f1c66d !important;position:relative;z-index:6}'; document.head.appendChild(st); })();
+ (function(){ if(document.getElementById('questGlowCSS'))return; const st=document.createElement('style'); st.id='questGlowCSS'; st.textContent='/* วงในสำคัญกว่าวงนอก: .mbtn ไม่มี border (border-color จึงไม่มีผล) และ .modeseg มี overflow:hidden ที่ตัดเงาวงนอกทิ้งหมด — เงา inset วาดในตัวปุ่มเลย เลยไม่โดนตัดไม่ว่าปุ่มจะอยู่ในกล่องแบบไหน */@keyframes questGlowPulse{0%,100%{box-shadow:inset 0 0 0 1.5px rgba(241,198,109,.75),0 0 0 0 rgba(241,198,109,.65),0 0 8px 2px rgba(241,198,109,.5)}50%{box-shadow:inset 0 0 0 2.5px rgba(241,198,109,1),0 0 0 4px rgba(241,198,109,.12),0 0 18px 7px rgba(241,198,109,.9)}}.quest-glow{animation:questGlowPulse 1.05s ease-in-out infinite;border-color:#f1c66d !important;border-radius:8px;position:relative;z-index:6}'; document.head.appendChild(st); })();
  function clearGlow(){ if(_glowEl){ _glowEl.classList.remove('quest-glow'); if(_glowHandler)_glowEl.removeEventListener('pointerdown',_glowHandler); } _glowEl=null;_glowSel=null;_glowHandler=null; }
- function applyGlow(sel,qid){ if(sel===_glowSel&&_glowEl&&document.body.contains(_glowEl))return; clearGlow(); const el=document.querySelector(sel); if(!el)return; el.classList.add('quest-glow'); _glowEl=el;_glowSel=sel; _glowHandler=function(){ _glowPressedQuest=qid; clearGlow(); }; el.addEventListener('pointerdown',_glowHandler,{once:true}); }
+ /* ปุ่มเป้าหมายหลายตัวใน index.html อยู่ในแผง .buildonly ซึ่ง body.mode-view ตั้ง display:none ไว้
+    querySelector ยังเจอ element (มันอยู่ใน DOM เสมอ) แต่ผู้เล่นมองไม่เห็นไฟกะพริบเลย
+    จึงต้องเช็ก "มองเห็นได้จริง" แล้วถอยไปไฮไลต์ปุ่มทางผ่าน (🔧 ก่อสร้าง) แทน */
+ const _visible=el=>!!el&&!!(el.offsetWidth||el.offsetHeight||el.getClientRects().length);
+ function resolveGlow(btn){ const list=Array.isArray(btn)?btn:[btn]; for(const sel of list){ const el=document.querySelector(sel); if(_visible(el)) return {el:el,sel:sel,primary:sel===list[0]}; } return null; }
+ function applyGlow(btn,qid){
+  const hit=resolveGlow(btn);
+  if(!hit){ clearGlow(); return; }
+  if(hit.el===_glowEl) return;                      // ปุ่มเดิม ไม่ต้องผูกใหม่
+  clearGlow();
+  hit.el.classList.add('quest-glow'); _glowEl=hit.el; _glowSel=hit.sel;
+  _glowHandler=function(){
+   if(hit.primary) _glowPressedQuest=qid;           // กดปุ่มเป้าหมายจริง = เลิกกะพริบ
+   else setTimeout(updateQuestGlow,60);             // กดปุ่มทางผ่าน = ย้ายไฟไปปุ่มถัดไปทันที
+   clearGlow();
+  };
+  hit.el.addEventListener('pointerdown',_glowHandler,{once:true});
+ }
  function updateQuestGlow(){ const cq=G.questDone?null:QUESTS[G.questIndex]; if(cq&&cq.btn&&_glowPressedQuest!==cq.id) applyGlow(cq.btn,cq.id); else clearGlow(); }
  function renderCard(){
   updateQuestGlow();
