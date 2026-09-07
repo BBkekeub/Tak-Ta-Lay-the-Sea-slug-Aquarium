@@ -182,10 +182,15 @@
       return { genes: g, value: valueOf(g, target) };
     }).sort((a, b) => b.value - a.value);
   }
+  let _showcase = null, _showcaseFor = -1;
+  function getShowcase(m) {
+    if (!_showcase || _showcaseFor !== m.trend.refreshAt) { _showcase = genShowcase(m.trend.target); _showcaseFor = m.trend.refreshAt; }
+    return _showcase;
+  }
   function refreshTrend(m) {
     if (m.trend && m.trend.refreshAt > now()) return false;
     const target = trendTarget();
-    m.trend = { target, refreshAt: now() + REFRESH_MS, showcase: genShowcase(target) };
+    m.trend = { target, refreshAt: now() + REFRESH_MS };
     return true;
   }
 
@@ -302,8 +307,46 @@
   document.body.append(marketDialog);
   marketDialog.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') { e.preventDefault(); marketDialog.close(); } }, true);
 
+  /* ---------- แอนิเมชันทากตัวอย่าง + คลิกขยายดูตัวใหญ่ (เดินเฉพาะตอนหน้าต่างเปิด) ---------- */
+  function drawAnimPortrait(cv, slug, phase) {
+    if (!cv || !slug) return;
+    let P = null; try { P = (typeof slugPartsOf === 'function') ? slugPartsOf(slug) : null; } catch (e) {}
+    const ctx = cv.getContext('2d'), w = cv.width, h = cv.height;
+    ctx.clearRect(0, 0, w, h);
+    if (!P || typeof SlugEngine === 'undefined' || !SlugEngine.drawSlug) { try { drawSlugPortrait(cv, slug); } catch (e) {} return; }
+    const pad = Math.max(10, w * 0.08);
+    const scale = Math.min((w - pad * 2) / P.w, (h - pad * 2) / P.h);
+    const prev = SlugEngine.ANIM; SlugEngine.ANIM = true;
+    try { SlugEngine.drawSlug(ctx, P, w / 2, h / 2 + h * 0.06, false, phase, scale, false, true, slug); } catch (e) {}
+    SlugEngine.ANIM = prev;
+  }
+  const zoom = document.createElement('div');
+  zoom.id = 'wmZoom';
+  zoom.style.cssText = 'position:fixed;inset:0;background:rgba(8,14,16,.85);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:100000;cursor:zoom-out';
+  zoom.innerHTML = '<canvas id="wmZoomCv" width="520" height="380" style="max-width:88vw;max-height:66vh;background:#0f1e22;border-radius:16px;border:1px solid #b59859"></canvas><div id="wmZoomLabel" style="color:#e5dcc4;font-size:15px;font-weight:600"></div><div style="color:#9fbfb5;opacity:.6;font-size:12px">แตะที่ไหนก็ได้เพื่อปิด</div>';
+  document.body.append(zoom);
+  let _zoomGenes = null;
+  zoom.onclick = () => { zoom.style.display = 'none'; _zoomGenes = null; };
+  function openZoom(genes, value) { _zoomGenes = genes; const lb = document.getElementById('wmZoomLabel'); if (lb) lb.textContent = 'ราคากลาง ' + coin(value); zoom.style.display = 'flex'; startAnim(); }
+  let _animRAF = 0;
+  function animLoop(ts) {
+    _animRAF = 0;
+    const phase = ts / 620;
+    if (marketDialog.open) {
+      const m = market(), sc = getShowcase(m), key = m.trend.refreshAt;
+      sc.forEach((c, i) => drawAnimPortrait(marketDialog.querySelector(`[data-mk-show="${i}"]`), dispSlug('show' + i + key, c.genes), phase + i * 1.1));
+    }
+    if (_zoomGenes && zoom.style.display !== 'none') {
+      const g = {}; for (const k of GENE_KEYS) g[k] = clamp(+_zoomGenes[k] || 0, 0, GENE_RANGE[k]);
+      drawAnimPortrait(document.getElementById('wmZoomCv'), { id: 'wm-zoom', genes: g, traits: typeof slugTraits === 'function' ? slugTraits(g) : {} }, phase);
+    }
+    if (marketDialog.open || (_zoomGenes && zoom.style.display !== 'none')) _animRAF = requestAnimationFrame(animLoop);
+  }
+  function startAnim() { if (!_animRAF) _animRAF = requestAnimationFrame(animLoop); }
+
   let _avail = [];              // แคชแถว "เลือกทากลงขาย" ของการเรนเดอร์ล่าสุด
   const _askDraft = new Map();  // ราคาที่ผู้เล่นพิมพ์ค้างไว้ (slugId → ค่า) — กันหายตอนรีเฟรช
+  let _availFilter = '';
 
   const UNIFORM_BASE = GENE_KEYS.every(k => GENE_BASE[k] === GENE_BASE[GENE_KEYS[0]]) ? GENE_BASE[GENE_KEYS[0]] : null;
   const bandLabel = i => i === 0 ? MATCH_BANDS[0][0] + '%'
@@ -383,11 +426,15 @@
   }
 
   function renderMarket(full) {
-    const m = market(), t = m.trend;
+    const m = market(), t = m.trend, showcase = getShowcase(m);
     if (!full && marketDialog.querySelector('[data-mk-listings]')) return refreshLive();
 
-    _avail = availableSlugs().map(e => ({ ...e, target: t.target, value: valueOf(e.slug.genes, t.target) }))
-                             .sort((a, b) => b.value - a.value).slice(0, 60);
+    let _all = availableSlugs().map(e => ({ ...e, target: t.target, value: valueOf(e.slug.genes, t.target) }))
+                             .sort((a, b) => b.value - a.value);
+    const _q = _availFilter.trim().toLowerCase();
+    if (_q) _all = _all.filter(e => String(e.slug.id).toLowerCase().includes(_q));
+    const _total = _all.length;
+    _avail = _all.slice(0, 60);
     const listings = m.listings.slice().sort((a, b) => b.prog - a.prog);
 
     marketDialog.innerHTML =
@@ -397,21 +444,24 @@
       เทรนเปลี่ยนใน <b data-mk-refresh>${fmtLeft(t.refreshAt - now())}</b></p>
 
       <h3 style="margin:14px 0 6px">ทากตัวอย่างที่ตลาดต้องการตอนนี้</h3>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${t.showcase.map((c, i) =>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${showcase.map((c, i) =>
         `<div style="flex:1;min-width:120px;padding:8px;border:1px solid #47605f;border-radius:8px;text-align:center">
-          <canvas data-mk-show="${i}" width="120" height="84" style="width:100%;height:auto;background:#0f1e22;border-radius:6px"></canvas>
+          <canvas data-mk-show="${i}" width="240" height="168" style="width:100%;height:auto;background:#0f1e22;border-radius:6px;cursor:zoom-in"></canvas>
           <div style="margin-top:4px;font-size:12px">ราคากลาง <b>${coin(c.value)}</b></div></div>`).join('')}</div>
 
       <h3 style="margin:16px 0 6px">กำลังขาย (<span data-mk-count>${listings.length}</span>/${MAX_LIST})</h3>
       <div data-mk-listings>${listings.length ? listings.map(listingRowHtml).join('')
         : '<p style="font-size:12px;opacity:.7">ยังไม่มีทากในตลาด — เลือกจากด้านล่างมาลงขายได้เลย</p>'}</div>
 
-      <h3 style="margin:16px 0 6px">เลือกทากลงขาย</h3>
+      <h3 style="margin:16px 0 6px">เลือกทากลงขาย <span style="font-size:12px;font-weight:400;opacity:.6">(แสดง ${_avail.length}/${_total})</span></h3>
+      <input data-mk-filter placeholder="🔍 ค้นหาไอดีทาก..." value="${esc(_availFilter)}" style="width:100%;box-sizing:border-box;margin-bottom:6px;background:#0f1e22;color:#e5dcc4;border:1px solid #47605f;border-radius:6px;padding:7px 10px">
       <div style="max-height:38vh;overflow:auto;border:1px solid #33403f;border-radius:8px">
         ${_avail.length ? _avail.map(availRowHtml).join('')
           : '<p style="font-size:12px;opacity:.7;padding:8px">ไม่มีทากที่ลงขายได้ (ตัวที่กำลังผสม/ถือ/มีข้อเสนอ จะลงไม่ได้)</p>'}</div>`;
 
-    t.showcase.forEach((c, i) => paint(marketDialog.querySelector(`[data-mk-show="${i}"]`), 'show' + i + t.refreshAt, c.genes));
+    showcase.forEach((c, i) => paint(marketDialog.querySelector(`[data-mk-show="${i}"]`), 'show' + i + t.refreshAt, c.genes));
+    showcase.forEach((c, i) => { const cv = marketDialog.querySelector(`[data-mk-show="${i}"]`); if (cv) cv.onclick = () => openZoom(c.genes, c.value); });
+    startAnim();
     for (const L of listings) paint(marketDialog.querySelector(`[data-mk-list="${CSS.escape(L.key)}"]`), L.key, L.genes);
     _avail.forEach((e, i) => { const cv = marketDialog.querySelector(`[data-mk-avail="${i}"]`); if (cv) { try { drawSlugPortrait(cv, e.slug); } catch (err) {} } });
 
@@ -427,6 +477,8 @@
       input.oninput = upd; upd();
       marketDialog.querySelector(`[data-list="${i}"]`).onclick = () => listSlug(e, +input.value);
     });
+    const _flt = marketDialog.querySelector('[data-mk-filter]');
+    if (_flt) _flt.oninput = () => { _availFilter = _flt.value; renderMarket(true); const f2 = marketDialog.querySelector('[data-mk-filter]'); if (f2) { f2.focus(); const pcur = f2.value.length; try { f2.setSelectionRange(pcur, pcur); } catch (e) {} } };
   }
 
   function bindListingButtons() {
@@ -445,7 +497,7 @@
     const rf = marketDialog.querySelector('[data-mk-refresh]'); if (rf) rf.textContent = fmtLeft(m.trend.refreshAt - now());
   }
 
-  window.openWorldMarket = function () { renderMarket(true); if (!marketDialog.open) marketDialog.showModal(); };
+  window.openWorldMarket = function () { renderMarket(true); if (!marketDialog.open) marketDialog.showModal(); startAnim(); };
   window.WorldMarket = { market, listSlug, unlist, tick, valueOf, breakdown, matchPct, multOf,
                          timeToSell, simulate, GENE_BASE, GENE_RANGE, MATCH_BANDS, FULL_VALUE, FLOOR_VALUE };
 
