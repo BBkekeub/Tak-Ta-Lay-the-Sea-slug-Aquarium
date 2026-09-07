@@ -956,10 +956,9 @@ function buildDecorBar(){
   if(rm) rm.onclick=()=>{
     if(!curTank || !selDecor){ toast('เลือกของในตู้ก่อน (คลิกที่ของ)','bad'); return; }
     const i=curTank.decor.indexOf(selDecor);
-    if(i>=0){ const back=Math.round(decorPrice(selDecor.key)*DECO_REFUND);
-      curTank.decor.splice(i,1); G.coin+=back;
-      toast('เก็บ'+TANK_DECOR[selDecor.key].name+' +'+back,'good');
-      if(typeof syncHUD==='function')syncHUD(); }
+    if(i>=0){ curTank.decor.splice(i,1); G.decorCredit=(G.decorCredit||0)+1;
+      toast('เก็บ'+TANK_DECOR[selDecor.key].name+' · ได้ 1 เครดิต (ซื้อของตกแต่งฟรี 1 ชิ้น)','good');
+      if(typeof syncHUD==='function')syncHUD(); if(typeof saveGame==='function')saveGame(); if(typeof syncDecorBar==='function')syncDecorBar(); }
     selDecor=null; syncDecorBar();
   };
 }
@@ -1749,8 +1748,12 @@ tankCv.addEventListener('pointerup', e=>{
     const ny=snapCell(Math.max(DCELL,Math.min(curTank.def.h-DCELL, f.fy)));
     if(!canPlaceDecor(selDecorKey,nx,ny,placeFlip,null)){ toast('ตรงนี้วางไม่ได้ — ล้นขอบตู้ หรือทับพื้นที่ของชิ้นอื่น','bad'); return; }
     const _price=decorPrice(selDecorKey);
-    if(G.coin<_price){ toast('เหรียญไม่พอ ('+_price+')','bad'); return; }
-    G.coin-=_price; toast('วาง'+TANK_DECOR[selDecorKey].name+' −'+_price,'good');
+    let _free=false;
+    if((G.decorCredit||0)>0){ G.decorCredit--; _free=true; }
+    else if(G.coin<_price){ toast('เหรียญไม่พอ ('+_price+')','bad'); return; }
+    else G.coin-=_price;
+    toast('วาง'+TANK_DECOR[selDecorKey].name+(_free?' · ใช้เครดิต (ฟรี)':' −'+_price),'good');
+    if(typeof syncDecorBar==='function')syncDecorBar();
     if(typeof syncHUD==='function')syncHUD();
     curTank.decor=curTank.decor||[];
     curTank.decor.push({ key:selDecorKey, fx:nx, fy:ny, flip:placeFlip|0 });

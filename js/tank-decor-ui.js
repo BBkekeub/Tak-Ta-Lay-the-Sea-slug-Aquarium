@@ -23,6 +23,7 @@
  .decorNav{position:absolute;top:45px;bottom:10px;width:28px;border:0;border-radius:6px;background:#102426;color:#dcc78e;font-size:26px;cursor:pointer}.decorNav.prev{left:7px}.decorNav.next{right:7px}
  @media(max-width:700px){.decorSelection{left:110px;right:120px}.decor-open .decorTrayHead strong,.decor-open .decorTrayCount,.decor-open .decorTrayHead output{visibility:hidden}}
  .decorTabs{display:flex;gap:6px;height:27px}.decorTabs button{border:1px solid #52615a;border-radius:6px 6px 0 0;background:#20383a;color:#c3c9bd;padding:4px 16px;cursor:pointer;font-size:12px}.decorTabs button[aria-selected="true"]{color:#f0d390;background:#3b4638;border-color:#b59a5c;border-bottom:2px solid #e6c173}
+ .decorCreditBadge{position:absolute;top:2px;right:2px;background:#e6c173;color:#142b2d;font-size:10px;font-weight:700;line-height:15px;min-width:15px;text-align:center;padding:0 4px;border-radius:8px;z-index:3;pointer-events:none}
  `;document.head.append(style);
  const header=document.createElement('div');header.className='decorTrayHead';header.innerHTML='<div class="decorTabs" role="tablist" aria-label="หมวดของตกแต่ง"></div>';tray.prepend(header);
  let activeCategory='Pumice';const category=key=>/^pumice/i.test(key)?'Pumice':'อื่น ๆ';
@@ -44,6 +45,7 @@
  let dockOpen=false;
  const oldSync=syncDecorBar;syncDecorBar=function(){oldSync();if(dockOpen!==tankBuildMode){const oldHeight=tankCv.getBoundingClientRect().height;dockOpen=tankBuildMode;body.classList.toggle('decor-open',dockOpen);resizeTank();tankCam.oy+=(TCH-oldHeight)/2;}toggle.textContent=tankBuildMode?'✓ เสร็จสิ้น':'✦ ตกแต่งตู้';toggle.setAttribute('aria-expanded',String(tankBuildMode));toggle.setAttribute('aria-controls','ovDecor');
   if(!tankBuildMode)return;syncTabs();
+  {const _cr=G.decorCredit||0;for(const b of pal.querySelectorAll('.dbtn')){let bd=b.querySelector('.decorCreditBadge');if(_cr>0){if(!bd){bd=document.createElement('span');bd.className='decorCreditBadge';b.appendChild(bd);}bd.textContent='🎟️'+_cr;}else if(bd)bd.remove();}}
   const key=selDecorKey||selDecor?.key;selection.textContent=key?TANK_DECOR[key].name:'';cancel.hidden=!key;document.getElementById('dRemove').hidden=!selDecor;document.getElementById('dFlip').hidden=!key;
  };
  const oldEnter=enterTank;enterTank=function(...args){const result=oldEnter(...args);syncDecorBar();return result;};

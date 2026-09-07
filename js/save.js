@@ -37,7 +37,7 @@ function saveGame(){
   if(!_saveOK) return;
   try{
     const data={
-      v:1, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
+      v:1, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||0, floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
       objs:(G.objs||[]).map(_saveObj),
       shelter:(G.shelter||[]).map(_saveObj),
       inv:(G.inv||[]).map(_saveSlug)
@@ -129,6 +129,7 @@ function loadGame(){
       .map(m=>({id:m.id,type:'log',title:m.title,body:String(m.body||''),at:_NUM(m.at,Date.now()),read:!!m.read}))
       .slice(-_LOGMAX);
     G.market=(d.market&&typeof d.market==='object')?d.market:null;
+    G.decorCredit=_NUM(d.decorCredit,0)|0;
     G.coin=_NUM(d.coin, G.coin);
     if(d.stats&&Number.isFinite(d.stats.sec))G.stats={earned:_NUM(d.stats.earned,0),spent:_NUM(d.stats.spent,0),sec:_NUM(d.stats.sec,0),sold:_NUM(d.stats.sold,0),fed:_NUM(d.stats.fed,0),cleaned:_NUM(d.stats.cleaned,0),bred:_NUM(d.stats.bred,0),ordered:_NUM(d.stats.ordered,0)};
     G.questOrderVersion=_NUM(d.questOrderVersion,0); G.questCompleted=Array.isArray(d.questCompleted)?d.questCompleted.filter(id=>typeof id==='string'):[];

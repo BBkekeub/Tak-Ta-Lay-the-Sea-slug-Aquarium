@@ -724,6 +724,21 @@ function removeObj(o){
   const back=Math.round(o.def.price*DECO_REFUND); G.coin+=back;
   toast('เก็บ'+o.def.name+' +'+back,'good'); syncHUD();finishConstruction();
 }
+function sellObj(o){
+  if(o.type==='tank'){
+    const val=Math.round((o.def.price||0)*0.5);
+    const n=(o.slugs||[]).length;
+    if(!confirm('ขายตู้ "'+o.def.name+'" ทิ้งถาวร?'+(n?' ทาก '+n+' ตัวจะกลับเข้าคลัง.':'')+' รับคืน '+val+' เหรียญ')) return;
+    (o.slugs||[]).forEach(s=>{ if(Array.isArray(G.inv)) G.inv.push(s); });
+    if(o.slugs) o.slugs.length=0;
+    G.objs=G.objs.filter(x=>x!==o);
+    G.coin+=val; toast('ขายตู้'+o.def.name+' +'+val+' เหรียญ','good'); syncHUD(); finishConstruction();
+  } else {
+    G.objs=G.objs.filter(x=>x!==o);
+    const back=Math.round((o.def.price||0)*DECO_REFUND); G.coin+=back;
+    toast('ขายทิ้ง'+o.def.name+' +'+back+' เหรียญ','good'); syncHUD(); finishConstruction();
+  }
+}
 
 /* ============================================================
    อินพุต (pan / zoom / คลิก)
@@ -740,7 +755,7 @@ cv.addEventListener('pointerdown', e=>{
   if(moving && movingByClick){ return; }                 // กำลังยกของอยู่ — รอปล่อยที่คลิกถัดไป
   restoreHeldRotation(); moving=null;
   // เตรียมลากย้าย (เฉพาะโหมดก่อสร้าง ยกเว้นเครื่องมือเก็บออก)
-  if(appMode==='build' && !placingWallDoor && tool!=='remove' && !buyKey){   // ถืออยู่ = คลิกคือวาง ไม่ใช่หยิบของเดิม
+  if(appMode==='build' && !placingWallDoor && tool!=='remove' && tool!=='sell' && !buyKey){   // ถืออยู่ = คลิกคือวาง ไม่ใช่หยิบของเดิม
     let o=objAt(cellUnder(e));
     if(!o){ const {sx,sy}=screenXY(e); const h=tankHit(sx,sy); if(h) o=h.o; }  // กดกระจกตู้ก็จับได้
     if(o) grab=o;
@@ -785,6 +800,7 @@ cv.addEventListener('pointerup', e=>{
   if(appMode==='view'){ if(th) enterTank(th.o,{fx:th.fx,fy:th.fy}); return; } // โหมดดู: คลิกตู้=เข้า
   // โหมดก่อสร้าง
   if(tool==='remove'){ if(o) removeObj(o); else if(th) removeObj(th.o); return; }
+  if(tool==='sell'){ if(o) sellObj(o); else if(th) sellObj(th.o); return; }
   if(tool==='place' && buyKey){                    // ถืออยู่ = คลิกที่ไหนก็คือวาง วางแล้วยังถือต่อ
     if(!inBounds(Math.floor(cell.cx),Math.floor(cell.cy),1,1)){ toast('อยู่นอกพื้นที่','bad'); return; }
     placeBuy(cell); return;
@@ -827,9 +843,10 @@ function setTool(t){
   tool=t;
   if(t!=='place'){ buyKey=null; buildShop(); }        // ย้าย/เก็บออก = ต้องมือว่าง
   document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('on', b.dataset.tool===t));
-  document.getElementById('toolName').textContent={place:'วาง',move:'ย้าย',remove:'เก็บออก'}[t];
+  document.getElementById('toolName').textContent={place:'วาง',move:'ย้าย',sell:'ขายทิ้ง',remove:'เก็บออก'}[t];
   const hints={place:'เลือกของจากร้าน = ถือไว้ · คลิกวางได้เรื่อย ๆ · R หมุน · Esc วางมือ · มือว่าง: คลิกของเพื่อยกย้าย',
     move:'คลิกของ = ยกขึ้นมา คลิกอีกทีเพื่อวาง (หรือลากค้างก็ได้) · R หมุน · Esc ยกเลิก',
+    sell:'คลิกของตกแต่ง = ขายทิ้งเอาเงิน · คลิกตู้ = ขายตู้ (ยืนยันก่อน ทากกลับเข้าคลัง) · ย้ายของ: ใช้โหมด "วาง" แล้วลาก',
     remove:'คลิกของตกแต่งเพื่อขายคืน · คลิกตู้เพื่อย้ายไปที่พักพิง'};
   document.getElementById('toolHint').textContent=hints[t];
   cv.classList.toggle('placing', t==='place');

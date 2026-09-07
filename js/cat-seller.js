@@ -214,10 +214,13 @@ function renderComputer(){
  const _inUnread=computerInbox().filter(m=>!m.read).length;
  /* สองแท็บใช้พื้นที่เดียวกัน ไม่แย่งที่กัน — ปุ่มแถวบนยังเป็นปุ่มสั่งงานเหมือนเดิม */
  const _tab=(key,text,badge)=>'<button class="tbtn" data-tab="'+key+'" aria-pressed="'+(computerTab===key)+'" style="border-color:'+(computerTab===key?'#f1cc75':'#50696a')+';background:'+(computerTab===key?'#3c4a44':'#203338')+'">'+text+(badge?' <span style="color:#f1cc75">'+badge+'</span>':'')+'</button>';
- computerDialog.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between"><b>คอมพิวเตอร์ร้าน</b><button class="tbtn" data-close aria-label="ปิด">✕</button></div><button class="tbtn" data-offers style="margin:16px 8px 0 0">ข้อเสนอหน้าร้าน ('+TRADE_OFFERS.length+')</button><button class="tbtn" data-orderbox style="margin:16px 0 0">🛒 สั่งซื้อกล่องทาก'+(typeof slugDeliveryReadyCount==='function'&&slugDeliveryReadyCount()?' · 📦'+slugDeliveryReadyCount():'')+'</button><button class="tbtn" data-market style="margin:16px 0 0 8px">🌐 ตลาดโลก</button>'
-  +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 10px;border-bottom:1px solid #2c3a3a;padding-bottom:10px">'
+ computerDialog.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between"><b>คอมพิวเตอร์ร้าน</b><button class="tbtn" data-close aria-label="ปิด">✕</button></div>'
+  +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:16px 0 10px;border-bottom:1px solid #2c3a3a;padding-bottom:10px">'
   +_tab('inbox','📬 เควส / ออเดอร์ออนไลน์',_inUnread?'!!'+_inUnread:'')
   +_tab('log','🐚 บันทึกทากในร้าน ('+computerLog().length+'/'+COMPUTER_LOG_MAX+')','')
+  +'<button class="tbtn" data-offers>ข้อเสนอหน้าร้าน ('+TRADE_OFFERS.length+')</button>'
+  +'<button class="tbtn" data-orderbox>🛒 สั่งซื้อกล่องทาก'+(typeof slugDeliveryReadyCount==='function'&&slugDeliveryReadyCount()?' · 📦'+slugDeliveryReadyCount():'')+'</button>'
+  +'<button class="tbtn" data-market>🌐 ตลาดโลก</button>'
   +'</div>'
   +(computerTab==='log'
     ?'<div style="max-height:52vh;overflow:auto" data-log></div>'

@@ -285,7 +285,7 @@ function stepPersonLife(p,dt){
 // Floor area controls occupancy; displayed slugs control arrival frequency.
 let _arrivalScore=null, _pendingParty=null, _arrivalRetryAt=0;
 function visitorCapacity(){return Math.max(0,Math.floor(floorArea()/4));}
-function visitorAttraction(){const slug=G.objs.reduce((n,o)=>n+(o.type==='tank'&&Array.isArray(o.slugs)?o.slugs.length*(typeof tankAttractionFactor==='function'?tankAttractionFactor(o):1):0),0);const deco=G.objs.reduce((n,o)=>n+((o.type==='deco'&&o._key!=='counter'&&o.def&&Number.isFinite(o.def.attr))?o.def.attr:0),0);return Math.round((slug+deco)*10)/10;}
+function visitorAttraction(){const slug=G.objs.reduce((n,o)=>n+(o.type==='tank'&&Array.isArray(o.slugs)?o.slugs.length*(typeof tankAttractionFactor==='function'?tankAttractionFactor(o):1):0),0);const deco=G.objs.reduce((n,o)=>n+((o.type==='deco'&&o._key!=='counter'&&o.def&&Number.isFinite(o.def.attr))?o.def.attr:0),0);const tankDeco=G.objs.reduce((n,o)=>n+((o.type==='tank'&&Array.isArray(o.decor))?o.decor.length*0.5:0),0);return Math.round((slug+deco+tankDeco)*10)/10;}
 function visitorInterval(score){return Math.max(20,60-Math.max(0,Math.ceil(Math.max(0,score)/10)-1)*5);}
 function chooseVisitorKind(capacity){
   const menu=[['solo',1,50],['couple',2,30],['family1',3,10],['family2',4,5],['parentChild',2,5]].filter(x=>x[1]<=capacity);
