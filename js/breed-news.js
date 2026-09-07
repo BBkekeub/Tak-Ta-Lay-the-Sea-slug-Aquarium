@@ -47,10 +47,11 @@
     if (typeof receiveComputerMessage === 'function') {
       receiveComputerMessage({
         id: 'breed-' + (opt.tag || 'x') + '-' + Date.now(),
-        type: 'online',
+        // 'log' = กล่อง "บันทึกทากในร้าน" แยกฝั่งกับเควส/ออเดอร์ · เก็บ 20 ฉบับล่าสุด ตัดเก่าสุดเอง
+        // (ของเดิมเป็น 'online' + repeating:true → กองรวมกับเควสแล้วสะสมไม่จำกัด)
+        type: 'log',
         title: icon + ' ' + title,
-        body: detail,
-        repeating: true   // แจ้งเตือนสถานะผสมพันธุ์ = ภารกิจวนซ้ำ (เด้งได้ทุกรอบ ไม่ติด ledger)
+        body: detail
       });
     }
     if (opt.desktop !== false) notifyDesktop('ร้านทากทะเล — ' + title, detail, opt.tag);

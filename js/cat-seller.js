@@ -142,13 +142,24 @@ function drawCounterPromo(o){drawCounterPromoAt(shiftedCounter(o,-3.5,10));}
 function drawCounterComputer(o){const shifted=shiftedCounter(o,2,-3);shifted.rot=(o.rot+3)&3;drawCounterComputerAt(shifted,o);o._computerHit=shifted._computerHit;}
 // Inbox producers supply stable IDs; receiving the same item never repeats its alert.
 function computerInbox(){return G.computerInbox ||= [];}
+/* บันทึกทากในร้าน (type 'log') แยกกล่องกับเควส/ออเดอร์ — เก็บได้ COMPUTER_LOG_MAX ฉบับ
+   ล้นเมื่อไหร่ตัดฉบับเก่าสุดทิ้งอัตโนมัติ · ไม่ผ่าน ledger mailSent เพราะเป็นเหตุการณ์ที่เกิดซ้ำได้ */
+var COMPUTER_LOG_MAX=20;   // var ไม่ใช่ const — save.js เช็ค typeof ค่านี้ตอน loadGame() ซึ่งรันก่อนไฟล์นี้ (const จะติด TDZ แล้ว throw)
+function computerLog(){return G.computerLog ||= [];}
 function receiveComputerMessage(message){
- if(!message||!['quest','online'].includes(message.type)||!message.id||!message.title)return false;
+ if(!message||!['quest','online','log'].includes(message.type)||!message.id||!message.title)return false;
+ if(message.type==='log'){
+  const log=computerLog();
+  // ไม่มีสถานะยังไม่อ่าน — บันทึกเป็นประวัติ ไม่ใช่จดหมายที่ต้องเด้ง !! ตาม
+  log.push({id:String(message.id),type:'log',title:String(message.title),body:String(message.body||''),at:Date.now(),read:true});
+  if(log.length>COMPUTER_LOG_MAX)log.splice(0,log.length-COMPUTER_LOG_MAX);
+  saveGame();if(computerDialog.open)renderComputer();return true;
+ }
  const _id=String(message.id),_rep=message.repeating===true;G.mailSent||={};if(!_rep&&G.mailSent[_id])return false;const items=computerInbox();if(items.some(m=>m.id===_id))return false;if(!_rep)G.mailSent[_id]=true;
  items.push({id:String(message.id),type:message.type,title:String(message.title),body:String(message.body||''),read:false});
  saveGame();if(computerDialog.open)renderComputer();return true;
 }
-function computerUnread(){return computerInbox().some(m=>!m.read);}
+function computerUnread(){return computerInbox().some(m=>!m.read);}   // บันทึกทากไม่นับ — ไม่ต้องเด้ง !!
 let computerTexture=null;
 const computerModelCache=new WeakMap();
 function drawCounterComputerAt(o,actual){
@@ -196,12 +207,48 @@ function drawCounterComputerAt(o,actual){
  o._computerHit={x:Math.min(...pts.map(p=>p.x))-8,y:Math.min(...pts.map(p=>p.y))-8,right:Math.max(...pts.map(p=>p.x))+8,bottom:Math.max(...pts.map(p=>p.y))+8};
  if(computerUnread()||TRADE_OFFERS.some(t=>t.counter===actual&&t.arrived)||(typeof slugDeliveryReadyCount==='function'&&slugDeliveryReadyCount()>0)){const q=counterLocal(o.def,o.rot,12,14),p=P(o.cx+q[0],o.cy+q[1],24*ZUNIT),pulse=Math.sin(performance.now()/260);ctx.save();ctx.translate(p.x,p.y-3*pulse);ctx.fillStyle='#f1c66d';ctx.beginPath();ctx.arc(0,0,Math.max(14,20*cam.zoom),0,Math.PI*2);ctx.fill();ctx.fillStyle='#56352a';ctx.font='bold '+Math.max(18,26*cam.zoom)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('!!',0,1);ctx.restore();}
 }
+let computerTab='inbox';   // แท็บที่เปิดอยู่ในคอมพิวเตอร์ร้าน: 'inbox' | 'log'
 const computerDialog=document.createElement('dialog');computerDialog.id='counterComputer';computerDialog.style.cssText='width:min(640px,90vw);max-height:80vh;overflow:auto;padding:22px;background:#172b2e;color:#e5dcc4;border:1px solid #b59859;border-radius:14px;color-scheme:dark';document.body.append(computerDialog);
 function openCounterComputer(){renderComputer();if(!computerDialog.open)computerDialog.showModal();}
 function renderComputer(){
- computerDialog.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between"><b>คอมพิวเตอร์ร้าน</b><button class="tbtn" data-close aria-label="ปิด">✕</button></div><button class="tbtn" data-offers style="margin:16px 8px 0 0">ข้อเสนอหน้าร้าน ('+TRADE_OFFERS.length+')</button><button class="tbtn" data-orderbox style="margin:16px 0 0">🛒 สั่งซื้อกล่องทาก'+(typeof slugDeliveryReadyCount==='function'&&slugDeliveryReadyCount()?' · 📦'+slugDeliveryReadyCount():'')+'</button><button class="tbtn" data-market style="margin:16px 0 0 8px">🌐 ตลาดโลก</button><h3>เควส / ออเดอร์ออนไลน์</h3><div data-inbox></div>';
- const list=computerDialog.querySelector('[data-inbox]');if(!computerInbox().length)list.textContent='ยังไม่มีรายการใหม่';
- for(const m of computerInbox()){const card=document.createElement('details'),title=document.createElement('summary'),body=document.createElement('p');card.style.cssText='padding:14px;margin:8px 0;border:1px solid #526663;border-radius:8px';title.textContent=(m.read?'':'!! · ')+(m.type==='quest'?'เควส · ':'ออนไลน์ · ')+m.title;body.textContent=m.body;body.style.whiteSpace="pre-line";card.append(title,body);if(m.id==='five-minute-gift'){const claim=document.createElement('button');claim.className='tbtn';claim.dataset.claimGift='';claim.textContent=m.claimed?'รับเงินแล้ว ✓':'รับเงินแนบ 500 เหรียญ';claim.disabled=!!m.claimed;claim.onclick=()=>{if(claimFiveMinuteGift()){claim.disabled=true;claim.textContent='รับเงินแล้ว ✓';}};card.append(claim);}const _del=document.createElement('button');_del.className='tbtn';_del.textContent='🗑 ลบจดหมาย';_del.style.cssText='margin-top:8px;display:block';_del.onclick=(ev)=>{ev.preventDefault();ev.stopPropagation();const _a=computerInbox(),_i=_a.indexOf(m);if(_i>=0)_a.splice(_i,1);if(typeof saveGame==='function')saveGame();renderComputer();};card.append(_del);card.ontoggle=()=>{if(card.open&&!m.read){m.read=true;title.textContent=(m.type==='quest'?'เควส · ':'ออนไลน์ · ')+m.title;saveGame();}};list.append(card);}
+ const _inUnread=computerInbox().filter(m=>!m.read).length;
+ /* สองแท็บใช้พื้นที่เดียวกัน ไม่แย่งที่กัน — ปุ่มแถวบนยังเป็นปุ่มสั่งงานเหมือนเดิม */
+ const _tab=(key,text,badge)=>'<button class="tbtn" data-tab="'+key+'" aria-pressed="'+(computerTab===key)+'" style="border-color:'+(computerTab===key?'#f1cc75':'#50696a')+';background:'+(computerTab===key?'#3c4a44':'#203338')+'">'+text+(badge?' <span style="color:#f1cc75">'+badge+'</span>':'')+'</button>';
+ computerDialog.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between"><b>คอมพิวเตอร์ร้าน</b><button class="tbtn" data-close aria-label="ปิด">✕</button></div><button class="tbtn" data-offers style="margin:16px 8px 0 0">ข้อเสนอหน้าร้าน ('+TRADE_OFFERS.length+')</button><button class="tbtn" data-orderbox style="margin:16px 0 0">🛒 สั่งซื้อกล่องทาก'+(typeof slugDeliveryReadyCount==='function'&&slugDeliveryReadyCount()?' · 📦'+slugDeliveryReadyCount():'')+'</button><button class="tbtn" data-market style="margin:16px 0 0 8px">🌐 ตลาดโลก</button>'
+  +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 10px;border-bottom:1px solid #2c3a3a;padding-bottom:10px">'
+  +_tab('inbox','📬 เควส / ออเดอร์ออนไลน์',_inUnread?'!!'+_inUnread:'')
+  +_tab('log','🐚 บันทึกทากในร้าน ('+computerLog().length+'/'+COMPUTER_LOG_MAX+')','')
+  +'</div>'
+  +(computerTab==='log'
+    ?'<div style="max-height:52vh;overflow:auto" data-log></div>'
+      +(computerLog().length?'<button class="tbtn" data-clearlog style="margin-top:10px;font-size:12px">🗑 ล้างบันทึกทั้งหมด</button>':'')
+    :'<div data-inbox></div>');
+ computerDialog.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{computerTab=b.dataset.tab;renderComputer();});
+ /* อัปเดตเลข !! บนหัวแท็บโดยไม่ต้อง render ใหม่ (ไม่งั้นการ์ดที่เพิ่งกางจะหุบ) */
+ const syncTabBadges=()=>{
+  const t1=computerDialog.querySelector('[data-tab="inbox"]'),t2=computerDialog.querySelector('[data-tab="log"]');
+  const u1=computerInbox().filter(m=>!m.read).length;
+  if(t1)t1.innerHTML='📬 เควส / ออเดอร์ออนไลน์'+(u1?' <span style="color:#f1cc75">!!'+u1+'</span>':'');
+  if(t2)t2.innerHTML='🐚 บันทึกทากในร้าน ('+computerLog().length+'/'+COMPUTER_LOG_MAX+')';
+ };
+ const list=computerDialog.querySelector('[data-inbox]');
+ if(list&&!computerInbox().length)list.textContent='ยังไม่มีรายการใหม่';
+ /* ฝั่งบันทึก — ใหม่สุดอยู่บน · เก่าสุดถูกตัดทิ้งเองเมื่อเกิน COMPUTER_LOG_MAX */
+ const logBox=computerDialog.querySelector('[data-log]');
+ if(logBox&&!computerLog().length)logBox.innerHTML='<p style="font-size:12px;opacity:.7;margin:4px 0">ยังไม่มีบันทึก — ความเคลื่อนไหวของทาก (วางไข่ · พร้อมฟัก · ตัวอ่อนรอพื้นที่) จะมาโผล่ที่นี่</p>';
+ for(const m of (logBox?computerLog().slice().reverse():[])){
+  const card=document.createElement('details'),title=document.createElement('summary'),body=document.createElement('p');
+  card.style.cssText='padding:9px 10px;margin:6px 0;border:1px solid #3b4d4b;border-radius:8px;font-size:13px';
+  const when=new Date(m.at||Date.now()).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+  title.textContent=when+' · '+m.title;title.style.cursor='pointer';
+  body.textContent=m.body;body.style.cssText='white-space:pre-line;font-size:12px;opacity:.85;margin:6px 0 0';
+  card.append(title,body);
+
+  logBox.append(card);
+ }
+ const _clr=computerDialog.querySelector('[data-clearlog]');
+ if(_clr)_clr.onclick=()=>{G.computerLog=[];saveGame();renderComputer();};
+ for(const m of (list?computerInbox():[])){const card=document.createElement('details'),title=document.createElement('summary'),body=document.createElement('p');card.style.cssText='padding:14px;margin:8px 0;border:1px solid #526663;border-radius:8px';title.textContent=(m.read?'':'!! · ')+(m.type==='quest'?'เควส · ':'ออนไลน์ · ')+m.title;body.textContent=m.body;body.style.whiteSpace="pre-line";card.append(title,body);if(m.id==='five-minute-gift'){const claim=document.createElement('button');claim.className='tbtn';claim.dataset.claimGift='';claim.textContent=m.claimed?'รับเงินแล้ว ✓':'รับเงินแนบ 500 เหรียญ';claim.disabled=!!m.claimed;claim.onclick=()=>{if(claimFiveMinuteGift()){claim.disabled=true;claim.textContent='รับเงินแล้ว ✓';}};card.append(claim);}const _del=document.createElement('button');_del.className='tbtn';_del.textContent='🗑 ลบจดหมาย';_del.style.cssText='margin-top:8px;display:block';_del.onclick=(ev)=>{ev.preventDefault();ev.stopPropagation();const _a=computerInbox(),_i=_a.indexOf(m);if(_i>=0)_a.splice(_i,1);if(typeof saveGame==='function')saveGame();renderComputer();};card.append(_del);card.ontoggle=()=>{if(card.open&&!m.read){m.read=true;title.textContent=(m.type==='quest'?'เควส · ':'ออนไลน์ · ')+m.title;syncTabBadges();saveGame();}};list.append(card);}
  computerDialog.querySelector('[data-close]').onclick=()=>computerDialog.close();
  computerDialog.querySelector('[data-offers]').onclick=()=>{computerDialog.close();const b=[...document.querySelectorAll('.context-nav button')].find(b=>b.textContent.startsWith('ข้อเสนอ'));if(b&&b.getAttribute('aria-expanded')!=='true')b.click();renderTradeOffers(true);};
  computerDialog.querySelector('[data-orderbox]').onclick=()=>{computerDialog.close();if(typeof openSlugShopDialog==='function')openSlugShopDialog();};

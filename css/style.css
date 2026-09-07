@@ -246,3 +246,16 @@ kbd{font-family:"IBM Plex Mono",monospace; font-size:10.5px; background:#0C0C0F;
   transition:width .18s ease;
 }
 .boottx{margin-top:12px; font-size:12px; color:var(--muted); min-height:1.5em}
+
+/* Offer cards: static styling, no animated effects or additional rendering. */
+#tradeOffers .trade-offer-card{margin-top:12px;padding:14px;border:1px solid #bd9d58;border-top:3px solid #e5bd65;border-radius:12px;background:linear-gradient(145deg,#365e62,#25484d);box-shadow:inset 0 1px 0 #ffffff25,0 5px 16px #0005;color:#f2eee3}
+#tradeOffers .trade-offer-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #71887c55}
+#tradeOffers .trade-offer-heading>b{font-size:27px;line-height:1.15;color:#ffda80}#tradeOffers .trade-offer-heading>b>span{font-size:14px}
+#tradeOffers .trade-status{background:#c2a65a22;border:1px solid #b89e5d77;border-radius:20px;padding:4px 8px;font-size:11px;color:#f9da8d;white-space:nowrap}
+#tradeOffers canvas[data-trade-slug]{border:1px solid #6a8881;background:#28464a!important}
+#tradeOffers select{border:1px solid #839b93;border-radius:7px;background:#294247!important;color:#fff!important;min-height:40px}
+#tradeOffers .trade-conditions{display:block;font-size:12px;line-height:1.65;color:#d0dfdb}#tradeOffers .trade-conditions>strong{color:#e8e8d8}
+#tradeOffers .trade-condition{display:block;margin:5px 0;padding:6px 8px;border-radius:6px;border-left:3px solid #60716e;background:#102c3280;color:#dbe5df}
+#tradeOffers .trade-condition.matched{border-color:#6ed2a4;background:#123d32b3;color:#c0ffdb}
+#tradeOffers .trade-actions{display:flex;gap:8px;margin-top:8px}#tradeOffers .trade-actions .tbtn{min-height:43px}
+#tradeOffers .trade-accept{flex:1;background:#d5b260;border:1px solid #ffe2a0;color:#192928;font-weight:750;box-shadow:0 2px 5px #0003}#tradeOffers .trade-accept:hover{background:#ebc978}#tradeOffers .trade-accept:disabled{opacity:.45;cursor:default}
