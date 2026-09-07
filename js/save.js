@@ -37,7 +37,7 @@ function saveGame(){
   if(!_saveOK) return;
   try{
     const data={
-      v:1, computerInbox:G.computerInbox||[], floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
+      v:1, computerInbox:G.computerInbox||[], market:G.market||null, floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
       objs:(G.objs||[]).map(_saveObj),
       shelter:(G.shelter||[]).map(_saveObj),
       inv:(G.inv||[]).map(_saveSlug)
@@ -121,6 +121,7 @@ function loadGame(){
   try{
     const d=JSON.parse(raw); if(!d || d.v!==1) return false;
     G.computerInbox=Array.isArray(d.computerInbox)?d.computerInbox.filter(m=>m&&typeof m.id==='string'&&['quest','online'].includes(m.type)&&typeof m.title==='string').map(m=>({id:m.id,type:m.type,title:m.title,body:String(m.body||''),read:!!m.read,claimed:!!m.claimed})):[];
+    G.market=(d.market&&typeof d.market==='object')?d.market:null;
     G.coin=_NUM(d.coin, G.coin);
     if(d.stats&&Number.isFinite(d.stats.sec))G.stats={earned:_NUM(d.stats.earned,0),spent:_NUM(d.stats.spent,0),sec:_NUM(d.stats.sec,0),sold:_NUM(d.stats.sold,0),fed:_NUM(d.stats.fed,0),cleaned:_NUM(d.stats.cleaned,0),bred:_NUM(d.stats.bred,0),ordered:_NUM(d.stats.ordered,0)};
     G.questOrderVersion=_NUM(d.questOrderVersion,0); G.questCompleted=Array.isArray(d.questCompleted)?d.questCompleted.filter(id=>typeof id==='string'):[];
