@@ -41,7 +41,7 @@ function tickBreeder(o,dt,rnd=Math.random){
  for(let i=b.larvae.length-1;i>=0;i--){const larva=b.larvae[i];walkBreedingZone(larva.slug,dt);larva.left=Math.max(0,larva.left-dt);
   if(larva.left>0)continue;
   if(!larva.ready&&larva.growthRoll!==undefined)larva.survives=larva.growthRoll<.7*breedingSatietyFactor(larva.slug.satiety)*breedingCleanFactor(o);
-  if(!larva.survives){b.larvae.splice(i,1);continue;}
+  if(!larva.survives){if(typeof onBreedLarvaDeath==='function')onBreedLarvaDeath(o,larva);b.larvae.splice(i,1);continue;}
   larva.ready=true;
   if(breederAdultSpace(o)){placeOnFloor(larva.slug,o);o.slugs.push(larva.slug);b.larvae.splice(i,1);}
  }
