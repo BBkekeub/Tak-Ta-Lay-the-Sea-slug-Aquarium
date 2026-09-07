@@ -396,10 +396,6 @@
       ผ่านครึ่งเวลาแล้วผู้ซื้อจะเริ่มต่อราคา (ลดได้ถึง ${Math.round(HAGGLE_MAX * 100)}%) · ครบ 3 ชม. ยังไม่ขาย ทากจะกลับเข้าคลัง<br>
       เทรนเปลี่ยนใน <b data-mk-refresh>${fmtLeft(t.refreshAt - now())}</b></p>
 
-      <details style="margin:10px 0;padding:8px;border:1px solid #47605f;border-radius:8px" ${listings.length ? '' : 'open'}>
-        <summary style="cursor:pointer"><b>📋 เทรนรอบนี้ต้องการยีนอะไร</b></summary>
-        <div style="margin-top:8px">${trendTableHtml(t)}</div></details>
-
       <h3 style="margin:14px 0 6px">ทากตัวอย่างที่ตลาดต้องการตอนนี้</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap">${t.showcase.map((c, i) =>
         `<div style="flex:1;min-width:120px;padding:8px;border:1px solid #47605f;border-radius:8px;text-align:center">
