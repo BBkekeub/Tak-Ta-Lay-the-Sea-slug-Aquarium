@@ -706,7 +706,7 @@ function paintPersonMesh(faces,p,H,snapshot=false){
   if(w<=0||h<=0)return;
   const scale=snapshot?1:Math.min(2,window.devicePixelRatio||1),width=Math.ceil(w*scale),height=Math.ceil(h*scale);
   if(canvas.width<width)canvas.width=Math.ceil(width/128)*128;if(canvas.height<height)canvas.height=Math.ceil(height/128)*128;
-  const blockers=personFurnitureFaces(),glass=[];
+  const blockers=personFurnitureFaces(!snapshot),glass=[];
   for(const o of G.objs){if(o.type!=='tank'||o===moving||(!snapshot&&!onScreen(o)))continue;
     const x=o.cx,y=o.cy,w=oW(o),h=oH(o),lo=tankStandH(o.def)/ZUNIT,hi=lo+tankGlassH(o.def)/ZUNIT;
     glass.push([[x,y,hi],[x+w,y,hi],[x+w,y+h,hi],[x,y+h,hi]],[[x+w,y,lo],[x+w,y+h,lo],[x+w,y+h,hi],[x+w,y,hi]],[[x,y+h,lo],[x+w,y+h,lo],[x+w,y+h,hi],[x,y+h,hi]]);

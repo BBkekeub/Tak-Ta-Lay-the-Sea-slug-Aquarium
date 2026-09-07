@@ -39,7 +39,7 @@ function catModel(o){
  const result={key,faces};catModelCache.set(o,result);return faces;
 }
 // Furniture depth masks use the real L, including its empty seller corner.
-personFurnitureFaces=function(){
+personFurnitureFaces=function(props=true){
  const out=[];
  const boxTo=(bx,by,bw,bh,top)=>{ if(!(top>0))return;
   const a=[bx,by,0],b=[bx+bw,by,0],c=[bx+bw,by+bh,0],d=[bx,by+bh,0];
@@ -52,7 +52,7 @@ personFurnitureFaces=function(){
    const top=decoH(o)/ZUNIT; // ผิวเคาน์เตอร์ (ราว 14)
    for(const q of [counterBlock(o,0,10,20,10),counterBlock(o,10,0,10,10)]) boxTo(q.x,q.y,q.w,q.h,top);
    // แมวแคชเชียร์นั่งมุมว่างของตัว L — เพิ่มกล่องบังสูงถึงหัวแมว ให้บังลูกค้าที่ยืนด้านหลัง
-   const cat=counterBlock(o,1,1,8,8); boxTo(cat.x,cat.y,cat.w,cat.h,24);
+   if(props){ const cat=counterBlock(o,1,1,8,8); boxTo(cat.x,cat.y,cat.w,cat.h,22); }
    continue;
   }
   const top=(o.type==='tank'?tankStandH(o.def):decoH(o))/ZUNIT;

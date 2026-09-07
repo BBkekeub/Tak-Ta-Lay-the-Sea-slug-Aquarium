@@ -110,27 +110,23 @@
     });
   }
   function buildUI() {
+    // ปุ่มลอยมุมขวาบน — เห็นชัดตลอด ไม่หลุดออกนอกจอเหมือนตอนแปะบนแถบเครื่องมือ
     bell = document.createElement('button');
     bell.id = 'breedNewsBell';
     bell.type = 'button';
-    bell.className = 'tbtn';
-    bell.style.position = 'relative';
+    bell.title = 'ข่าวผสมพันธุ์';
+    bell.style.cssText = 'position:fixed;top:54px;right:14px;z-index:9000;height:34px;padding:0 12px;border-radius:17px;border:1px solid #50605f;background:#141c20;color:#e6dfcd;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.4);display:flex;align-items:center;gap:5px';
     bell.textContent = '🔔 ข่าว';
 
     badge = document.createElement('span');
     badge.style.cssText = 'position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#d9534f;color:#fff;font-size:11px;font-weight:600;display:none;align-items:center;justify-content:center;line-height:18px;box-sizing:border-box';
     bell.appendChild(badge);
-
-    var bar = document.querySelector('.topbar');
-    var fit = document.getElementById('bFit');
-    if (bar && fit && fit.parentNode === bar) fit.insertAdjacentElement('afterend', bell);
-    else if (bar) bar.appendChild(bell);
-    else { bell.style.cssText += ';position:fixed;top:10px;right:12px;z-index:9000'; document.body.appendChild(bell); }
+    document.body.appendChild(bell);
 
     panel = document.createElement('div');
     panel.id = 'breedNewsPanel';
     panel.hidden = true;
-    panel.style.cssText = 'position:fixed;top:52px;right:12px;z-index:9000;width:320px;max-width:92vw;max-height:60vh;overflow:auto;background:#141c20;border:1px solid #50605f;border-radius:10px;color:#e6dfcd;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.45)';
+    panel.style.cssText = 'position:fixed;top:96px;right:14px;z-index:9000;width:320px;max-width:92vw;max-height:64vh;overflow:auto;background:#141c20;border:1px solid #50605f;border-radius:10px;color:#e6dfcd;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.45)';
     document.body.appendChild(panel);
 
     bell.addEventListener('click', function (ev) {
