@@ -585,6 +585,16 @@ function drawSmileFace(P, cx, cy, flip, k, base){
   });
   tctx.restore();
 }
+/* ตาแอคชั่นตอนอยู่บนกำแพง — วาดในระบบพิกัดที่ 'หมุน/พลิก' แล้ว (เรียกก่อน restore ใน drawWallSlug)
+   ใช้ flip=false เพราะสไปรต์บนกำแพงวาดท่ามาตรฐานแล้วหมุนเอา (ทิศหัวมาจาก rot ไม่ใช่ s.flip)
+   กลบตากลมเดิม (ในสไปรต์) แล้ววาดตาสคริปต์ทับ · จบแอคชั่น = เฟรมถัดไปไม่วาด = ตาเดิมกลับมาเอง */
+function drawWallActionFace(s,P,sa){
+  if(!P) return;
+  const k=P.s*sa, base=slugBaseHex(s.genes);
+  if(s.state==='sleep') drawSleepFace(P,0,0,false,k,base);
+  else if(s.state==='dashCharge'||s.state==='dash') drawDashFace(P,0,0,false,k,base,s.charge);
+  else if((s.state==='rest'||s.state==='greet'||s.state==='wake'||s.state==='stretch') && smileNow(s)) drawSmileFace(P,0,0,false,k,base);
+}
 /* ยิ้มไหมตอนนี้ — แต่ละตัวมีจังหวะสุ่มเป็นของตัวเอง ยิ้ม ~2.2 วิ ทุก ~14 วิ */
 function smileNow(s){
   if(!Number.isFinite(s._smilePhase)){ let h=0; const id=''+(s.id||''); for(let i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))>>>0; s._smilePhase=(h%1000)/1000*14; }
@@ -1091,7 +1101,7 @@ function drawWallSlug(s,parts,sa){
   const x=center.x+pose.dx*(height/2+1), y=center.y+pose.dy*(height/2+1);
   tctx.save();tctx.translate(x,y);tctx.rotate(pose.rot);
   if(pose.flipY)tctx.scale(1,-1);
-  tctx.drawImage(spr.c,-width/2,-height/2,width,height);tctx.restore();
+  tctx.drawImage(spr.c,-width/2,-height/2,width,height);drawWallActionFace(s,parts,sa);tctx.restore();
   s._hit={x,y,r:Math.max(20,width*.5)};
   return {x, y, hx:pose.hx, hy:pose.hy, len:width};
 }
