@@ -837,7 +837,7 @@ function drawFace(ctx,bw,bh,D){
   /* ตา/ปาก: วาดอาร์ตดิบ ไม่แมปสีเลย — ลูกตาต้องดำสนิทและไฮไลท์ต้องขาวเสมอ
      ห้ามส่งเข้า gradMap ด้วยวัสดุผิว (พอตัวเป็นทอง ตากลายเป็นน้ำตาลอ่อน = จางตามสีตัว) */
   const em=META.eye, eyeC=A.eye;
-  if(!pose.noEyes) FACE.eyes.forEach(E=>{
+  FACE.eyes.forEach(E=>{
     const d=bh*E.hR, ew=d*(E.ar||1);
     ctx.save(); ctx.translate(E.u*bw, E.v*bh); ctx.rotate((E.rot||0)*Math.PI/180);
     ctx.drawImage(eyeC, -ew/2, -d/2, ew, d); ctx.restore();
