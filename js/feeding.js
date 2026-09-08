@@ -192,7 +192,9 @@ function foodCanPlace(type,level,fx,fy){
  const tank=curTank; if(!tank) return {ok:false,why:'ยังไม่ได้เข้าตู้'};
  const spec=FOOD_TYPES[type].levels[level-1],solid=decorSolidSet(tank.decor);
  if(fx<1||fy<1||fx>tank.def.w-1||fy>tank.def.h-1||solid.has(ptKey(fx,fy))) return {ok:false,why:'วางอาหารบนพื้นที่ว่างในตู้ครับ'};
- if((tank.foods||[]).length>=8) return {ok:false,why:'วางอาหารได้พร้อมกันไม่เกิน 8 ชิ้น'};
+ /* จำนวนอาหารสูงสุดต่อตู้ ไม่เท่ากันตามขนาด (foodMax ใน CATALOG) — ตู้เก่าที่ไม่มีค่านี้ใช้ 8 เหมือนเดิม */
+ const foodMax=Number.isFinite(tank.def.foodMax)?tank.def.foodMax:8;
+ if((tank.foods||[]).length>=foodMax) return {ok:false,why:'ตู้นี้วางอาหารพร้อมกันได้ไม่เกิน '+foodMax+' ชิ้น'};
  if(G.coin<spec.cost) return {ok:false,why:'เหรียญไม่พอ ('+spec.cost+')'};
  return {ok:true,why:''};
 }

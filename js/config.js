@@ -126,15 +126,16 @@ const SLUG_WID_CELLS = 20 / CM_PER_CELL;            // 4 ช่อง
      ตู้กลาง = 2×1 ช่องใหญ่ = 100×50 cm
      ตู้ใหญ่  = 2×2 ช่องใหญ่ = 100×100 cm
      ตู้ยักษ์ = 3×2 ช่องใหญ่ = 150×100 cm
-   ของตกแต่ง: w,h = footprint · col = สี                                        */
+   ของตกแต่ง: w,h = footprint · col = สี
+   foodMax = วางอาหารพร้อมกันได้กี่ชิ้นในตู้นั้น (ตู้ใหญ่วางได้เยอะกว่า — ดู feeding.js)   */
 const TANK_GLASS_COLOR='#9fd0f0';                  // ทุกขนาดใช้น้ำ/กระจกสีเดียวกัน
 const CATALOG = {
-  tank_breed:{kind:'tank',name:'ตู้เพาะพันธุ์ 3 ส่วน',icon:'🥚',price:1200,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,breeder:true},
+  tank_breed:{kind:'tank',name:'ตู้เพาะพันธุ์ 3 ส่วน',icon:'🥚',price:2000,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,breeder:true,foodMax:10},
   counter: {kind:'deco',name:'เคาน์เตอร์แมวขายทาก',icon:'🐱',price:0,w:2*SUB,h:2*SUB,col:'#826448'},
-  tank_s:  {kind:'tank', name:'ตู้เล็ก',  icon:'🐚', price:120,  w:1*SUB, h:1*SUB, glass:TANK_GLASS_COLOR},
-  tank_m:  {kind:'tank', name:'ตู้กลาง', icon:'🪸', price:300,  w:2*SUB, h:1*SUB, glass:TANK_GLASS_COLOR},
-  tank_l:  {kind:'tank', name:'ตู้ใหญ่',  icon:'🌊', price:560,  w:2*SUB, h:2*SUB, glass:TANK_GLASS_COLOR},
-  tank_xl: {kind:'tank', name:'ตู้ยักษ์', icon:'🐋', price:980,  w:3*SUB, h:2*SUB, glass:TANK_GLASS_COLOR},
+  tank_s:  {kind:'tank', name:'ตู้เล็ก',  icon:'🐚', price:500,  w:1*SUB, h:1*SUB, glass:TANK_GLASS_COLOR, foodMax:8},
+  tank_m:  {kind:'tank', name:'ตู้กลาง', icon:'🪸', price:1500, w:2*SUB, h:1*SUB, glass:TANK_GLASS_COLOR, foodMax:10},
+  tank_l:  {kind:'tank', name:'ตู้ใหญ่',  icon:'🌊', price:4500, w:2*SUB, h:2*SUB, glass:TANK_GLASS_COLOR, foodMax:20},
+  tank_xl: {kind:'tank', name:'ตู้ยักษ์', icon:'🐋', price:8000, w:3*SUB, h:2*SUB, glass:TANK_GLASS_COLOR, foodMax:40},
   rock:    {kind:'deco', name:'หินตกแต่ง', icon:'🪨', price:30, w:2, h:2, col:'#5b6b6f', attr:3},
   plant:   {kind:'deco', name:'สาหร่าย',   icon:'🌿', price:24, w:1, h:1, col:'#3f8f5e', attr:2},
   sign:    {kind:'deco', name:'ป้ายร้าน',  icon:'🪧', price:40, w:2, h:1, col:'#9a7b45', attr:5},
