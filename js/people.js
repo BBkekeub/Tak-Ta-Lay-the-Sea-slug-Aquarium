@@ -802,7 +802,7 @@ function drawPerson(p){
   function world(v){
     v=[v[0]+shift*Math.min(1,v[2]/.5),v[1]+(action==='lean'?gesture*.026*Math.max(0,v[2]-.5):0),v[2]];
     if(v[2]>.855){
-      v[0]*=1.9;v[1]=lean+.009+(v[1]-(lean+.009))*1.55;
+      v[0]*=2.15;v[1]=lean+.009+(v[1]-(lean+.009))*1.85;
       const angle=-(p.headYaw||0),x=v[0],y=v[1]-(lean+.009);
       v[0]=x*Math.cos(angle)-y*Math.sin(angle);v[1]=lean+.009+x*Math.sin(angle)+y*Math.cos(angle);
       if(action==='nod')v[2]+=Math.sin((p.actionT||0)*6)*.004*gesture;
@@ -810,7 +810,7 @@ function drawPerson(p){
     if(!posedArms&&crouch&&v[2]>.855){const y=v[1]-lean,z=v[2]-.855,a=-.65*crouch;v[1]=lean+y*Math.cos(a)+z*Math.sin(a);v[2]=.855+z*Math.cos(a)-y*Math.sin(a);}
     if(!posedArms)v=inspectPose(v);
     // Compact legs/torso and a larger head share the mascot's rounded proportions.
-    const shapedZ=v[2]<.515?v[2]*(.40/.515):v[2]<.855?.40+(v[2]-.515)*(.29/.34):.69+(v[2]-.855)*1.9;
+    const shapedZ=v[2]<.515?v[2]*(.335/.515):v[2]<.855?.335+(v[2]-.515)*(.295/.34):.63+(v[2]-.855)*2.1;
     const z=p.kid?(shapedZ<.40?shapedZ*.94:.376+(shapedZ-.40)*1.045):shapedZ;
     return [p.x+(right[0]*v[0]+fx*v[1])*H,p.y+(right[1]*v[0]+fy*v[1])*H,(z+jump)*H];
   }
@@ -840,28 +840,28 @@ function drawPerson(p){
   for(const side of [-1,1]){
     const s=Math.sin(phase+(side<0?Math.PI:0)), stride=s*.075*motion;
     const lift=Math.max(0,Math.cos(phase+(side<0?Math.PI:0)))*.026*motion;
-    const hip=[side*.048*build,0,.515+bob];
-    const knee=[side*.050*build,stride*.45+.012*motion,.285+bob+lift*.4];
-    const ankle=[side*.051*build,stride,.038+lift];
-    limb(hip,knee,.042*build,.029,skirt?p.skin:p.pants);
-    limb(knee,ankle,.030,.023,skirt||p.outfit==='shorts'?p.skin:p.pants);
-    rings([[ankle[0],stride+.026,.012+lift,.035,.062],[ankle[0],stride+.026,.029+lift,.036,.060],[ankle[0],stride+.006,.059+lift,.025,.035]],p.shoe,8);
-    rings([[ankle[0],stride+.026,.007+lift,.036,.062],[ankle[0],stride+.026,.016+lift,.036,.062]],'#c9c7b7',8);
+    const hip=[side*.055*build,0,.515+bob];
+    const knee=[side*.058*build,stride*.45+.012*motion,.285+bob+lift*.4];
+    const ankle=[side*.060*build,stride,.038+lift];
+    limb(hip,knee,.068*build,.054,skirt?p.skin:p.pants);
+    limb(knee,ankle,.055,.043,skirt||p.outfit==='shorts'?p.skin:p.pants);
+    rings([[ankle[0],stride+.034,.016+lift,.060,.096],[ankle[0],stride+.034,.042+lift,.061,.092],[ankle[0],stride+.010,.084+lift,.043,.056]],p.shoe,8);
+    rings([[ankle[0],stride+.034,.009+lift,.061,.096],[ankle[0],stride+.034,.022+lift,.061,.096]],'#c9c7b7',8);
   }
-  if(!skirt)rings([[0,0,.495+bob,.081*build,.047],[0,0,.555+bob,.080*build,.052]],p.pants);
-  const top=.805+bob+breath;
-  rings([[0,lean*.3,.543+bob,.091*build,.059],[0,lean*.6,.610+bob,.092*build,.060],[0,lean,.735+bob,.108*build*shoulderWidth,.063],[0,lean,top-.025,.097*build*shoulderWidth,.054],[0,lean,top,.048*build,.033]],p.shirt);
-  rings([[0,lean*.3,.537+bob,.092*build,.060],[0,lean*.3,.553+bob,.092*build,.060]],p.shirt,8);
+  if(!skirt)rings([[0,0,.495+bob,.093*build,.056],[0,0,.555+bob,.092*build,.060]],p.pants);
+  const top=.822+bob+breath;
+  rings([[0,lean*.3,.502+bob,.104*build,.067],[0,lean*.3,.529+bob,.108*build,.069],[0,lean*.3,.543+bob,.104*build,.067],[0,lean*.6,.610+bob,.105*build,.068],[0,lean,.740+bob,.124*build*shoulderWidth,.072],[0,lean,top-.028,.112*build*shoulderWidth,.062],[0,lean,top,.055*build,.038]],p.shirt);
+  rings([[0,lean*.3,.523+bob,.107*build,.069],[0,lean*.3,.553+bob,.105*build,.068]],p.shirt,8);
   if(skirt){
     const hem=p.kid?.365:.325,cloth=p.outfit==='dress'?p.shirt:p.pants;
-    rings([[gait*.003,0,hem+bob,.120*build,.072],[0,0,.45+bob,.105*build,.060],[0,lean*.3,.543+bob,.086*build,.054]],cloth,16);
+    rings([[gait*.003,0,hem+bob,.172*build,.108],[0,0,.45+bob,.146*build,.091],[0,lean*.3,.543+bob,.118*build,.076]],cloth,12);
   }
   // Neck and a narrow cloth collar, with no broad shiny shoulder highlight.
-  rings([[0,lean,top-.002,.035,.031],[0,lean+.001,top+.018,.031,.029]],p.shirt);
-  rings([[0,lean,top+.007,.024,.024],[0,lean+.005,.858+bob,.025,.026]],p.skin);
+  rings([[0,lean,top-.002,.046,.041],[0,lean+.001,top+.016,.041,.038]],p.shirt);
+  rings([[0,lean,top+.006,.034,.034],[0,lean+.005,.858+bob,.035,.036]],p.skin);
   for(const side of [-1,1]){
     posedArms=false;
-    const shoulder=[side*.101*build*shoulderWidth,lean,top-.040];
+    const shoulder=[side*.112*build*shoulderWidth,lean,top-.046];
     const swing=-side*gait*.047;
     const elbow=[side*.126*build,lean+swing*.6,.670+bob];
     const interested=p.state==='look'&&side===1;
@@ -895,9 +895,9 @@ function drawPerson(p){
     for(let axis=0;axis<3;axis++){hand[axis]=limitedPose.hand[axis];elbow[axis]=limitedPose.elbow[axis];}
     if(!crouch)constrainVisitorArm(p,[elbow],world,H,right,fx,fy);
     const cuff=shoulder.map((x,i)=>x+(elbow[i]-x)*.67);
-    limb(shoulder,cuff,.034*build,.028,p.shirt);
-    limb(cuff,elbow,.024,.020,p.skin);limb(elbow,hand,.021,.014,p.skin);
-    rings([[hand[0],hand[1],hand[2]-.026,.012,.015],[hand[0],hand[1]+.002,hand[2]-.013,.017,.017],[hand[0],hand[1],hand[2]+.008,.014,.013]],p.skin,10);
+    limb(shoulder,cuff,.048*build,.040,p.shirt);
+    limb(cuff,elbow,.035,.031,p.skin);limb(elbow,hand,.032,.023,p.skin);
+    rings([[hand[0],hand[1],hand[2]-.030,.018,.022],[hand[0],hand[1]+.002,hand[2]-.014,.026,.026],[hand[0],hand[1],hand[2]+.009,.021,.019]],p.skin,8);
   }
   posedArms=false;
   // Face is a shaped jaw and brow in 3D; facial features turn with the head.
@@ -917,7 +917,7 @@ function drawPerson(p){
   // Ten silhouettes, built from a small number of low-poly hair sections.
   const cut=p.hairCut,sway=Math.sin(phase)*motion*.009;
   if(['bob','long'].includes(cut)){
-    const bottom=cut==='long'?.765:.856;
+    const bottom=cut==='long'?.861:.864;
     const rows=[[bottom,.049,.038],[bottom+.018,.059,.044],[.925,.057,.050],[.979,.040,.039]];
     for(let j=0;j<rows.length-1;j++)for(let i=0;i<16;i++){
       const a=i*Math.PI/8,b=(i+1)*Math.PI/8;
@@ -967,11 +967,15 @@ function drawPerson(p){
   feature([[-.006,y,hz+.004],[.006,y,hz+.004],[.008,y+.008,hz-.015],[0,y+.012,hz-.022],[-.008,y+.008,hz-.015]],p.skin,-5);
   for(const side of [-1,1]){
    const x=side*.021*hs;
-   feature([[x-.008,y-.001,hz+.016],[x+.008,y-.001,hz+.015],[x+.007,y+.001,hz+.012],[x-.007,y+.001,hz+.013]],p.hair,8);
+   /* ตาเป็นวงแปดเหลี่ยม (ไม่ใช่สี่เหลี่ยมแบน) — สไตล์ low-poly ดูที่รูปทรงรวม ไม่ใช่รายละเอียดหน้า */
+   const disc=(cx,cz,r,rz,depth,color,shade=0)=>feature(Array.from({length:8},(_,i)=>{
+     const a=-i*Math.PI/4+Math.PI/8;return [cx+Math.cos(a)*r,y+depth,cz+Math.sin(a)*rz];}),color,shade);
+   feature([[x-.0115,y-.001,hz+.0205],[x+.0115,y-.001,hz+.0195],[x+.011,y+.001,hz+.0170],[x-.011,y+.001,hz+.0180]],p.hair,8);
    if(!blink){
-    feature([[x-.008,y+.002,hz+.005],[x-.005,y+.002,hz+.010],[x+.005,y+.002,hz+.010],[x+.008,y+.002,hz+.005],[x+.006,y+.002,hz-.005],[x-.005,y+.002,hz-.005]],'#f4eee0');
-    feature([[x-.0035,y+.003,hz+.007],[x+.0035,y+.003,hz+.007],[x+.003,y+.004,hz-.005],[x-.003,y+.004,hz-.005]],'#3e352d');
-   }else feature([[x-.005,y+.002,hz+.002],[x+.005,y+.002,hz+.002],[x+.005,y+.003,hz],[x-.005,y+.003,hz]],'#4b3c32');
+    disc(x,hz+.002,.0125,.0130,.002,'#f6f1e6');
+    disc(x+side*.0012,hz+.001,.0072,.0076,.0035,'#3a322b');
+    disc(x-side*.0028,hz+.005,.0026,.0027,.0048,'#ffffff',16);
+   }else feature([[x-.011,y+.002,hz+.003],[x+.011,y+.002,hz+.003],[x+.011,y+.003,hz-.001],[x-.011,y+.003,hz-.001]],'#4b3c32');
   }
   feature([[-.010,y-.003,hz-.032],[0,y-.001,hz-.034],[.010,y-.003,hz-.032],[.007,y-.001,hz-.037],[-.007,y-.001,hz-.037]],p.skin,-26);
   if(p.bagged){
