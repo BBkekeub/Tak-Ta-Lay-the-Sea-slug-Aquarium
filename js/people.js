@@ -973,12 +973,18 @@ function drawPerson(p){
     /* แขนแกว่งสวนกับขาข้างเดียวกัน · ผูกกับ phase ของการเดินตรง ๆ ไม่ใช่ค่า gait ที่ถูกหรี่ไว้ */
     const armTh=phase+(side<0?0:Math.PI);
     const armDamp=Math.min(1,Math.max(.35,clearance/6));
-    const swing=Math.sin(armTh)*0.055*motion*armDamp;
+    /* ไหล่แกว่งหน้า-หลังราว ±12° (เดินชมของช้า ๆ) — งานวิจัย gait ไหล่กวาดรวม ~30° */
+    const swing=Math.sin(armTh)*0.058*motion*armDamp;
     const interested=p.state==='look'&&side===1, pointing=interested&&action==='point';
-    /* แขนหลังงอศอกมากกว่าแขนหน้า (ท่าเดินจริง) · ยกมือขึ้นเล็กน้อยตอนแกว่งมาข้างหน้า */
-    const fold=Math.max(0,-Math.sin(armTh))*motion*armDamp;
-    let elbow=[shoulder[0]+side*.012,shoulder[1]+swing*.55-.010,shoulder[2]-L1*(.94-.05*fold)];
-    let hand =[shoulder[0]+side*.020,shoulder[1]+swing,shoulder[2]-(L1+L2)*(.90-.06*fold)];
+    /* ศอก "งอค้าง" ตลอดการเดิน (offset ~26°) แล้วงอเพิ่มตอนแกว่งมา "ข้างหน้า" (peak ~42°+)
+       — คนจริงไม่เคยเหยียดแขนตรง และศอกงอมากตอนแขนมาหน้า ตรงข้ามกับท่าสวนสนามที่ดันแขนตรงไปหน้า
+       ของเดิมงอตอนแขนไปหลังแล้วเหยียดตรงตอนไปหน้า → เลยดูเหมือนทหารสวนสนาม แก้ให้กลับด้าน */
+    const foldBase =0.30*motion*armDamp;                               // งอค้างพื้นฐาน (แขนไม่มีทางตรง)
+    const foldFront=Math.max(0,Math.sin(armTh))*0.58*motion*armDamp;   // งอเพิ่มตอนมือมาข้างหน้า
+    const fold=Math.min(1,foldBase+foldFront);
+    /* ต้นแขนห้อยเกือบดิ่งจากไหล่ · "มือ" นำหน้าข้อศอก → ศอกทำหน้าที่บานพับ ไม่ใช่แขนแข็งแกว่งทั้งท่อน */
+    let elbow=[shoulder[0]+side*.014,shoulder[1]+swing*.34-.006,shoulder[2]-L1*(.93-.05*fold)];
+    let hand =[shoulder[0]+side*.022,shoulder[1]+swing*1.18+.030*fold,shoulder[2]-(L1+L2)*(.94-.14*fold)];
     if(interested){hand[1]+=.070;hand[2]=shoulder[2]-(L1+L2)*.62;}
     if(pointing){hand[1]+=.090*gesture;hand[2]+=.130*gesture;}
     if(side===1&&action==='chat'){hand[1]+=.055*gesture;hand[2]+=.09*gesture;}
