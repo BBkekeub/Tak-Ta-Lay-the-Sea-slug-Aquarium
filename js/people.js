@@ -368,8 +368,11 @@ function planFamily(g){
   g.firstArrivedAt=null;
   const leader=g.members[0],tanks=G.objs.filter(o=>o.type==='tank'&&o!==moving);
   const leaving=g.visits<=0||!tanks.length;
+  /* เดิม filter ตู้ที่เพิ่งดูทิ้งไปเลย → ถ้าในร้านเหลือตู้ที่ยืนกันได้ทั้งกลุ่มแค่ตู้นั้นตู้เดียว
+     กลุ่มจะวางแผนไม่สำเร็จตลอดกาล = ยืนแข็งคาที่ ตอนนี้แค่ "ไปอยู่ท้ายคิว" ยังชอบตู้ใหม่เหมือนเดิม */
+  const mkOptions=list=>list.flatMap(o=>lookSpots(o).map(spot=>({spot,focus:o}))).sort(()=>Math.random()-.5);
   const options=leaving?Array.from({length:16},()=>({spot:doorSpot(),focus:null})):
-    (tanks.length>1?tanks.filter(o=>o!==g.focus):tanks).flatMap(o=>lookSpots(o).map(spot=>({spot,focus:o}))).sort(()=>Math.random()-.5);
+    [...mkOptions(tanks.filter(o=>o!==g.focus)), ...mkOptions(tanks.filter(o=>o===g.focus))];
   for(const choice of options){
     if(!choice.spot)continue;
     const spots=leaving?g.members.map(()=>({...choice.spot})):partySpots(choice.spot,g.members.length,g,leaving,choice.focus);if(!spots)continue;
@@ -392,6 +395,19 @@ function stepFamilies(dt){
   for(const g of groups){
     if(g.members.some(p=>p.tradeOffer))continue;
     g.time+=dt;
+    /* ---- กันกลุ่ม "ยืนแข็ง" ถาวร ----
+       ครอบครัว 4 คน (พ่อแม่+ลูก 2) ต้องการที่ยืนหน้าตู้ 4 จุดพร้อมกัน แต่ตู้กลางมีที่ยืนแค่ 2-3 จุด
+       planFamily จึงล้มเหลวทุกครั้ง วนขอใหม่ทุก 2 วิ ไม่มีวันสำเร็จ = ทั้งกลุ่มยืนนิ่งคาประตูตลอดไป
+       ทางออกไล่ระดับ: หาที่ยืนไม่ได้ 8 วิ -> เลิกดู เดินออกจากร้าน · ยังไม่ได้อีก 8 วิ -> แยกกันเดินเดี่ยว
+       (คนเดียวหาที่ยืนได้เสมอ เพราะขอที่แค่จุดเดียว) */
+    if(g.stage==='planning'){
+      g.planFail=(g.planFail||0)+dt;
+      if(g.planFail>8&&g.visits>0){g.visits=0;g.replan=true;g.time=99;}      // ออกจากร้านแทนการยืนรอ
+      if(g.planFail>16){
+        for(const p of g.members){p.family=null;p._familyGoal=null;p._regroup=null;p.state='walk';p.tgt=null;p.route=[];p.stuck=0;p.lookT=0;nextGoal(p);}
+        g.members=[];continue;
+      }
+    }else g.planFail=0;
     if(g.stage==='new'||g.replan&&g.time>2&&g.firstArrivedAt==null&&g.stage!=='look'){planFamily(g);continue;}
     if(g.focus&&(!G.objs.includes(g.focus)||g.focus===moving)){planFamily(g);continue;}
     const atDestination=p=>{const goal=p._familyGoal||p.tgt;return goal&&Math.hypot(p.x-goal.x,p.y-goal.y)<1.2;};
@@ -632,9 +648,25 @@ function stepPeople(){
     p.x = nx; p.y = ny;
     // Gait is finalized from actual displacement below.                            // จังหวะก้าวตามระยะที่เดินจริง
   }
-  for(const p of PEOPLE){
+  for(let i=PEOPLE.length-1;i>=0;i--){
+    const p=PEOPLE[i];
     const distance=Math.hypot(p.x-(p._stepX??p.x),p.y-(p._stepY??p.y));
     updateBlockedVisitor(p,dt,distance);
+    /* ---- ตัวเฝ้าระวัง "ยืนแข็ง" ของลูกค้าเดี่ยว ----
+       เคสที่เจอ: เป้าหมายที่สุ่มได้ตกอยู่บนช่องที่ไม่ใช่พื้นร้าน (ร้านเป็นรูปตัว L ไม่ใช่สี่เหลี่ยมเต็ม)
+       personRoute() คืนเส้นทางว่างทุกครั้ง → stuck ครบ 0.8 → nextGoal() → รีเซ็ต stuck → วนแบบนี้ตลอดกาล
+       ตัวนับนี้จึงต้องแยกจาก p.stuck เพราะ nextGoal() ล้าง p.stuck ทุกรอบ
+       ไล่ระดับ: ขยับไม่ได้ 10 วิ -> สั่งให้เดินออกจากร้าน · 20 วิ -> เอาออกจากร้านเลย ดีกว่ายืนค้าง
+       ยกเว้นคนที่ "ตั้งใจยืน" อยู่แล้ว: กำลังดูตู้ · รอครอบครัว · รอผู้เล่นตอบข้อเสนอที่เคาน์เตอร์ */
+    const walking=(p.state==='walk'||p.state==='leave')&&!p.family&&!p.tradeOffer&&!p._columnFollower;
+    if(!walking||distance>1e-5)p._idleWalk=0;
+    else{
+      p._idleWalk=(p._idleWalk||0)+dt;
+      if(p._idleWalk>20){PEOPLE.splice(i,1);continue;}
+      if(p._idleWalk>10&&p.state!=='leave'){
+        p.state='leave';p.focus=null;p.tgt=doorSpot();p.route=[];p.routeGoal=null;p._pathRetryAt=0;p.stuck=0;
+      }
+    }
     if(distance>1e-5){
       // Walking slowly changes cadence, not leg size. Previously slow movement
       // shrank the stride/lift almost to zero while the body kept translating.
