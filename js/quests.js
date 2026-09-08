@@ -30,8 +30,8 @@
   {t:'ทำความสะอาดตู้', h:'ในตู้มีปุ่มทำความสะอาด ลองขัดคราบสาหร่ายให้เอี่ยม', cond:b=>S().cleaned>b.cleaned, reward:{coin:40, rep:0, txt:'ได้แปรงขัดตู้'}, btn:'#mView'},
   {t:'แต่งร้านสักหน่อย', h:'เข้าโหมดก่อสร้าง (🔧) ซื้อของตกแต่งมาวางในร้าน 1 ชิ้น', cond:b=>decorCount()>b.decor, reward:{coin:40, rep:0, txt:'ปลดล็อกชุดตกแต่งใหม่'}, btn:'#mBuild'},
   {t:'ทำประตูเข้าร้าน', h:'โหมดก่อสร้าง → ปุ่ม 🚪 ประตู เลือกตำแหน่งบนกำแพง วางประตูให้ลูกค้าเดินเข้าได้', cond:b=>!!G.door, reward:{coin:40, rep:0, txt:'ลูกค้าเดินเข้าร้านได้แล้ว'}, btn:['button[onclick^="placeEntrance"]','#mBuild']},
-  {t:'เพิ่มความดึงดูดของร้าน', h:'ซื้อของตกแต่งเพิ่ม (และมีทากอยู่ในตู้) ให้ค่าความดึงดูดแตะ 6', cond:b=>attraction()>=6, reward:{coin:1200, rep:0, txt:'ร้านน่าเข้า ลูกค้าเริ่มแวะ — ได้ทุนก้อนไปเปิดตู้เพาะพันธุ์!'}, btn:'#mBuild'},
-  {t:'สร้างโต๊ะเพาะพันธุ์', h:'ในร้านค้า (โหมดก่อสร้าง) มีตู้เพาะพันธุ์ 3 ส่วน วางลงไป', cond:b=>breederExists(), reward:{coin:0, rep:2, txt:'ปลดล็อกการเพาะพันธุ์'}, btn:'#mBuild'},
+  {t:'เพิ่มความดึงดูดของร้าน', h:'ซื้อของตกแต่งเพิ่ม (และมีทากอยู่ในตู้) ให้ค่าความดึงดูดแตะ 6', cond:b=>attraction()>=6, reward:{coin:500, rep:0, tank:'tank_breed', txt:'รับตู้เพาะพันธุ์ฟรีในที่พักพิง แล้วนำมาวางในร้านได้เลย'}, btn:'#mBuild'},
+  {t:'วางตู้เพาะพันธุ์', h:'เปิดที่พักพิง เลือกตู้เพาะพันธุ์ฟรีที่ได้รับ แล้ววางในร้าน', cond:b=>breederExists(), reward:{coin:0, rep:2, txt:'ปลดล็อกการเพาะพันธุ์'}, btn:'#mBuild'},
   {t:'ผสมพันธุ์ทากคู่แรก', h:'เข้าตู้เพาะ เลือกทากว่าง 2 ตัว แล้วเริ่มผสมพันธุ์', cond:b=>S().bred>b.bred, reward:{coin:80, rep:1, txt:'รอลูกทากตัวแรกได้เลย'}, btn:'#mView'},
   {t:'วางเคาน์เตอร์ขายทาก', h:'โหมดก่อสร้าง → วางเคาน์เตอร์ (ฟรี) ไว้ให้ลูกค้ามาเสนอราคาซื้อทาก', cond:b=>(G.objs||[]).some(o=>o&&o.type==='deco'&&o._key==='counter'), reward:{coin:0, rep:1, txt:'พร้อมขายทากแล้ว'}, btn:['button[onclick^="placeTradeCounter"]','#mBuild']},
   {t:'ขายทากให้ลูกค้า', h:'รอลูกค้าเดินมาที่เคาน์เตอร์เสนอราคา แล้วกดขาย — ขายลูกที่เพาะได้ อย่าขายคู่พ่อแม่', cond:b=>S().sold>b.sold, reward:{coin:100, rep:1, txt:'นี่คือรายได้หลักของร้าน'}, btn:'#mView'},
@@ -113,7 +113,7 @@
   if(G.questDone){ card.innerHTML=questHeader('เควส')+(questCollapsed?'':'<div style="font-weight:600;color:#f1c66d;margin-top:3px">🎉 จบบทเรียนเริ่มต้น</div><div style="opacity:.85;margin-top:3px">เปิดร้านเพาะทากได้เต็มตัวแล้ว ลุยเลย!</div>'); bindToggle(); return; }
   const i=G.questIndex, q=QUESTS[i]; if(!q){ G.questDone=true; renderCard(); return; }
   if(questCollapsed){ card.innerHTML=questHeader('เควส '+(i+1)+' / '+QUESTS.length+' · '+q.t); bindToggle(); return; }
-  const rw=[]; if(q.reward.coin) rw.push('💰'+q.reward.coin); if(q.reward.rep) rw.push('⭐'+q.reward.rep);
+  const rw=[]; if(q.reward.tank)rw.push('🥚 ตู้เพาะพันธุ์ 1 ตู้'); if(q.reward.coin) rw.push('💰'+q.reward.coin); if(q.reward.rep) rw.push('⭐'+q.reward.rep);
   card.innerHTML=questHeader('เควส '+(i+1)+' / '+QUESTS.length)
    +'<div style="font-weight:600;color:#f1c66d;margin-top:3px">'+q.t+'</div>'
    +'<div style="opacity:.9;margin-top:5px">'+q.h+'</div>'
@@ -129,10 +129,11 @@
  }
  function grantReward(q){
   const r=q.reward||{};
+  if(r.tank){const def=CATALOG[r.tank];G.shelter.push({id:'o'+(G.seq++),type:def.kind,_key:r.tank,cx:0,cy:0,def,rot:0,slugs:[]});}
   if(r.coin) G.coin=(G.coin||0)+r.coin;
   if(r.rep)  G.rep =(G.rep||0)+r.rep;
   if(Number.isFinite(r.box)&&typeof SLUG_BOXES!=='undefined'&&typeof rollBoxGenes==='function'){const _bx=SLUG_BOXES[r.box];if(_bx){const _has=(G.objs||[]).some(o=>o&&o._key==='counter');if(_has&&typeof slugDeliveries==='function')slugDeliveries().push({id:'quest-'+q.id+'-box',boxIndex:r.box,name:_bx.name,readyAt:Date.now()+1500,genes:rollBoxGenes(_bx),alerted:false});else if(Array.isArray(G.inv)&&typeof makeSlug==='function')G.inv.push(makeSlug(rollBoxGenes(_bx)));}}
-  const parts=[]; if(r.coin)parts.push('+'+r.coin+' เหรียญ'); if(r.rep)parts.push('+'+r.rep+' ชื่อเสียง');
+  const parts=[]; if(r.tank)parts.push('ตู้เพาะพันธุ์ฟรี 1 ตู้'); if(r.coin)parts.push('+'+r.coin+' เหรียญ'); if(r.rep)parts.push('+'+r.rep+' ชื่อเสียง');
   if(typeof toast==='function') toast('✅ เควสสำเร็จ: '+q.t+(parts.length?' · '+parts.join(' · '):'')+(r.txt?' · '+r.txt:''),'good');
   if(typeof syncHUD==='function') syncHUD();
   syncRep();

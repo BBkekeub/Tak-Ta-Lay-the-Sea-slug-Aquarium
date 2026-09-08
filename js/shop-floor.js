@@ -912,12 +912,14 @@ registerMode('holding','floor',()=>!!buyKey||!!moving,()=>{
 function setMode(m){
   appMode=m;
   document.body.classList.toggle('mode-view', m==='view');
+  document.body.classList.toggle('mode-build', m==='build');
   document.getElementById('mView').classList.toggle('on', m==='view');
   document.getElementById('mBuild').classList.toggle('on', m==='build');
   if(m==='build'){ buyKey=null; setTool('place'); buildShop(); }   // เข้าโหมดก่อสร้างด้วยมือว่าง
   else { restoreHeldRotation(); moving=null; grab=null; cv.classList.remove('placing'); }
 }
 function toast(msg,kind){
+  if(typeof playNotificationSound==='function')playNotificationSound(notificationKind(String(msg),kind));
   const el=document.getElementById('toast'); el.textContent=msg;
   el.className='toast on'+(kind?' '+kind:'');
   clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('on'),1600);

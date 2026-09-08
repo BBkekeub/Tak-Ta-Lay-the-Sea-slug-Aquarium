@@ -51,7 +51,11 @@ function tryCustomerOffer(p,tank){
 }
 function finishTrade(id,accept=false){
   const o=TRADE_OFFERS.find(o=>o.id===id);if(!o)return;
-  if(accept){
+  /* ข้อเสนอ 'พ่อค้าเร่ขายให้เรา' — ตรงข้ามกับข้อเสนอปกติ จ่ายเงินออก ได้ทากเข้าคลัง */
+  if(accept&&o.sell){
+    if(!o.arrived||!PEOPLE.includes(o.p)||!G.objs.includes(o.counter)||o.counter===moving||o.cx!==o.counter.cx||o.cy!==o.counter.cy||o.rot!==o.counter.rot){finishTrade(id);return;}
+    if(typeof buyFromPeddler!=='function'||!buyFromPeddler(o))return;
+  }else if(accept){
     if(!o.arrived||!PEOPLE.includes(o.p)||!G.objs.includes(o.counter)||o.counter===moving||o.cx!==o.counter.cx||o.cy!==o.counter.cy||o.rot!==o.counter.rot||!G.objs.includes(o.tank)||!o.tank.slugs.includes(o.slug)){finishTrade(id);return;}
     if(typeof heldSlug!=='undefined'&&heldSlug===o.slug){toast('วางทากกลับตู้ก่อน');return;}
     if(totalShopSlugs()<=2){toast('ต้องเหลือทากในร้านอย่างน้อย 2 ตัว จึงยังขายไม่ได้','bad');return;}
@@ -71,7 +75,8 @@ function finishTrade(id,accept=false){
 function stepTradeOffers(dt){
   for(const o of [...TRADE_OFFERS]){
     o.age+=dt;
-    if(!PEOPLE.includes(o.p)||!G.objs.includes(o.tank)||!o.tank.slugs.includes(o.slug)||!G.objs.includes(o.counter)||o.counter===moving||o.cx!==o.counter.cx||o.cy!==o.counter.cy||o.rot!==o.counter.rot||o.age>90)finishTrade(o.id);
+    const gone=o.sell?false:(!G.objs.includes(o.tank)||!o.tank.slugs.includes(o.slug));
+    if(!PEOPLE.includes(o.p)||gone||!G.objs.includes(o.counter)||o.counter===moving||o.cx!==o.counter.cx||o.cy!==o.counter.cy||o.rot!==o.counter.rot||o.age>(o.timeout||90))finishTrade(o.id);
   }
   tradeHudTime+=dt;if(tradeHudTime>1){tradeHudTime=0;renderTradeOffers();}
 }
@@ -103,6 +108,7 @@ function renderTradeOffers(force=false){
   // Do not replace an open native picker during the one-second countdown update.
   if(!force&&el.contains(document.activeElement)&&document.activeElement.tagName==='SELECT')return;
   const html=TRADE_OFFERS.map(o=>{
+    if(o.sell)return typeof sellOfferCard==='function'?sellOfferCard(o):'';
     o.requestedId ||= o.slug.id;
     o.choices=tradeAlternatives(o);
     const name=tradeEscape(o.slug.id),tank=tradeEscape(o.tank.def.name+' '+o.tank.id);
@@ -138,8 +144,23 @@ function drawTradeCounter(o){
   ctx.save();ctx.font=`${Math.max(10,22*cam.zoom)}px sans-serif`;ctx.textAlign='center';ctx.fillStyle='#f3dfaa';ctx.fillText('เสนอราคา',p.x,p.y);ctx.restore();
 }
 
-// Short arrival chime. Reuse one audio context; allocate voices only on an event.
-let tradeAudio=null;
+// Event-only audio: share one context, bound overlapping chimes, release each voice.
+let tradeAudio=null, notificationEnd=0;
+const notificationLast=new Map();
+const NOTIFICATION_TONES={
+ buyer:[[0,784],[.16,1047]],
+ seller:[[0,659],[.15,523],[.3,784]],
+ order:[[0,880],[.12,1175],[.3,880]],
+ mail:[[0,587],[.22,880]],
+ eggs:[[0,523],[.18,659]],
+ hatch:[[0,784],[.12,988],[.24,1175]],
+ grown:[[0,440],[.22,440],[.44,587]],
+ breedDone:[[0,659],[.16,784],[.32,1047]],
+ quest:[[0,523],[.12,659],[.24,784],[.4,1047]],
+ success:[[0,698],[.14,932]],
+ warning:[[0,392],[.22,330]],
+ notice:[[0,740]]
+};
 function unlockTradeAudio(){
  try{const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;
   tradeAudio ||= new Audio();
@@ -148,17 +169,36 @@ function unlockTradeAudio(){
 }
 document.addEventListener('pointerdown',unlockTradeAudio,{passive:true});
 document.addEventListener('keydown',unlockTradeAudio,{passive:true});
+function playNotificationSound(kind){
+ const volume=typeof bgm!=='undefined'?bgm.volume:.35;
+ if(volume<=0||!tradeAudio||tradeAudio.state!=='running')return false;
+ const now=tradeAudio.currentTime,last=notificationLast.get(kind);
+ if(last!==undefined&&now-last<.8)return false;
+ const notes=NOTIFICATION_TONES[kind]||NOTIFICATION_TONES.notice;
+ // Queue at most a short burst; do not build an unbounded notification backlog.
+ if(notificationEnd>now+1.5)return false;
+ const start=Math.max(now,notificationEnd),level=.34*Math.sqrt(volume);
+ notificationLast.set(kind,now);notificationEnd=start+notes[notes.length-1][0]+.32;
+ for(const [offset,hz] of notes){
+  const voice=tradeAudio.createOscillator(),gain=tradeAudio.createGain(),at=start+offset;
+  voice.type='sine';voice.frequency.setValueAtTime(hz,at);
+  gain.gain.setValueAtTime(0,at);gain.gain.linearRampToValueAtTime(level,at+.015);gain.gain.exponentialRampToValueAtTime(.0001,at+.28);
+  voice.connect(gain);gain.connect(tradeAudio.destination);
+  voice.onended=()=>{voice.disconnect();gain.disconnect();};voice.start(at);voice.stop(at+.3);
+ }
+ return true;
+}
+function notificationKind(msg,kind){
+ if(kind==='bad')return /ตัวอ่อน.*เต็ม/.test(msg)?'grown':'warning';
+ if(/ไข่พร้อมฟัก/.test(msg))return 'hatch';
+ if(/วางไข่แล้ว/.test(msg))return 'eggs';
+ if(/ฟักไข่ครบ/.test(msg))return 'breedDone';
+ if(/เควสสำเร็จ/.test(msg))return 'quest';
+ if(/ออเดอร์ออนไลน์.*ใหม่/.test(msg))return 'order';
+ if(/📬|จดหมาย|ของขวัญต้อนรับ/.test(msg))return 'mail';
+ return kind==='good'?'success':'notice';
+}
 function notifyTradeArrival(offer){
  if(!offer.arrived||offer.soundNotified)return;
- offer.soundNotified=true;
- const volume=typeof bgm!=='undefined'?bgm.volume:.35;
- if(volume<=0||!tradeAudio||tradeAudio.state!=='running')return;
- const start=tradeAudio.currentTime;
- for(const [offset,hz] of [[0,784],[.13,1046.5]]){
-  const voice=tradeAudio.createOscillator(),gain=tradeAudio.createGain(),at=start+offset;
-  voice.type='sine';voice.frequency.value=hz;
-  gain.gain.setValueAtTime(0,at);gain.gain.linearRampToValueAtTime(.22*volume,at+.012);gain.gain.exponentialRampToValueAtTime(.0001,at+.32);
-  voice.connect(gain);gain.connect(tradeAudio.destination);
-  voice.onended=()=>{voice.disconnect();gain.disconnect();};voice.start(at);voice.stop(at+.34);
- }
+ if(playNotificationSound(offer.sell?'seller':'buyer'))offer.soundNotified=true;
 }

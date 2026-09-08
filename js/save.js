@@ -37,7 +37,7 @@ function saveGame(){
   if(!_saveOK) return;
   try{
     const data={
-      v:1, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||0, floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, orders:G.orders||[], nextOrderAt:G.nextOrderAt||0, orderSeq:G.orderSeq||0, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
+      v:1, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||0, floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, orders:G.orders||[], nextOrderAt:G.nextOrderAt||0, orderSeq:G.orderSeq||0, nextPeddlerAt:G.nextPeddlerAt||0, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
       objs:(G.objs||[]).map(_saveObj),
       shelter:(G.shelter||[]).map(_saveObj),
       inv:(G.inv||[]).map(_saveSlug)
@@ -156,6 +156,7 @@ function loadGame(){
                 reward:_NUM(o.reward,1500)|0,buyer:String(o.buyer||''),taunt:String(o.taunt||''),
                 done:!!o.done,doneAt:_NUM(o.doneAt,0),slugId:String(o.slugId||'')};});
     G.nextOrderAt=_NUM(d.nextOrderAt,0); G.orderSeq=_NUM(d.orderSeq,0)|0;
+    G.nextPeddlerAt=_NUM(d.nextPeddlerAt,0);   /* คิวพ่อค้าเร่ (slug-peddler.js) เป็นเวลาจริง เดินต่อแม้ปิดเกม */
     G.larvaDeaths=_NUM(d.larvaDeaths,0)|0; G.rivalDeathMailSent=!!d.rivalDeathMailSent; G.rival100MailSent=!!d.rival100MailSent;
     /* สมุด "ของฟรีที่แจกไปแล้ว" (grantOnce ใน slug-box-shop.js) — ต้องคงข้ามรีโหลด
        เซฟเก่ายังไม่มีสมุดนี้ จึงเติมจากธงเดิมก่อน ไม่งั้นของขวัญ/กล่องคู่แข่งจะถูกแจกซ้ำอีกหนึ่งรอบ */

@@ -1,4 +1,12 @@
-const BREEDING={mate:60,egg:60,grow:60,adultCap:12,larvaCap:50};
+/* hatchMin/hatchMax = โอกาสฟักต่อไข่ 1 ฟอง ไล่ตามค่าความสมบูรณ์ (vigor) เฉลี่ยของพ่อแม่
+   0 → 7% · 100 → 18% · โอกาสฟักอยู่ในช่วงนี้เสมอ
+   พิตี้: ต่อการวางไข่ 1 ครอก การันตีอย่างน้อย 1 ตัว (ดู hatchBreedingEgg) */
+const BREEDING={mate:60,egg:60,grow:60,adultCap:12,larvaCap:50,hatchMin:.07,hatchMax:.18};
+/* โอกาสฟักจริงต่อฟองตามความสมบูรณ์ — ใช้ทั้งตอนฟักและตอนโชว์ใน UI */
+function breedingHatchChance(o,b){
+ const base=Number.isFinite(b.hatchChance)?b.hatchChance:(b.eggs&&b.eggs[0]&&Number.isFinite(b.eggs[0].baseChance)?b.eggs[0].baseChance:BREEDING.hatchMin);
+ return Math.max(BREEDING.hatchMin,Math.min(BREEDING.hatchMax,base));
+}
 const isBreeder=o=>!!o?.def?.breeder;
 function breederState(o){return o.breeding||(o.breeding={parents:[],eggs:[],larvae:[],phase:'idle',left:0,lab:BreedingGenes.newLab(),clean:100});}
 function breederReserved(o){const b=isBreeder(o)?breederState(o):null;return b?b.parents.filter(s=>!o.slugs.includes(s)).length:0;}
@@ -20,7 +28,13 @@ function hatchBreedingEgg(o,index){
  if(!isBreeder(o))return false;const b=breederState(o),egg=b.eggs[index];
  if(b.phase!=='hatching'||!egg||egg.open)return false;
  if(egg.alive&&b.larvae.length>=50){toast('ตัวอ่อนเต็ม รอพื้นที่ว่างก่อนฟัก','bad');return false;}
- if(egg.hatchRoll!==undefined){const failed=b.eggs.filter(e=>e.open&&!e.alive).length;egg.alive=egg.hatchRoll<Math.min(1,(egg.baseChance+(egg.last?failed*.1:0))*breedingSatietyFactor(b.parentSatiety)*breedingCleanFactor(o));}
+ if(egg.hatchRoll!==undefined){
+  egg.alive=egg.hatchRoll<breedingHatchChance(o,b);
+ }
+  /* พิตี้เรท — ครอกหนึ่งต้องได้อย่างน้อย 1 ตัว
+     ถ้านี่คือฟองสุดท้ายที่ยังไม่เปิด และทั้งครอกยังไม่มีตัวไหนรอด ให้ฟองนี้รอดแน่นอน
+     (ผสมจนจบแล้วไม่ได้อะไรเลยมันใจร้ายเกินไป) */
+  if(!egg.alive&&!b.eggs.some(e=>e.open&&e.alive)&&b.eggs.filter(e=>!e.open).length<=1){egg.alive=true;egg.pity=true;}
  if(egg.alive&&b.larvae.length>=50){toast('พื้นที่ตัวอ่อนเต็ม','bad');return false;}
  egg.open=true;
  if(egg.alive){const genes=BreedingGenes.breed(...b.parentGenes,b.lab,egg.seed).child;const slug=makeSlug(genes);slug.breedLife=50;slug.satiety=100;b.larvae.push({slug,left:BREEDING.grow,survives:egg.grow,growthRoll:egg.growthRoll,ready:false});}
@@ -33,7 +47,10 @@ function tickBreeder(o,dt,rnd=Math.random){
  if(b.phase==='mating'||b.phase==='eggs'){
   b.left=Math.max(0,b.left-dt);
   if(b.left===0&&b.phase==='mating'){
-   b.parentSatiety=b.parents.reduce((n,s)=>n+(s.satiety??50),0)/Math.max(1,b.parents.length);b.phase='eggs';b.left=BREEDING.egg;let dead=0;const n=Math.round(5+b.strength/100*10),chance=.05+b.strength/100*.05;
+   b.parentSatiety=b.parents.reduce((n,s)=>n+(s.satiety??50),0)/Math.max(1,b.parents.length);b.phase='eggs';b.left=BREEDING.egg;let dead=0;const n=Math.round(5+b.strength/100*10);
+   /* โอกาสฟัก 7–18% ไล่ตามความสมบูรณ์เฉลี่ยของพ่อแม่ (ค่าปัจจุบันรวมบัฟอาหาร) */
+   const vig=b.parents.length?b.parents.reduce((n,s)=>n+Math.max(0,Math.min(100,foodGenes(s).vigor)),0)/b.parents.length:50;
+   const chance=BREEDING.hatchMin+(vig/100)*(BREEDING.hatchMax-BREEDING.hatchMin);b.hatchChance=chance;b.hatchVigor=Math.round(vig);
    b.eggs=Array.from({length:n},(_,i)=>({alive:false,open:false,hatchRoll:rnd(),baseChance:chance,last:i===n-1,seed:(rnd()*4294967296)>>>0,growthRoll:rnd()}));
    for(const parent of b.parents){parent.breedZone=true;if(!o.slugs.includes(parent))o.slugs.push(parent);}b.parents=[];
   }else if(b.left===0&&b.phase==='eggs')b.phase='hatching';
@@ -99,9 +116,10 @@ function renderBreederUI(){
  if(!tankMode||!isBreeder(curTank)){breederPanel.hidden=true;breederPanelKey='';return;}
  const o=curTank,b=breederState(o);if(breederPanelTank!==o){breederChosen.clear();breederPanelTank=o;}
  breederChosen=new Set([...breederChosen].filter(id=>o.slugs.some(s=>s.id===id)));
- const key=[o.id,b.phase,Math.ceil(b.left),o.slugs.map(s=>s.id+':'+(s.breedLife??50)).join(),b.larvae.length,b.larvae.filter(l=>l.ready).length,b.eggs.map(e=>+e.open).join(),[...breederChosen].join()].join('|');breederPanel.hidden=false;if(key===breederPanelKey)return;breederPanelKey=key;
+ const key=[o.id,b.phase,Math.ceil(b.left),Math.round(breedingHatchChance(o,b)*100),o.slugs.map(s=>s.id+':'+(s.breedLife??50)).join(),b.larvae.length,b.larvae.filter(l=>l.ready).length,b.eggs.map(e=>+e.open).join(),[...breederChosen].join()].join('|');breederPanel.hidden=false;if(key===breederPanelKey)return;breederPanelKey=key;
  const state=b.phase==='idle'?'พร้อมผสม':b.phase==='mating'?'กำลังผสม '+Math.ceil(b.left)+' วิ':b.phase==='eggs'?'รอฟัก '+Math.ceil(b.left)+' วิ':'กดไข่ทีละฟองเพื่อฟัก';
- breederPanel.innerHTML='<div style="margin-bottom:8px">เลี้ยงทั่วไป 100×50 ซม. · '+o.slugs.length+'/12 ตัว　|　ผสม 25×50 ซม. · '+state+'　|　ตัวอ่อน 25×50 ซม. · '+b.larvae.length+'/50 ตัว'+(b.larvae.some(l=>l.ready)?' · รอพื้นที่โซนตัวโต':'')+'</div><div style="display:flex;gap:8px;flex-wrap:wrap">'+'<button class="tbtn" id="startBreeder" '+(b.phase!=='idle'?'disabled':'')+'>เลือกทากมาผสมพันธุ์</button></div>'+(b.phase==='hatching'?'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px"><button class="tbtn" id="hatchAllBreeder">ฟักทั้งหมด</button>'+'</div>':'');
+ const oddsText=(b.phase==='eggs'||b.phase==='hatching')&&b.eggs.length?'　|　โอกาสฟัก '+Math.round(breedingHatchChance(o,b)*100)+'% ต่อฟอง'+(Number.isFinite(b.hatchVigor)?' (ความสมบูรณ์ '+b.hatchVigor+')':'')+' · การันตีอย่างน้อย 1 ตัวต่อครอก':'';
+ breederPanel.innerHTML='<div style="margin-bottom:8px">เลี้ยงทั่วไป 100×50 ซม. · '+o.slugs.length+'/12 ตัว　|　ผสม 25×50 ซม. · '+state+'　|　ตัวอ่อน 25×50 ซม. · '+b.larvae.length+'/50 ตัว'+(b.larvae.some(l=>l.ready)?' · รอพื้นที่โซนตัวโต':'')+oddsText+'</div><div style="display:flex;gap:8px;flex-wrap:wrap">'+'<button class="tbtn" id="startBreeder" '+(b.phase!=='idle'?'disabled':'')+'>เลือกทากมาผสมพันธุ์</button></div>'+(b.phase==='hatching'?'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px"><button class="tbtn" id="hatchAllBreeder">ฟักทั้งหมด</button>'+'</div>':'');
  breederPanel.querySelectorAll('[data-parent]').forEach(el=>el.onchange=()=>{if(el.checked&&breederChosen.size<2)breederChosen.add(el.dataset.parent);else breederChosen.delete(el.dataset.parent);breederPanelKey='';renderBreederUI();});
  if(breederPanel.querySelector('#hatchAllBreeder'))breederPanel.querySelector('#hatchAllBreeder').onclick=()=>hatchAllBreeder(o);
  breederPanel.querySelector('#startBreeder').onclick=()=>openBreedingPicker(o);breederPanel.querySelectorAll('[data-egg]').forEach(el=>el.onclick=()=>hatchBreedingEgg(o,+el.dataset.egg));

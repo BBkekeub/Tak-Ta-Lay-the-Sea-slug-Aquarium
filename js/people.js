@@ -289,6 +289,34 @@ let _arrivalScore=null, _pendingParty=null, _arrivalRetryAt=0;
 function visitorCapacity(){return Math.max(0,Math.floor(floorArea()/4));}
 function visitorAttraction(){const slug=G.objs.reduce((n,o)=>n+(o.type==='tank'&&Array.isArray(o.slugs)?o.slugs.length*(typeof tankAttractionFactor==='function'?tankAttractionFactor(o):1):0),0);const deco=G.objs.reduce((n,o)=>n+((o.type==='deco'&&o._key!=='counter'&&o.def&&Number.isFinite(o.def.attr))?o.def.attr:0),0);const tankDeco=G.objs.reduce((n,o)=>n+((o.type==='tank'&&Array.isArray(o.decor))?o.decor.length*0.5:0),0);return Math.round((slug+deco+tankDeco)*10)/10;}
 function visitorInterval(score){return Math.max(20,60-Math.max(0,Math.ceil(Math.max(0,score)/10)-1)*5);}
+/* ---- พื้นขั้นต่ำของจำนวนลูกค้า (ช่วงเงียบ) ----
+   ช่วงแรกความดึงดูดต่ำ ลูกค้ามาห่างกัน 60 วิ แต่แต่ละคนอยู่ในร้านแค่ ~30-40 วิ
+   ค่าเฉลี่ยจึงเหลือคนในร้านไม่ถึง 1 คน = ร้านโล่งเกือบตลอด
+   แก้ที่ "อัตราการไหลเข้า" ไม่ใช่ "เวลาที่อยู่": ถ้าในร้านน้อยกว่า VISITOR_MIN
+   คนถัดไปจะเข้ามาภายใน QUIET_GAP วินาที (และเลือกกลุ่มเล็กเพื่อเติมให้ไว)
+   ลูกค้าช่วงแรกยังเดินเข้า-ดูตู้-เดินออกไวเหมือนเดิม แค่มีคนใหม่ไหลเข้ามาแทนที่ทันที */
+var VISITOR_MIN=2;     // คนขั้นต่ำที่อยากให้มีในร้านตลอด
+var QUIET_GAP=3;       // วินาทีระหว่างคนเข้า ตอนที่ยังไม่ถึงขั้นต่ำ
+function visitorFloor(capacity){return Math.min(VISITOR_MIN,Math.max(0,capacity));}
+/* คนที่กำลังเดินออก ไม่นับว่าอยู่ในร้านแล้ว — สั่งคนใหม่ตั้งแต่ตอนเขาเริ่มเดินออก
+   คนใหม่จะเดินสวนเข้ามาพอดี ร้านเลยไม่มีช่วงโล่งระหว่างรอยต่อ */
+function visitorPresent(){let n=0;for(const p of PEOPLE)if(p.state!=='leave'&&!p.wantsSell)n++;return n;}
+/* ตอนเติมให้ถึงขั้นต่ำใช้เฉพาะกลุ่มเล็ก — ครอบครัว 4 คนต้องรอที่ยืนพร้อมกัน 4 จุด ช้ากว่ามาก */
+function chooseQuietKind(need,capacity){
+  const room=Math.max(1,Math.min(need,capacity));
+  const menu=[['solo',1,70],['couple',2,30]].filter(x=>x[1]<=room);
+  if(!menu.length)return 'solo';
+  let roll=Math.random()*menu.reduce((sum,x)=>sum+x[2],0);
+  for(const option of menu){roll-=option[2];if(roll<0)return option[0];}
+  return menu[menu.length-1][0];
+}
+/* ดูกี่ตู้ก่อนกลับ — ผูกกับจำนวนตู้ในร้าน
+   ร้านมี 2 ตู้แล้วเดินวน 5 รอบมันประหลาด ช่วงแรกจึงเป็น "เข้ามาดู แล้วออก" */
+function visitorVisits(){
+  const tanks=(G.objs||[]).filter(o=>o&&o.type==='tank'&&o!==moving).length;
+  const cap=Math.min(VISIT_MAX,tanks),min=Math.min(VISIT_MIN,cap);
+  return min+((Math.random()*(cap-min+1))|0);
+}
 function chooseVisitorKind(capacity){
   const menu=[['solo',1,50],['couple',2,30],['family1',3,10],['family2',4,5],['parentChild',2,5]].filter(x=>x[1]<=capacity);
   if(!menu.length)return null;
@@ -324,6 +352,8 @@ function stepVisitorArrivals(){
   const capacity=visitorCapacity(),score=visitorAttraction();
   if(!capacity){_pendingParty=null;_arrivalScore=null;_spawnAt=Infinity;return;}
   if(stepOpeningVisitors(capacity,score))return;
+  /* พ่อค้าเร่ถือตู้ทากมาขาย (slug-peddler.js) — คิวแยกจากลูกค้าปกติ */
+  if(typeof stepPeddlerArrival==='function'&&stepPeddlerArrival(capacity))return;
   if(score!==_arrivalScore){
     if(_arrivalScore===null||!isFinite(_spawnAt))_spawnAt=_peopleT+visitorInterval(score);
     else if(!_pendingParty){
@@ -336,8 +366,15 @@ function stepVisitorArrivals(){
   if(_pendingParty&&_pendingParty.profiles.length>capacity){
     _pendingParty=null;_spawnAt=_peopleT+visitorInterval(score);
   }
+  /* ยังไม่ถึงคนขั้นต่ำ = โหมดช่วงเงียบ ดึงคนถัดไปเข้ามาไว ๆ และเลือกกลุ่มเล็ก */
+  const floorN=visitorFloor(capacity),here=visitorPresent(),quiet=here<floorN;
+  if(quiet){
+    const need=floorN-here;
+    if(_pendingParty&&_pendingParty.profiles.length>Math.max(1,need))_pendingParty=null;
+    if(_spawnAt>_peopleT+QUIET_GAP)_spawnAt=_peopleT+QUIET_GAP;
+  }
   if(_peopleT<_spawnAt)return;
-  if(!_pendingParty){const kind=chooseVisitorKind(capacity);_pendingParty={kind,profiles:visitorProfiles(kind)};}
+  if(!_pendingParty){const kind=quiet?chooseQuietKind(floorN-visitorPresent(),capacity):chooseVisitorKind(capacity);_pendingParty={kind,profiles:visitorProfiles(kind)};}
   if(capacity-PEOPLE.length<_pendingParty.profiles.length||_peopleT<_arrivalRetryAt)return;
   if(spawnVisitors(capacity-PEOPLE.length,_pendingParty.kind,_pendingParty.profiles)){
     _pendingParty=null;_spawnAt=_peopleT+visitorInterval(score);
@@ -350,7 +387,7 @@ function spawnVisitors(capacity,requestedKind=null,requestedProfiles=null){
   for(let attempt=0;attempt<15;attempt++){
     const door=doorSpot();if(!door)continue;
     const spots=partySpots(door,count,null,true);if(!spots)continue;
-    const g=count>1?{kind,members:[],visits:2+((Math.random()*2)|0),stage:'new',time:0,replan:false}:null;
+    const g=count>1?{kind,members:[],visits:visitorVisits(),stage:'new',time:0,replan:false}:null;
     const batch=[];
     for(let i=0;i<count;i++){
       const p=makePerson({...profiles[i],at:spots[i]});if(!p)break;
@@ -358,6 +395,7 @@ function spawnVisitors(capacity,requestedKind=null,requestedProfiles=null){
       batch.push(p);
     }
     if(batch.length!==count)continue;
+    if(kind==='peddler'&&typeof makePeddler==='function'&&!makePeddler(batch[0]))continue;
     if(g){g.members=batch;assignFamilyBuyer(batch);}PEOPLE.push(...batch);_partySequence++;return true;
   }
   return false;
@@ -481,7 +519,7 @@ function makePerson(options={}){
     fdx: -1, fdy: -1,                    // ทิศที่หันหน้า (พิกัดพื้น)
     state: 'walk', t: 0, stuck: 0, lookT: 0,
     tgt: null, focus: null,
-    visits: VISIT_MIN + ((Math.random()*(VISIT_MAX-VISIT_MIN+1))|0),
+    visits: visitorVisits(),
     strolls: 0,
     skin: pick1(P_SKIN), hair: pick1(kid?P_HAIR.filter(c=>c!=='#8a8f94'):P_HAIR), shirt: pick1(P_SHIRT), pants: pick1(P_PANTS),
     shoe: Math.random()<0.5 ? '#23262b' : '#3a2f28',
@@ -539,6 +577,8 @@ function nextGoal(p){
   if(p._columnFollower)return;
   if(p._yieldResume)return;
   if(p.tradeOffer)return;
+  /* พ่อค้าเร่: เดินตรงไปเคาน์เตอร์เพื่อยื่นขาย ถ้ายังไปไม่ได้ (เคาน์เตอร์ไม่ว่าง/ทางตัน) ค่อยเดินเล่นรอ */
+  if(p.wantsSell&&!p.tradeDone&&typeof trySellerOffer==='function'&&trySellerOffer(p))return;
   if(p.family){if(p.family.firstArrivedAt!=null||p.family.stage==='look'){p.route=[];p._routeRetryAt=_peopleT+.5;p.stuck=0;return;}p.family.replan=true;return;}
   if(p.strolls > 0){                                   // เดินเล่นคั่นก่อน
     p.strolls--; p.focus = null; p.tgt = strollSpot(p); p.state = 'walk'; p.stuck = 0; return;
@@ -800,7 +840,7 @@ function drawPerson(p){
   // Reuse idle poses at 12 Hz and moving/gesturing poses at 30 Hz;
   // position is translated every frame so walking remains smooth.
   const poseRate=(p.motion>.05||p.action!=='watch')?30:12;
-  const poseKey=[Math.floor(p.idle*poseRate),p.action==='watch'?0:Math.round((p.actionT||0)*30),Math.round((p.catchupBoost||1)*10),Math.round(p.phase*20),Math.round((p.motion||0)*20),Math.round(p.fdx*100),Math.round(p.fdy*100),Math.round((p.headYaw||0)*100),p.action,p.state,p._squeezeUntil>_peopleT?1:0,p.focus?.id,['point','crouch'].includes(p.action)?Math.round(p.x*20):0,['point','crouch'].includes(p.action)?Math.round(p.y*20):0,p.hCm,p.outfit,p.hairCut,p.shirt,p.pants,p.skin,p.hair,p.bagged,p.accessory,p.modelHair,p.facial,p.body].join('|');
+  const poseKey=[Math.floor(p.idle*poseRate),p.action==='watch'?0:Math.round((p.actionT||0)*30),Math.round((p.catchupBoost||1)*10),Math.round(p.phase*20),Math.round((p.motion||0)*20),Math.round(p.fdx*100),Math.round(p.fdy*100),Math.round((p.headYaw||0)*100),p.action,p.state,p._squeezeUntil>_peopleT?1:0,p.focus?.id,['point','crouch'].includes(p.action)?Math.round(p.x*20):0,['point','crouch'].includes(p.action)?Math.round(p.y*20):0,p.hCm,p.outfit,p.hairCut,p.shirt,p.pants,p.skin,p.hair,p.bagged,p.accessory,p.modelHair,p.facial,p.body,p.carryTank?1:0,p.carryTank?p.carryColor:0,p.carryTank?p.carryAccent:0].join('|');
   if(p._drawPose&&p._drawPose.key===poseKey){
     const cached=p._drawPose,dx=p.x-cached.x,dy=p.y-cached.y;
     const faces=dx||dy?cached.faces.map(f=>({rgb:f.rgb,v:f.v.map(v=>[v[0]+dx,v[1]+dy,v[2]])})):cached.faces;
@@ -929,7 +969,10 @@ function drawPerson(p){
      แต่แขนกับหัวถูกยึดด้วยค่าเต็ม → ลำตัวกับไหล่/คอเสื้อเหลื่อมกันเป็นรอยต่อ
      (กายวิภาคก็ตรงกว่า: อกขึ้นไปเป็นก้อนแข็ง บิดกันที่กระดูกสันหลังช่วงล่าง) */
   const TWZ=JT.chest[2];
-  const KID_LEG=0.88, KID_HEAD=1.20;              // เด็ก: ขาสั้นลง 12% · หัวโตขึ้น 20%
+  const KID_LEG=0.88, KID_HEAD=1.20;
+  /* ตู้ทากใบเล็กที่พ่อค้าเร่อุ้มมา (ราว 30×15×20 ซม. เทียบคนสูง 165) — พิกัดเดียวกับ world() */
+  const CARRY_HW=.090, CARRY_HH=.060, CARRY_HD=.045;
+  const CARRY_Z=HIPZ+(TWZ-HIPZ)*.34, CARRY_Y=.115;              // เด็ก: ขาสั้นลง 12% · หัวโตขึ้น 20%
   /* วางชิ้นส่วนหนึ่งชิ้น: หมุน → ยืดตามความยาวข้อต่อ → ย้ายไปข้อต่อ → แปลงเป็นพิกัดโลก → ปั๊มสามเหลี่ยม
      ไม่เรียก face() ทีละสามเหลี่ยมเพราะจะเรียก world() ซ้ำ 3 เท่า (เวอร์เท็กซ์หนึ่งตัวใช้ร่วมกันหลายหน้า)
      แปลงทีละเวอร์เท็กซ์ครั้งเดียวแล้วค่อยประกอบหน้า เร็วกว่า ~3 เท่า */
@@ -1081,6 +1124,12 @@ function drawPerson(p){
     if(side===1&&action==='chat'){hand[1]+=.055*gesture;hand[2]+=.09*gesture;}
     if(side===-1&&action==='adjust'){hand[0]*=1-.6*gesture;hand[1]+=.065*gesture;hand[2]+=.16*gesture;}
     if(action==='chin'&&side===1){const tgt=[side*.030,lean+.060,JT.head[2]-.030+bob];for(let i=0;i<3;i++)hand[i]+=(tgt[i]-hand[i])*gesture;}
+    /* อุ้มตู้ทากไว้หน้าท้อง — สั่งตำแหน่งมือ/ศอกทั้งสองข้างให้สมมาตร แล้วปล่อย IK จัดข้อต่อ
+       ต้องมาก่อน solvePersonArm ไม่งั้นแขนจะแกว่งทับตู้ */
+    if(p.carryTank&&!crouch){
+      hand=[side*(CARRY_HW+.022), lean+CARRY_Y-.012, CARRY_Z-.004+bob];
+      elbow=[side*(CARRY_HW+.055), lean+.012, CARRY_Z+.085+bob];
+    }
     if(action==='jump'&&p.kid){hand[0]+=(side*.170-hand[0])*gesture;hand[1]+=(lean+.015-hand[1])*gesture;hand[2]+=(shoulder[2]+.10-hand[2])*gesture;elbow[0]+=(side*.16-elbow[0])*gesture;}
     if(crouch){
       const sh=inspectPose(shoulder),rest=inspectPose(hand);
@@ -1102,6 +1151,27 @@ function drawPerson(p){
     emit(hd,hand,axisRot(hd.axis,axF),1);
   }
   posedArms=false;
+
+  /* ---- ตู้ทากใบเล็กในมือพ่อค้าเร่ ----
+     เปิดด้านหน้า (ไม่วาดกระจกหน้า) เพื่อให้เห็นตัวทากข้างใน — เมชนี้เป็นสีทึบล้วน
+     ถ้าวาดกระจกหน้าด้วยจะบังทากมิด และวาดโปร่งแสงไม่ได้ในตัวเรนเดอร์นี้ */
+  if(p.carryTank){
+    const cz=CARRY_Z+bob, y0=lean+CARRY_Y-CARRY_HD, y1=lean+CARRY_Y+CARRY_HD;
+    const x0=-CARRY_HW, x1=CARRY_HW, z0=cz-CARRY_HH, z1=cz+CARRY_HH;
+    const water=p.carryColor||'#2f6f78', frame='#20282e', sand='#c9bb95';
+    const q=(a,b,c,d,col,sh=0)=>face([a,b,c,d],col,sh,true);
+    q([x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1],water,-8);          // กระจกหลัง
+    q([x0,y0,z0],[x0,y0,z1],[x0,y1,z1],[x0,y1,z0],water,-3);          // ข้างซ้าย
+    q([x1,y0,z0],[x1,y1,z0],[x1,y1,z1],[x1,y0,z1],water,-3);          // ข้างขวา
+    q([x0,y0,z0],[x0,y1,z0],[x1,y1,z0],[x1,y0,z0],frame,0);           // ก้นตู้
+    q([x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],frame,6);           // ขอบบน
+    q([x0+.006,y0+.004,z0+.010],[x1-.006,y0+.004,z0+.010],[x1-.006,y1-.006,z0+.010],[x0+.006,y1-.006,z0+.010],sand,0); // ทราย
+    // ตัวทากในตู้ — สีจากยีนสีลำตัว/หงอนของตัวที่เอามาขาย
+    rings([[0,lean+CARRY_Y,z0+.016,.030,.018],[0,lean+CARRY_Y,z0+.030,.038,.024],[0,lean+CARRY_Y,z0+.046,.026,.016]],p.carryAccent||'#d8b0d0',8);
+    // โครงกรอบหน้า 4 ด้าน (เปิดโล่งตรงกลาง)
+    for(const [a,b] of [[[x0,y1,z0],[x1,y1,z0]],[[x0,y1,z1],[x1,y1,z1]],[[x0,y1,z0],[x0,y1,z1]],[[x1,y1,z0],[x1,y1,z1]]])
+      limb(a,b,.006,.006,frame);
+  }
 
   if(p.bagged){
     // Strap lies against the front and back of the body instead of floating over it.

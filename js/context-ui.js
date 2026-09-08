@@ -38,10 +38,11 @@
  }
  for(const [key,label] of [['inventory','คลังทาก'],['shelf','ของที่เก็บ'],['offers','ข้อเสนอ'],['settings','ตั้งค่า']]){const b=document.createElement('button');b.className='tbtn';b.textContent=label;b.onclick=()=>{if(appMode==='build')setMode('view');show(active===key?'':key);};buttons.set(key,b);nav.append(b);}
  const close=document.createElement('button');close.className='tbtn panel-close';close.textContent='✕';close.setAttribute('aria-label','ปิดแผง');close.onclick=()=>{if(appMode==='build')setMode('view');show('');};rail.prepend(close);
- const previous=setMode;setMode=function(mode){previous(mode);show(mode==='build'?'build':'');};
+ window.toggleFloorBuildTools=()=>show(active==='build'?'':'build');
+ const previous=setMode;setMode=function(mode){previous(mode);show('');};
  const badge=buttons.get('offers');const offers=document.getElementById('tradeOffers');
  new MutationObserver(()=>{const count=typeof TRADE_OFFERS!=='undefined'?TRADE_OFFERS.length:offers.querySelectorAll('select').length;badge.textContent=count?'ข้อเสนอ ('+count+')':'ข้อเสนอ';}).observe(offers,{childList:true,subtree:true});
  const ov=document.getElementById('ov');new MutationObserver(()=>{document.body.classList.toggle('inside-tank',ov.classList.contains('on'));window.dispatchEvent(new Event('resize'));}).observe(ov,{attributes:true,attributeFilter:['class']});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!help.open&&active&&appMode!=='build')show('');});
- show(appMode==='build'?'build':'');
+ show('');
 })();
