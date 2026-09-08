@@ -87,14 +87,32 @@ slugShopDialog.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Es
 function drawGiftBoxProp(o){
  o._giftHit=null;
  if(!slugDeliveryReadyCount())return;
- const base=14*ZUNIT,bodyH=3.0*ZUNIT;
- const b=counterBlock(o,10.4,6.2,3.4,3.4);isoBox(b.x,b.y,b.w,b.h,base,bodyH,'#cf5a71','#7f2f43','#a53e56');
- const lid=counterBlock(o,10.0,5.8,4.2,4.2);isoBox(lid.x,lid.y,lid.w,lid.h,base+bodyH,0.7*ZUNIT,'#e06a80','#8a3448','#b8485f');
- const rbV=counterBlock(o,11.75,5.8,0.9,4.2);isoBox(rbV.x,rbV.y,rbV.w,rbV.h,base,bodyH+0.72*ZUNIT,'#f1da8b','#b89a4e','#d6bd6c');
- const rbH=counterBlock(o,10.0,7.55,4.2,0.9);isoBox(rbH.x,rbH.y,rbH.w,rbH.h,base,bodyH+0.72*ZUNIT,'#f1da8b','#b89a4e','#d6bd6c');
- const pts=[];for(const x of [10.0,14.2])for(const y of [5.8,10.0])for(const z of [14,17.72]){const q=counterLocal(o.def,o.rot,x,y);pts.push(P(o.cx+q[0],o.cy+q[1],z*ZUNIT));}
+ /* กล่องของขวัญ: ตัวกล่อง + ฝา + โบว์ไขว้
+    เดิมทำโบว์เป็นแท่งทึบสองแท่งพาดยาวเต็มกล่องตั้งแต่พื้นถึงยอด — ในมุมไอโซ "หน้าข้าง" ของแท่ง
+    คือด้านหน้า/ด้านขวาของกล่องทั้งแผ่น โบว์เลยกลืนหน้ากล่องหมด มองเป็นก้อนเหลืองก้อนเดียว
+    ของจริงโบว์พาดบนฝาแล้วห้อยลงกลางหน้าแต่ละด้านเท่านั้น จึงแยกเป็น
+      · แถบบนฝา 2 เส้นไขว้ (บาง ๆ วางทับฝา)
+      · แถบดิ่งกลางหน้ากล่อง 4 ด้าน (บางมากในแนวลึก แปะไว้ที่ผิวกล่อง)
+    วาดครบ 4 ด้านเพราะเคาน์เตอร์หมุนได้ ด้านที่กล้องเห็นเปลี่ยนไปตามการหมุน */
+ const base=14*ZUNIT,bodyH=2.1*ZUNIT,lidH=0.5*ZUNIT;
+ const W=4.6,OVER=0.16,RIB=0.7,SKIN=0.12,x0=9.6,y0=5.9;
+ const LID=W+OVER*2,lx=x0-OVER,ly=y0-OVER,rc=(W-RIB)/2,H=bodyH+lidH;
+ const PINK='#cf5a71',PINKD='#7f2f43',PINKS='#a53e56';
+ const LIDT='#e06a80',LIDD='#8a3448',LIDS='#b8485f';
+ const GOLD='#f1da8b',GOLDD='#b89a4e',GOLDS='#d6bd6c';
+ const put=(x,y,w,h,z,hh,a,b,c)=>{const q=counterBlock(o,x,y,w,h);isoBox(q.x,q.y,q.w,q.h,z,hh,a,b,c);};
+ put(x0,y0,W,W,base,bodyH,PINK,PINKD,PINKS);                       // ตัวกล่อง
+ put(lx,ly,LID,LID,base+bodyH,lidH,LIDT,LIDD,LIDS);                // ฝา
+ put(x0+rc,y0-SKIN,RIB,SKIN,base,H,GOLD,GOLDD,GOLDS);              // โบว์ห้อยหน้ากล่อง 4 ด้าน
+ put(x0+rc,y0+W,RIB,SKIN,base,H,GOLD,GOLDD,GOLDS);
+ put(x0-SKIN,y0+rc,SKIN,RIB,base,H,GOLD,GOLDD,GOLDS);
+ put(x0+W,y0+rc,SKIN,RIB,base,H,GOLD,GOLDD,GOLDS);
+ put(x0+rc,ly,RIB,LID,base+H,0.12*ZUNIT,GOLD,GOLDD,GOLDS);         // แถบโบว์บนฝา ไขว้กัน
+ put(lx,y0+rc,LID,RIB,base+H,0.12*ZUNIT,GOLD,GOLDD,GOLDS);
+ const topZ=14+(H+0.12*ZUNIT)/ZUNIT;
+ const pts=[];for(const x of [lx,lx+LID])for(const y of [ly,ly+LID])for(const z of [14,topZ]){const q=counterLocal(o.def,o.rot,x,y);pts.push(P(o.cx+q[0],o.cy+q[1],z*ZUNIT));}
  o._giftHit={x:Math.min(...pts.map(p=>p.x))-8,y:Math.min(...pts.map(p=>p.y))-8,right:Math.max(...pts.map(p=>p.x))+8,bottom:Math.max(...pts.map(p=>p.y))+8};
- const q=counterLocal(o.def,o.rot,12.1,7.5),p=P(o.cx+q[0],o.cy+q[1],19*ZUNIT),pulse=Math.sin(performance.now()/260);
+ const q=counterLocal(o.def,o.rot,x0+W/2,y0+W/2),p=P(o.cx+q[0],o.cy+q[1],(topZ+1.4)*ZUNIT),pulse=Math.sin(performance.now()/260);
  ctx.save();ctx.translate(p.x,p.y-3*pulse);ctx.fillStyle='#f1c66d';ctx.beginPath();ctx.arc(0,0,Math.max(12,17*cam.zoom),0,Math.PI*2);ctx.fill();ctx.fillStyle='#56352a';ctx.font='bold '+Math.max(14,20*cam.zoom)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('!',0,1);ctx.restore();
 }
 

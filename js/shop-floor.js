@@ -375,7 +375,7 @@ function drawFloor(){
 
   // วัตถุ (จัดลำดับความลึก)
   animBudget = 14;    // รีเซ็ตงบอนิเมชันต่อเฟรม (คุมไม่ให้กระตุกแม้ซูมใกล้เห็นเยอะ · ที่เหลือใช้สไปรต์นิ่ง)
-  const list = G.objs.slice().sort((a,b)=> (a.cy+a.cx+a.def.h+a.def.w) - (b.cy+b.cx+b.def.h+b.def.w));
+  const list = isoSortedObjects();
 
   let ghost=null;
   if(appMode==='build' && hoverCell){            // เงาพรีวิว เฉพาะโหมดก่อสร้าง
@@ -425,6 +425,54 @@ function drawSubGrid(bx,by){
 }
 
 /* กล่องไอโซเมตริก: footprint (cx,cy,w,h ช่องเล็ก) ฐาน baseZ สูง boxH */
+/* ---------- ลำดับความลึกแบบไอโซเมตริก ----------
+   ของเดิมเรียงด้วยคะแนนเดียว (cx+cy+w+h = มุมไกลสุด) ซึ่งผิดเมื่อของสองชิ้นขนาดต่างกันมาก:
+   หินตกแต่ง 2x2 ที่วางอยู่ "หน้า" เคาน์เตอร์ 20x20 ได้คะแนน 57 ส่วนเคาน์เตอร์ได้ 72
+   หินจึงถูกวาดก่อนแล้วโดนเคาน์เตอร์ทับ ทั้งที่อยู่ใกล้กล้องกว่า
+   และใช้ def.w/def.h ตรง ๆ โดยไม่สนการหมุน (ต้องใช้ oW/oH)
+
+   กติกาที่ถูกต้อง: A อยู่ "หลัง" B ก็ต่อเมื่อ A จบก่อน B เริ่ม บนแกน x หรือ y แกนใดแกนหนึ่ง
+   ความสัมพันธ์นี้เรียงด้วยคะแนนเดียวไม่ได้ ต้อง topological sort (ของมีไม่กี่สิบชิ้น O(n^2) ถูกมาก)
+   คิดใหม่เฉพาะตอนของย้าย/เพิ่ม/ลบ (ดูลายเซ็น) — แพนกล้อง/ซูมไม่ทำให้คิดใหม่ */
+let _isoOrder=null,_isoSig='';
+function isoSortedObjects(){
+  const objs=G.objs||[];
+  let sig=objs.length+'';
+  for(const o of objs) sig+='|'+o.id+','+o.cx+','+o.cy+','+(o.rot|0);
+  if(sig===_isoSig&&_isoOrder) return _isoOrder;
+  _isoSig=sig; _isoOrder=isoTopoSort(objs.slice());
+  return _isoOrder;
+}
+function isoTopoSort(objs){
+  const n=objs.length;
+  if(n<2) return objs;
+  const X2=objs.map(o=>o.cx+oW(o)), Y2=objs.map(o=>o.cy+oH(o));
+  const key=i=>objs[i].cx+objs[i].cy+X2[i]+Y2[i];
+  const after=Array.from({length:n},()=>[]), indeg=new Array(n).fill(0);
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){
+    const a=objs[i],b=objs[j];
+    /* บังกันได้จริงก็ต่อเมื่อช่วงบนอีกแกนหนึ่ง "ซ้อนกัน" — คู่ที่อยู่ทแยงมุมกันไม่เคยทับกันบนจอ
+       ถ้าใส่เงื่อนไขให้คู่ทแยงด้วยจะเกิดวงจร (ต่างฝ่ายต่างต้องอยู่หลังอีกฝ่าย) แล้ว topo sort พัง */
+    const ovX=a.cx<X2[j]&&b.cx<X2[i], ovY=a.cy<Y2[j]&&b.cy<Y2[i];
+    let r;
+    if(ovY&&X2[i]<=b.cx) r=-1;                    // ช่วง y ซ้อนกัน และ i จบก่อน j เริ่มบนแกน x → i อยู่หลัง
+    else if(ovY&&X2[j]<=a.cx) r=1;
+    else if(ovX&&Y2[i]<=b.cy) r=-1;
+    else if(ovX&&Y2[j]<=a.cy) r=1;
+    else r=key(i)-key(j);                          // ไม่มีใครบังใคร → เรียงด้วยคะแนนพอ
+    if(r<0){after[i].push(j);indeg[j]++;}
+    else if(r>0){after[j].push(i);indeg[i]++;}
+  }
+  const ready=[];for(let i=0;i<n;i++)if(!indeg[i])ready.push(i);
+  const out=[],seen=new Array(n).fill(false);
+  while(ready.length){
+    ready.sort((a,b)=>key(a)-key(b));             // เสมอกันให้ตัวไกลกว่ามาก่อน ผลจะนิ่ง
+    const i=ready.shift();out.push(objs[i]);seen[i]=true;
+    for(const j of after[i]) if(--indeg[j]===0) ready.push(j);
+  }
+  if(out.length<n) for(let i=0;i<n;i++) if(!seen[i]) out.push(objs[i]);   // มีวงจร: ต่อท้ายไปตามเดิม
+  return out;
+}
 function isoBox(cx,cy,w,h, baseZ, boxH, topCol, rightCol, frontCol, alpha){
   const tz=baseZ+boxH;
   const T1=P(cx,cy,tz), T2=P(cx+w,cy,tz), T3=P(cx+w,cy+h,tz), T4=P(cx,cy+h,tz);
