@@ -978,12 +978,15 @@ function drawPerson(p){
     /* ศอก "งอค้าง" ตลอดการเดิน (offset ~26°) แล้วงอเพิ่มตอนแกว่งมา "ข้างหน้า" (peak ~42°+)
        — คนจริงไม่เคยเหยียดแขนตรง และศอกงอมากตอนแขนมาหน้า ตรงข้ามกับท่าสวนสนามที่ดันแขนตรงไปหน้า
        ของเดิมงอตอนแขนไปหลังแล้วเหยียดตรงตอนไปหน้า → เลยดูเหมือนทหารสวนสนาม แก้ให้กลับด้าน */
-    const foldBase =0.30*motion*armDamp;                               // งอค้างพื้นฐาน (แขนไม่มีทางตรง)
-    const foldFront=Math.max(0,Math.sin(armTh))*0.58*motion*armDamp;   // งอเพิ่มตอนมือมาข้างหน้า
-    const fold=Math.min(1,foldBase+foldFront);
-    /* ต้นแขนห้อยเกือบดิ่งจากไหล่ · "มือ" นำหน้าข้อศอก → ศอกทำหน้าที่บานพับ ไม่ใช่แขนแข็งแกว่งทั้งท่อน */
-    let elbow=[shoulder[0]+side*.014,shoulder[1]+swing*.34-.006,shoulder[2]-L1*(.93-.05*fold)];
-    let hand =[shoulder[0]+side*.022,shoulder[1]+swing*1.18+.030*fold,shoulder[2]-(L1+L2)*(.94-.14*fold)];
+    /* ศอกงอ "ค้าง" ตลอด ~34° แล้วงอเพิ่มแค่ ~13° ตอนแขนมาข้างหน้า
+       (ชีวกลศาสตร์จริง amplitude การงอศอกแค่ ~6-15° รอบ offset ~26°)
+       ของเดิมงอเพิ่มถึง ~30° เลยเห็นปลายแขน "สะบัด" — ลดแอมพลิจูดลงให้แค่ขยับนิด ๆ */
+    const flick=Math.max(0,Math.sin(armTh))*0.045*motion*armDamp;      // งอเพิ่มตอนมือมาหน้า (บาง ๆ)
+    const handFrac=0.955-flick;                                        // ระยะมือจากไหล่ (สัดส่วนความยาวแขน) น้อย=งอมาก
+    const foldE=flick/0.045;                                           // 0..1 ใช้ขยับศอก/มือเล็กน้อยตามจังหวะ
+    /* ต้นแขนห้อยเกือบดิ่ง · มือนำหน้าข้อศอกพอประมาณ (ไม่ลากไปข้างหน้าจนสะบัด) */
+    let elbow=[shoulder[0]+side*.014,shoulder[1]+swing*.32-.006,shoulder[2]-L1*(.95-.03*foldE)];
+    let hand =[shoulder[0]+side*.022,shoulder[1]+swing*1.0,shoulder[2]-(L1+L2)*handFrac];
     if(interested){hand[1]+=.070;hand[2]=shoulder[2]-(L1+L2)*.62;}
     if(pointing){hand[1]+=.090*gesture;hand[2]+=.130*gesture;}
     if(side===1&&action==='chat'){hand[1]+=.055*gesture;hand[2]+=.09*gesture;}
