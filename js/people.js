@@ -22,8 +22,8 @@ function peopleInArea(x0,y0,x1,y1){
 
 /* ---------- ค่าปรับ ---------- */
 const PERSON_SPEED_CM = 52;      // ความเร็วเดินชมของ (ซม./วินาที)
-const WALK_STEP = 0.30;          // ความยาวก้าว เทียบส่วนสูง (คนสูง 170 → ก้าวละ ~51 ซม. แบบเดินชมของ ไม่ใช่เดินรีบ)
-const WALK_LIFT = 0.042;         // ยกเท้าสูงสุดตอนก้าว เทียบส่วนสูง (~7 ซม. พอให้พ้นพื้น ไม่ใช่ยกเข่าเดินสวนสนาม)
+const WALK_STEP = 0.24;          // ความยาวก้าว เทียบส่วนสูง (คนสูง 170 → ก้าวละ ~51 ซม. แบบเดินชมของ ไม่ใช่เดินรีบ)
+const WALK_LIFT = 0.026;         // ยกเท้าสูงสุดตอนก้าว เทียบส่วนสูง (~7 ซม. พอให้พ้นพื้น ไม่ใช่ยกเข่าเดินสวนสนาม)
 const PERSON_R        = 2.5;     // รัศมีกันชนกับตู้/ของ (ช่องเล็ก ≈ 16 ซม.)
 const PERSON_EDGE     = 2.0;     // เว้นจากขอบพื้นร้าน (ช่องเล็ก)
 const LOOK_MIN = 5, LOOK_MAX = 5;    // ยืนดูตู้นานแค่ไหน (วินาที)
@@ -973,7 +973,7 @@ function drawPerson(p){
     /* แขนแกว่งสวนกับขาข้างเดียวกัน · ผูกกับ phase ของการเดินตรง ๆ ไม่ใช่ค่า gait ที่ถูกหรี่ไว้ */
     const armTh=phase+(side<0?0:Math.PI);
     const armDamp=Math.min(1,Math.max(.35,clearance/6));
-    const swing=Math.sin(armTh)*0.105*motion*armDamp;
+    const swing=Math.sin(armTh)*0.055*motion*armDamp;
     const interested=p.state==='look'&&side===1, pointing=interested&&action==='point';
     /* แขนหลังงอศอกมากกว่าแขนหน้า (ท่าเดินจริง) · ยกมือขึ้นเล็กน้อยตอนแกว่งมาข้างหน้า */
     const fold=Math.max(0,-Math.sin(armTh))*motion*armDamp;
