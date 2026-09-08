@@ -968,6 +968,9 @@ function drawPerson(p){
     posedArms=false;
     const S=side<0?'L':'R', J=k=>JT[k+S];
     const L1=dist(J('shoulder'),J('elbow')), L2=dist(J('elbow'),J('wrist')), REACH=(L1+L2)*.985;
+    /* โมเดลวางสัดส่วนแขนกลับหัว (ท่อนล่าง 0.180 ยาวกว่าท่อนบน 0.154) — คนจริงท่อนบนยาวกว่า ~0.56:0.44
+       ย้ายจุดศอกให้ท่อนบนยาวขึ้น/ท่อนล่างสั้นลง โดยระยะเอื้อมรวม (REACH) เท่าเดิม ปลายมือถึงที่เดิม */
+    const ARMTOT=L1+L2, UARM=ARMTOT*0.56, FARM=ARMTOT*0.44;
     const shoulder=[J('shoulder')[0],J('shoulder')[1]+lean,J('shoulder')[2]+bob];
     /* แขนแกว่งสวนกับขาข้างเดียวกัน · ผูกกับ phase ของการเดินตรง ๆ ไม่ใช่ค่า gait ที่ถูกหรี่ไว้ */
     const armTh=phase+(side<0?0:Math.PI);
@@ -985,7 +988,7 @@ function drawPerson(p){
     const handFrac=0.972-flick;                                        // ฐานงอ ~27° (offset จริง) → หน้า ~40° น้อย=งอมาก
     const foldE=flick/0.032;                                           // 0..1 ใช้ขยับศอก/มือเล็กน้อยตามจังหวะ
     /* ต้นแขนห้อยเกือบดิ่ง · มือนำหน้าข้อศอกพอประมาณ (ไม่ลากไปข้างหน้าจนสะบัด) */
-    let elbow=[shoulder[0]+side*.014,shoulder[1]+swing*.32-.006,shoulder[2]-L1*(.95-.03*foldE)];
+    let elbow=[shoulder[0]+side*.014,shoulder[1]+swing*.32-.006,shoulder[2]-UARM*(.95-.03*foldE)];
     let hand =[shoulder[0]+side*.022,shoulder[1]+swing*1.0,shoulder[2]-(L1+L2)*handFrac];
     if(interested){hand[1]+=.070;hand[2]=shoulder[2]-(L1+L2)*.62;}
     if(pointing){hand[1]+=.090*gesture;hand[2]+=.130*gesture;}
@@ -1000,10 +1003,10 @@ function drawPerson(p){
       elbow=[side*.125,shoulder[1]+.025,shoulder[2]-L1*.80];
       posedArms=true;
     }
-    let pose=solvePersonArm(shoulder,hand,elbow,REACH,L1,L2);
+    let pose=solvePersonArm(shoulder,hand,elbow,REACH,UARM,FARM);
     hand=pose.hand.slice();elbow=pose.elbow.slice();
     if(!crouch)constrainVisitorArm(p,[hand],world,H,right,fx,fy);
-    pose=solvePersonArm(shoulder,hand,elbow,REACH,L1,L2);
+    pose=solvePersonArm(shoulder,hand,elbow,REACH,UARM,FARM);
     hand=pose.hand.slice();elbow=pose.elbow.slice();
     if(!crouch)constrainVisitorArm(p,[elbow],world,H,right,fx,fy);
     const ua=MDL.parts['arm'+S],fa=MDL.parts['fore'+S],hd=MDL.parts['hand'+S];
