@@ -22,6 +22,8 @@ function peopleInArea(x0,y0,x1,y1){
 
 /* ---------- ค่าปรับ ---------- */
 const PERSON_SPEED_CM = 52;      // ความเร็วเดินชมของ (ซม./วินาที)
+const WALK_STEP = 0.30;          // ความยาวก้าว เทียบส่วนสูง (คนสูง 170 → ก้าวละ ~51 ซม. แบบเดินชมของ ไม่ใช่เดินรีบ)
+const WALK_LIFT = 0.042;         // ยกเท้าสูงสุดตอนก้าว เทียบส่วนสูง (~7 ซม. พอให้พ้นพื้น ไม่ใช่ยกเข่าเดินสวนสนาม)
 const PERSON_R        = 2.5;     // รัศมีกันชนกับตู้/ของ (ช่องเล็ก ≈ 16 ซม.)
 const PERSON_EDGE     = 2.0;     // เว้นจากขอบพื้นร้าน (ช่องเล็ก)
 const LOOK_MIN = 5, LOOK_MAX = 5;    // ยืนดูตู้นานแค่ไหน (วินาที)
@@ -633,7 +635,9 @@ function stepPeople(){
     if(distance>1e-5){
       // Walking slowly changes cadence, not leg size. Previously slow movement
       // shrank the stride/lift almost to zero while the body kept translating.
-      p.phase+=distance*.72;p.motion=1;
+      /* หนึ่งรอบ (2π) = ก้าวสองก้าว · ก้าวหนึ่งยาว WALK_STEP เท่าของส่วนสูง
+         เดิมใช้ค่าคงที่ .72 = ก้าวละ ~22 ซม. ซึ่งสั้นถี่เหมือนซอยเท้า */
+      p.phase+=distance*Math.PI/Math.max(1e-3,WALK_STEP*(p.hCm/CM_PER_CELL));p.motion=1;
     }
   }
   personGrid=null;
@@ -779,7 +783,7 @@ function drawPerson(p){
   const motion=p.motion||0, phase=p.phase;
   let clearance=Infinity;for(const o of G.objs){if(o===moving)continue;const dx=Math.max(o.cx-p.x,0,p.x-o.cx-oW(o)),dy=Math.max(o.cy-p.y,0,p.y-o.cy-oH(o));clearance=Math.min(clearance,Math.hypot(dx,dy));}
   const gait=Math.sin(phase)*motion*Math.min(1,Math.max(.25,clearance/6));
-  const bob=Math.cos(phase*2)*0.0025*motion;
+  let bob=0;                       // ตัวขึ้น-ลงตามจังหวะก้าว คำนวณจริงหลังรู้ความยาวขา (ดูบล็อกโมเดล)
   const breath=Math.sin(p.idle*1.6)*0.0015;
   const action=p.action||'watch';
   const gesture=action==='watch'?0:Math.sin(Math.PI*Math.min(1,(p.actionT||0)/(p.actionDuration||1)));
@@ -897,18 +901,61 @@ function drawPerson(p){
       }
     }
   }
-  /* ---- ขา: สะโพก → เข่า → ข้อเท้า (ท่าเดินเดิม) ---- */
+  /* ---- ขา: วงจรเดินจริง (ช่วงยืนพื้น / ช่วงยกเท้า) + IK เข่าสองท่อน ----
+     ของเดิมเป็นไซน์ล้วน ๆ ทั้งเท้าและเข่า ผลคือ (ก) เท้าไถลไปกับพื้นเพราะไซน์เคลื่อนที่ไม่คงที่
+     (ข) ขายืด-หดแทนที่จะงอเข่า เพราะสั่งตำแหน่งเข่าตรง ๆ แล้วไปยืดเมชให้ถึง
+     ที่นี่: ช่วงยืนพื้นให้เท้าถอยหลังเป็นเส้นตรงเท่ากับระยะที่ตัวเดินไป (ไม่ไถล)
+             ช่วงยกเท้าวาดเป็นส่วนโค้ง แล้วหาเข่าด้วย IK โดยความยาวท่อนขาคงที่ */
+  const LEGL1=dist(JT.hipL,JT.kneeL), LEGL2=dist(JT.kneeL,JT.ankleL), LEGMAX=(LEGL1+LEGL2)*0.999;
+  const LEGREST=JT.hipL[2]-JT.ankleL[2];
+  const STEPA=WALK_STEP*0.5*motion;                 // เท้าแกว่งไป-กลับข้างละเท่านี้
+  /* ก้าวยาวขึ้น = ขากางขึ้น = สะโพกต้องต่ำลงตามเรขาคณิต ไม่งั้นเท้าลอย/ขายืด
+     นี่คือที่มาของการ "ยุบ-ยืด" ตามจังหวะเดินของคนจริง */
+  {
+    /* ระยะที่ "เท้าข้างที่ยืนพื้น" ห่างจากใต้สะโพก — เป็นสามเหลี่ยม ไม่ใช่ไซน์
+       (ตอนแรกใช้ sin(phase) ซึ่งผิดเฟส 90° ทำให้จังหวะที่ขากางสุดกลับไม่ยุบตัว
+        ขาเลยเอื้อมไม่ถึงพื้น ถูก clamp แล้วท่าเดินออกมาแข็ง ๆ ลอย ๆ) */
+    const u=((phase%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
+    const half=u<Math.PI?u/Math.PI:(u-Math.PI)/Math.PI;
+    const spread=Math.abs(1-2*half)*STEPA;
+    /* ยุบเพิ่มอีกนิดจากค่าต่ำสุดทางเรขาคณิต เพื่อให้เข่าข้างที่ยืนพื้น "งอนิด ๆ" ตลอด
+       ขาเหยียดตึงเป๊ะทุกจังหวะจะดูแข็งเหมือนหุ่น */
+    bob=Math.sqrt(Math.max(0,LEGMAX*LEGMAX-spread*spread))-LEGREST-0.013*motion;
+  }
+  /* IK สองท่อน: รู้สะโพกกับข้อเท้า หาเข่าโดยให้ท่อนขายาวคงที่ และงอไปข้างหน้าเสมอ */
+  function legIK(a,b,L1,L2){
+    let ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2];
+    let d=Math.hypot(ux,uy,uz)||1e-6;
+    if(d>LEGMAX){const k=LEGMAX/d;ux*=k;uy*=k;uz*=k;d=LEGMAX;}
+    ux/=d;uy/=d;uz/=d;
+    const t=(d*d+L1*L1-L2*L2)/(2*d), h=Math.sqrt(Math.max(0,L1*L1-t*t));
+    const dp=uy;                                   // ทิศงอเข่า = ไปข้างหน้า (+y) หักส่วนที่ขนานแกนขาออก
+    let nx=-ux*dp, ny=1-uy*dp, nz=-uz*dp;
+    const nl=Math.hypot(nx,ny,nz);
+    if(nl<1e-6){nx=0;ny=1;nz=0;}else{nx/=nl;ny/=nl;nz/=nl;}
+    return [a[0]+ux*t+nx*h, a[1]+uy*t+ny*h, a[2]+uz*t+nz*h];
+  }
   for(const side of [-1,1]){
     const S=side<0?'L':'R', J=k=>JT[k+S];
-    const sw=Math.sin(phase+(side<0?Math.PI:0)), stride=sw*.075*motion;
-    const lift=Math.max(0,Math.cos(phase+(side<0?Math.PI:0)))*.030*motion;
+    let th=(phase+(side<0?Math.PI:0))%(Math.PI*2); if(th<0)th+=Math.PI*2;
+    let fy,fz,pitch;
+    if(th<Math.PI){                                 // ยกเท้าไปข้างหน้า
+      const u=th/Math.PI, e=u*u*(3-2*u);            // smoothstep: ออกตัวนุ่ม ลงนุ่ม
+      fy=-STEPA+2*STEPA*e; fz=WALK_LIFT*motion*Math.sin(Math.PI*u);
+      pitch=0.20*Math.sin(Math.PI*u)*motion;        // ปลายเท้าเชิดตอนลอย
+    }else{                                          // เท้าอยู่กับพื้น
+      const u=(th-Math.PI)/Math.PI;
+      fy=STEPA-2*STEPA*u; fz=0;
+      pitch=-0.32*Math.max(0,u-0.68)/0.32*motion;   // ถีบปลายเท้าตอนจะยกขึ้น
+    }
     const hip=[J('hip')[0],J('hip')[1],J('hip')[2]+bob];
-    const knee=[J('knee')[0],J('knee')[1]+stride*.45+.012*motion,J('knee')[2]+bob+lift*.45];
-    const ankle=[J('ankle')[0],J('ankle')[1]+stride,J('ankle')[2]+lift];
+    const ankle=[J('ankle')[0],J('ankle')[1]+fy,J('ankle')[2]+fz];
+    const knee=legIK(hip,ankle,LEGL1,LEGL2);
     const rl=MDL.parts['thigh'+S],cl=MDL.parts['calf'+S],fl=MDL.parts['foot'+S];
-    emit(rl,hip,axisRot(rl.axis,norm(sub(knee,hip))),dist(hip,knee)/rl.len);
-    emit(cl,knee,axisRot(cl.axis,norm(sub(ankle,knee))),dist(knee,ankle)/cl.len);
-    emit(fl,ankle,null,1);                       // เท้าวางราบกับพื้นเสมอ ไม่หมุนตามน่อง
+    emit(rl,hip,axisRot(rl.axis,norm(sub(knee,hip))),1);
+    emit(cl,knee,axisRot(cl.axis,norm(sub(ankle,knee))),1);
+    const ca=Math.cos(pitch),sa=Math.sin(pitch);
+    emit(fl,ankle,[1,0,0, 0,ca,-sa, 0,sa,ca],1);    // เท้าเงย/ถีบรอบแกนข้าง
   }
   /* ---- ลำตัว + หัว ---- */
   emit(MDL.parts.torso,[JT.hips[0],JT.hips[1],JT.hips[2]+bob],null,1,lean);
@@ -923,10 +970,15 @@ function drawPerson(p){
     const S=side<0?'L':'R', J=k=>JT[k+S];
     const L1=dist(J('shoulder'),J('elbow')), L2=dist(J('elbow'),J('wrist')), REACH=(L1+L2)*.985;
     const shoulder=[J('shoulder')[0],J('shoulder')[1]+lean,J('shoulder')[2]+bob];
-    const swing=-side*gait*.047;
+    /* แขนแกว่งสวนกับขาข้างเดียวกัน · ผูกกับ phase ของการเดินตรง ๆ ไม่ใช่ค่า gait ที่ถูกหรี่ไว้ */
+    const armTh=phase+(side<0?0:Math.PI);
+    const armDamp=Math.min(1,Math.max(.35,clearance/6));
+    const swing=Math.sin(armTh)*0.105*motion*armDamp;
     const interested=p.state==='look'&&side===1, pointing=interested&&action==='point';
-    let elbow=[shoulder[0]+side*.012,shoulder[1]+swing*.6-.010,shoulder[2]-L1*.94];
-    let hand =[shoulder[0]+side*.020,shoulder[1]+swing,shoulder[2]-(L1+L2)*.90];
+    /* แขนหลังงอศอกมากกว่าแขนหน้า (ท่าเดินจริง) · ยกมือขึ้นเล็กน้อยตอนแกว่งมาข้างหน้า */
+    const fold=Math.max(0,-Math.sin(armTh))*motion*armDamp;
+    let elbow=[shoulder[0]+side*.012,shoulder[1]+swing*.55-.010,shoulder[2]-L1*(.94-.05*fold)];
+    let hand =[shoulder[0]+side*.020,shoulder[1]+swing,shoulder[2]-(L1+L2)*(.90-.06*fold)];
     if(interested){hand[1]+=.070;hand[2]=shoulder[2]-(L1+L2)*.62;}
     if(pointing){hand[1]+=.090*gesture;hand[2]+=.130*gesture;}
     if(side===1&&action==='chat'){hand[1]+=.055*gesture;hand[2]+=.09*gesture;}
