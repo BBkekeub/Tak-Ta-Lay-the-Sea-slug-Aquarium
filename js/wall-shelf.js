@@ -9,15 +9,22 @@
    หน่วย: u = ช่องเล็ก (5 ซม.) · SUB ช่องเล็ก = 1 คอลัมน์ = 40 ซม. · z = ZUNIT ต่อ 5 ซม.
    ============================================================ */
 
-const SHELF_PER_TIER = 3;                 // ช่องต่อหนึ่งชั้น
+const SHELF_PER_TIER = 3;                 // กล่องต่อหนึ่งชั้น
 const SHELF_TIERS    = 2;                 // จำนวนชั้น
 const SHELF_SLOTS    = SHELF_PER_TIER * SHELF_TIERS;   // = 6 · ผูกกับ MAX_LIST ในตลาดโลก
-const SHELF_W        = 3 * SUB;           // กว้าง 3 คอลัมน์ = 120 ซม.
-const SHELF_D        = 4;                 // ลึก 20 ซม. (ยื่นออกจากผนัง)
-const SHELF_T        = 0.7 * ZUNIT;       // หนาแผ่นชั้น 3.5 ซม. (แผ่นบาง ๆ แบบชั้นลอย)
-const SHELF_Z        = [28 * ZUNIT, 38 * ZUNIT];       // ความสูงชั้นล่าง/ชั้นบน (140 / 190 ซม.) — ยกให้พ้นหัวตู้ทุกขนาด (ตู้ใหญ่สุดสูง 135 ซม.) + ของตกแต่งสูง ๆ ไม่ทับ · เพดานห้อง 240 ซม.
-const SHELF_BOX      = 4;                 // ตู้เล็กกว้าง-ลึก 20 ซม.
-const SHELF_BOX_H    = 4.5 * ZUNIT;       // ตู้เล็กสูง 22.5 ซม.
+/* ---- ขนาดจริงเป็นเซนติเมตร (hardcode ตามสเปก · 1 ช่องเล็ก = 5 ซม. · ZUNIT = 5 ซม. ในแกน z) ---- */
+const _cm  = v => v / CM_PER_CELL;             // ซม. → ช่องเล็ก (แกน u / d)
+const _cmZ = v => (v / CM_PER_CELL) * ZUNIT;   // ซม. → world-z
+const SHELF_W    = _cm(120);              // แผ่นชั้นยาว 120 ซม. (ใช้เป็น footprint การวางด้วย)
+const SHELF_D    = _cm(20);               // ลึก 20 ซม. (ยื่นจากผนัง)
+const SHELF_T    = _cmZ(4);               // หนาแผ่นชั้น 4 ซม.
+const SHELF_Z    = [_cmZ(140), _cmZ(170)];// ใต้แผ่นชั้นล่าง 140 ซม. · ชั้นบน 170 ซม. (ห่าง 30 ซม.) วัดจากพื้น
+const SHELF_BOX  = _cm(20);               // กล่องโชว์ทากลูกบาศก์ 20×20×20 ซม.
+const SHELF_BOX_H = _cmZ(20);
+const SLOT_U_CM  = [40, 70, 100];         // กึ่งกลางกล่องจากขอบซ้าย — เว้น 10 จากขอบขวา/ระหว่างกล่อง (นับจากขวา)
+const SIGN_U_CM  = 15;                     // กึ่งกลางป้ายจากขอบซ้าย (กว้าง 20 → 5..25 · ห่างขอบซ้าย 5 · ห่างกล่องแรก 5)
+const SIGN_LEN   = _cm(20);               // ป้าย A-frame ยาว 20 ซม.
+const SIGN_H     = _cmZ(11);              // ความสูงป้าย ~11 ซม.
 
 /* ตำแหน่งบนกำแพง: u = ระยะตามแนวกำแพง · d = ระยะยื่นเข้ามาในห้อง · z = ความสูง */
 function shelfPt(side, u, z, d = 0) { return side === 'north' ? P(u, d, z) : P(d, u, z); }
@@ -35,8 +42,7 @@ function shelfSlotCount() { return shelfRect() ? SHELF_SLOTS : 0; }
 function shelfSlotAt(i) {
   const r = shelfRect(); if (!r || i < 0 || i >= SHELF_SLOTS) return null;
   const tier = Math.floor(i / SHELF_PER_TIER), col = i % SHELF_PER_TIER;
-  const step = SHELF_W / SHELF_PER_TIER;
-  return { side: r.side, u: r.offset + step * (col + 0.5), z: SHELF_Z[tier] + SHELF_T, tier, col };
+  return { side: r.side, u: r.offset + _cm(SLOT_U_CM[col]), z: SHELF_Z[tier] + SHELF_T, tier, col };
 }
 
 /* ---------- วาด ---------- */
@@ -88,6 +94,7 @@ function drawWallShelf(preview) {
     if (drawShelfTank(slot, list[i], i)) coins.push([slot, list[i], i]);
   }
   for (const [slot, L, i] of coins) drawShelfCoin(slot, L, i);
+  for (let tier = 0; tier < SHELF_TIERS; tier++) drawShelfSign(r, tier);   // ป้าย Online ทั้งสองชั้น (วาดท้ายสุด)
   ctx.restore();
 }
 
@@ -149,6 +156,28 @@ function drawShelfCoin(slot, L, i) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('฿', 0, 1);
   ctx.restore();
   _shelfHits.push({ i, key: L.key, x: p.x - rad - 6, y: p.y - rad - 9, right: p.x + rad + 6, bottom: p.y + rad + 3 });
+}
+
+/* ป้าย A-frame สามเหลี่ยม (แบบตั้งโต๊ะสำนักงาน) ยาว 20 ซม. เขียน "Online" — วางซ้ายสุดของชั้น ทั้งสองชั้น */
+function drawShelfSign(r, tier) {
+  const side = r.side, uc = r.offset + _cm(SIGN_U_CM), z0 = SHELF_Z[tier] + SHELF_T;
+  const u0 = uc - SIGN_LEN / 2, u1 = uc + SIGN_LEN / 2;
+  const dB = 0.7, dF = SHELF_D - 0.7, dC = (dB + dF) / 2, zA = z0 + SIGN_H;
+  // หน้าลาดด้านผนัง→สัน · หน้าลาดด้านกล้อง→สัน · ปลายสามเหลี่ยมสองข้าง
+  shelfFace(side, [[u0, z0, dB], [u1, z0, dB], [u1, zA, dC], [u0, zA, dC]], '#7a2f2f', 'rgba(0,0,0,.35)');
+  shelfFace(side, [[u0, z0, dF], [u1, z0, dF], [u1, zA, dC], [u0, zA, dC]], '#d0473f', 'rgba(0,0,0,.35)');
+  shelfFace(side, [[u0, z0, dB], [u0, z0, dF], [u0, zA, dC]], '#9c3a34');
+  shelfFace(side, [[u1, z0, dB], [u1, z0, dF], [u1, zA, dC]], '#9c3a34');
+  // ข้อความ Online บนหน้าด้านกล้อง (แนวนอน อ่านง่ายแบบป้ายตั้งโต๊ะ)
+  const tp = shelfPt(side, uc, (z0 + zA) / 2, (dF + dC) / 2);
+  ctx.save();
+  let fs = Math.max(6, SIGN_H * cam.zoom * 0.42);
+  ctx.font = 'bold ' + fs + 'px sans-serif';
+  const maxW = SIGN_LEN * TW * cam.zoom * 1.5, tw = ctx.measureText('Online').width;
+  if (tw > maxW) { fs *= maxW / tw; ctx.font = 'bold ' + fs + 'px sans-serif'; }
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('Online', tp.x, tp.y);
+  ctx.restore();
 }
 
 /* ---------- กดรับเงิน ---------- */
