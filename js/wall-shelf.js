@@ -9,15 +9,22 @@
    หน่วย: u = ช่องเล็ก (5 ซม.) · SUB ช่องเล็ก = 1 คอลัมน์ = 40 ซม. · z = ZUNIT ต่อ 5 ซม.
    ============================================================ */
 
-const SHELF_PER_TIER = 3;                 // ช่องต่อหนึ่งชั้น
+const SHELF_PER_TIER = 3;                 // กล่องต่อหนึ่งชั้น
 const SHELF_TIERS    = 2;                 // จำนวนชั้น
 const SHELF_SLOTS    = SHELF_PER_TIER * SHELF_TIERS;   // = 6 · ผูกกับ MAX_LIST ในตลาดโลก
-const SHELF_W        = 3 * SUB;           // กว้าง 3 คอลัมน์ = 120 ซม.
-const SHELF_D        = 5;                 // ลึก 25 ซม. (ยื่นออกจากผนัง)
-const SHELF_T        = 0.7 * ZUNIT;       // หนาแผ่นชั้น 3.5 ซม. (แผ่นบาง ๆ แบบชั้นลอย)
-const SHELF_Z        = [19 * ZUNIT, 30 * ZUNIT];       // ความสูงชั้นล่าง/ชั้นบน (95 / 150 ซม.)
-const SHELF_BOX      = 5;                 // ตู้เล็กกว้าง-ลึก 25 ซม.
-const SHELF_BOX_H    = 5 * ZUNIT;         // ตู้เล็กสูง 25 ซม.
+/* ---- ขนาดจริงเป็นเซนติเมตร (hardcode ตามสเปก · 1 ช่องเล็ก = 5 ซม. · ZUNIT = 5 ซม. ในแกน z) ---- */
+const _cm  = v => v / CM_PER_CELL;             // ซม. → ช่องเล็ก (แกน u / d)
+const _cmZ = v => (v / CM_PER_CELL) * ZUNIT;   // ซม. → world-z
+const SHELF_W    = _cm(120);              // แผ่นชั้นยาว 120 ซม. (ใช้เป็น footprint การวางด้วย)
+const SHELF_D    = _cm(20);               // ลึก 20 ซม. (ยื่นจากผนัง)
+const SHELF_T    = _cmZ(4);               // หนาแผ่นชั้น 4 ซม.
+const SHELF_Z    = [_cmZ(140), _cmZ(170)];// ใต้แผ่นชั้นล่าง 140 ซม. · ชั้นบน 170 ซม. (ห่าง 30 ซม.) วัดจากพื้น
+const SHELF_BOX  = _cm(20);               // กล่องโชว์ทากลูกบาศก์ 20×20×20 ซม.
+const SHELF_BOX_H = _cmZ(20);
+const SLOT_U_CM  = [100, 70, 40];         // กึ่งกลางกล่องจากขอบซ้าย เรียง 'ขวา→ซ้าย' — ตัวแรกลงช่องขวาสุด (เริ่มนับจากทากขวา) ไล่เข้าหาป้ายทางซ้าย
+const SIGN_U_CM  = 15;                     // กึ่งกลางป้ายจากขอบซ้าย (กว้าง 20 → 5..25 · ห่างขอบซ้าย 5 · ห่างกล่องแรก 5)
+const SIGN_LEN   = _cm(20);               // ป้าย A-frame ยาว 20 ซม.
+const SIGN_H     = _cmZ(11);              // ความสูงป้าย ~11 ซม.
 
 /* ตำแหน่งบนกำแพง: u = ระยะตามแนวกำแพง · d = ระยะยื่นเข้ามาในห้อง · z = ความสูง */
 function shelfPt(side, u, z, d = 0) { return side === 'north' ? P(u, d, z) : P(d, u, z); }
@@ -35,8 +42,7 @@ function shelfSlotCount() { return shelfRect() ? SHELF_SLOTS : 0; }
 function shelfSlotAt(i) {
   const r = shelfRect(); if (!r || i < 0 || i >= SHELF_SLOTS) return null;
   const tier = Math.floor(i / SHELF_PER_TIER), col = i % SHELF_PER_TIER;
-  const step = SHELF_W / SHELF_PER_TIER;
-  return { side: r.side, u: r.offset + step * (col + 0.5), z: SHELF_Z[tier] + SHELF_T, tier, col };
+  return { side: r.side, u: r.offset + _cm(SLOT_U_CM[col]), z: SHELF_Z[tier] + SHELF_T, tier, col };
 }
 
 /* ---------- วาด ---------- */
@@ -48,13 +54,13 @@ function shelfFace(side, pts, fill, stroke) {
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
   if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); }
 }
-/* กล่องสี่เหลี่ยมยื่นออกจากกำแพง — วาดครบทั้ง 6 ด้าน
-   ของเดิมวาดแค่ 3 ด้านที่ "คิดว่า" กล้องเห็น แล้วเดาปลายที่เห็นจาก side (north->u1 / west->u0)
-   ซึ่งผิด: ในภาพไอโซนี้ความลึกคือ x+y ทั้งสองกำแพงจึงเห็นปลาย u1 เหมือนกัน ผนังตะวันตกเลยมีด้านโหว่
-   วาดครบ 6 ด้านแล้วไม่ต้องเดา ไม่มีรูไม่ว่ามุมไหน · เรียงไกล->ใกล้: ล่าง, ปลาย u0, หลัง d0, บน, ปลาย u1, หน้า d1
-   (ความลึกบนจอ = u+d เท่ากันทั้งสองกำแพง ด้านที่ค่ามากกว่าอยู่ใกล้กล้อง วาดทีหลัง) */
+/* กล่องสี่เหลี่ยมยื่นออกจากกำแพง — วาดครบทั้ง 6 ด้าน เป็นกล่องทึบจริง ๆ
+   ของเดิมวาดแค่ 3 ด้านที่ "คิดว่า" กล้องเห็น แล้วเดาปลายจาก side (north->u1 / west->u0)
+   ซึ่งผิด: ในภาพไอโซนี้ความลึกบนจอคือ x+y ทั้งสองกำแพงจึงเห็นปลาย u1 เหมือนกัน
+   ผนังตะวันตกเลยมีด้านโหว่ · วาดครบ 6 ด้านแล้วไม่ต้องเดา ไม่มีรูไม่ว่าหันมุมไหน
+   ลำดับ ไกล->ใกล้: ล่าง · ปลาย u0 · หลัง d0 · บน · ปลาย u1 · หน้า d1 */
 function shelfBox(side, u0, u1, z0, z1, d0, d1, top, front, sideCol, stroke) {
-  const dim = (c, k) => {                       // ด้านที่หันหนีกล้อง ทำให้เข้มลง กันเห็นเป็นแผ่นแบน ๆ ถ้าโผล่ตรงขอบ
+  const dim = (c, k) => {                       // ด้านที่หันหนีกล้องทำให้เข้มลง เผื่อโผล่ตรงขอบ
     if (typeof c !== 'string' || c[0] !== '#' || c.length !== 7) return c;
     const v = i => Math.max(0, Math.round(parseInt(c.substr(i, 2), 16) * k)).toString(16).padStart(2, '0');
     return '#' + v(1) + v(3) + v(5);
@@ -99,6 +105,7 @@ function drawWallShelf(preview) {
     if (drawShelfTank(slot, list[i], i)) coins.push([slot, list[i], i]);
   }
   for (const [slot, L, i] of coins) drawShelfCoin(slot, L, i);
+  for (let tier = 0; tier < SHELF_TIERS; tier++) drawShelfSign(r, tier);   // ป้าย Online ทั้งสองชั้น (วาดท้ายสุด)
   ctx.restore();
 }
 
@@ -115,47 +122,42 @@ function shelfSlug(L) {
 }
 function drawShelfTank(slot, L, i) {
   const side = slot.side, hw = SHELF_BOX / 2, z0 = slot.z, z1 = z0 + SHELF_BOX_H;
-  const d0 = (SHELF_D - SHELF_BOX) / 2 + .2, d1 = d0 + SHELF_BOX;
-  const sold = !!L.soldAt, uL = slot.u - hw, uR = slot.u + hw;
-  const baseTop = z0 + .7 * ZUNIT;                       // ฐานตู้ (ทึบ) — ทากยืนอยู่บนนี้
-  /* ลำดับต้องเป็น หลัง→หน้า: กระจกหลัง → ฐานตู้ → ทาก → กระจกหน้า → ขอบบน
-     ถ้าวาดฐานทีหลังทาก ฐานจะบังตัวทากหายไปเลย (แผ่นบนของฐานกินพื้นที่จอเยอะในมุมไอโซ) */
-  ctx.globalAlpha = .30;
-  shelfFace(side, [[uL, z0, d0], [uR, z0, d0], [uR, z1, d0], [uL, z1, d0]], '#7fc4e8');
+  const d0 = (SHELF_D - SHELF_BOX) / 2, d1 = d0 + SHELF_BOX;
+  const sold = !!L.soldAt;
+  const baseH = .6 * ZUNIT;                                  // ฐานตู้ทึบ (สูงจากพื้นชั้น)
+  /* วาดของ "ทึบ" ให้ครบก่อน (ผนังหลัง + ฐาน) แล้วค่อยวางทาก ทากจะได้ไม่โดนโครงตู้/คานทับ
+     ปิดท้ายด้วยกระจกหน้า+ฝาบน (โปร่งใส) ที่วางทับทากได้โดยยังเห็นทากทะลุ */
+  ctx.globalAlpha = .28;
+  shelfFace(side, [[slot.u - hw, z0, d0], [slot.u + hw, z0, d0], [slot.u + hw, z1, d0], [slot.u - hw, z1, d0]], '#7fc4e8');   // ผนังกระจกด้านไกล
   ctx.globalAlpha = 1;
-  shelfBox(side, uL, uR, z0, baseTop, d0, d1, '#2b3a42', '#1d282e', '#243138', 'rgba(0,0,0,.5)');
-
-  /* ทาก: สไปรต์แบนยืนบนฐานตู้ · คลิปด้วยเงาของตู้ ล้นออกไปเท่าไหร่ก็ไม่โผล่นอกกระจก
-     (สไปรต์มีขอบโปร่งราว 30% ตัวทากจริงจึงกว้างราว 3/4 ของตู้) */
+  shelfBox(side, slot.u - hw, slot.u + hw, z0, z0 + baseH, d0, d1, '#2b3a42', '#1d282e', '#243138', 'rgba(0,0,0,.5)');        // ฐานตู้ทึบ
+  // ทาก: ย่อให้พอดี "ภายในตู้" (เหนือฐาน) วางกึ่งกลาง — วาดหลังฐาน จึงไม่โดนตัดครึ่งตัว
   const s = shelfSlug(L);
   if (s && typeof slugSprite === 'function') {
     try {
       const sp = slugSprite(s);
-      const w = SHELF_BOX * 1.05 * TW * cam.zoom, h = w * sp.c.height / sp.c.width;
-      const c = shelfPt(side, slot.u, baseTop, (d0 + d1) / 2);
-      ctx.save();
-      ctx.beginPath();
-      for (const [u, z, d] of [[uL, z0, d0], [uR, z0, d0], [uR, z0, d1], [uR, z1, d1], [uR, z1, d0], [uL, z1, d0], [uL, z1, d1], [uL, z0, d1]]) {
-        const q = shelfPt(side, u, z, d); ctx.lineTo(q.x, q.y);
-      }
-      ctx.closePath(); ctx.clip();
-      ctx.globalAlpha = sold ? .45 : 1;
-      ctx.drawImage(sp.c, c.x - w / 2, c.y - h * .88, w, h);
+      const innerH = (SHELF_BOX_H - baseH) * cam.zoom;                 // ความสูงภายในตู้ (px บนจอ)
+      const innerW = SHELF_BOX * TW * cam.zoom * 1.7;                  // ความกว้างหน้าตู้โดยประมาณ (px)
+      const scale = Math.min(innerW * .92 / sp.c.width, innerH * .92 / sp.c.height);
+      const w = sp.c.width * scale, h = sp.c.height * scale;
+      const c = shelfPt(side, slot.u, z0 + baseH + (SHELF_BOX_H - baseH) * .5, (d0 + d1) / 2);
+      ctx.globalAlpha = sold ? .5 : 1;
+      ctx.drawImage(sp.c, c.x - w / 2, c.y - h / 2, w, h);
       ctx.globalAlpha = 1;
-      ctx.restore();
     } catch (e) { }
   }
-  // กระจกด้านหน้า + ขอบบนตู้
-  ctx.globalAlpha = .22;
-  shelfFace(side, [[uL, z0, d1], [uR, z0, d1], [uR, z1, d1], [uL, z1, d1]], '#cfe9f6');
+  // กระจกด้านหน้า + ฝาบน (โปร่งใส) — วาดหลังทาก
+  ctx.globalAlpha = .20;
+  shelfFace(side, [[slot.u - hw, z0, d1], [slot.u + hw, z0, d1], [slot.u + hw, z1, d1], [slot.u - hw, z1, d1]], '#cfe9f6');   // กระจกด้านหน้า
   ctx.globalAlpha = 1;
-  shelfFace(side, [[uL, z1, d0], [uR, z1, d0], [uR, z1, d1], [uL, z1, d1]], 'rgba(150,200,220,.18)', 'rgba(180,220,240,.35)');
+  shelfFace(side, [[slot.u - hw, z1, d0], [slot.u + hw, z1, d0], [slot.u + hw, z1, d1], [slot.u - hw, z1, d1]], 'rgba(150,200,220,.16)', 'rgba(180,220,240,.35)');   // ฝาบน
+
   return sold;
 }
 /* ขายได้แล้ว — เหรียญลอยเหนือตู้ กดเพื่อรับเงิน (วาดหลังตู้ทุกใบ จะได้ไม่โดนทับ) */
 function drawShelfCoin(slot, L, i) {
   const side = slot.side, hw = SHELF_BOX / 2, z1 = slot.z + SHELF_BOX_H;
-  const d0 = (SHELF_D - SHELF_BOX) / 2 + .2, d1 = d0 + SHELF_BOX;
+  const d0 = (SHELF_D - SHELF_BOX) / 2, d1 = d0 + SHELF_BOX;
   const p = shelfPt(side, slot.u, z1 + 3.0 * ZUNIT, (d0 + d1) / 2);
   const rad = Math.max(13, 19 * cam.zoom), pulse = Math.sin(performance.now() / 240);
   ctx.save(); ctx.translate(p.x, p.y - 3 * pulse);
@@ -165,6 +167,38 @@ function drawShelfCoin(slot, L, i) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('฿', 0, 1);
   ctx.restore();
   _shelfHits.push({ i, key: L.key, x: p.x - rad - 6, y: p.y - rad - 9, right: p.x + rad + 6, bottom: p.y + rad + 3 });
+}
+
+/* ป้าย A-frame สามเหลี่ยม (แบบตั้งโต๊ะสำนักงาน) ยาว 20 ซม. เขียน "Online" — วางซ้ายสุดของชั้น ทั้งสองชั้น */
+function drawShelfSign(r, tier) {
+  const side = r.side, uc = r.offset + _cm(SIGN_U_CM), z0 = SHELF_Z[tier] + SHELF_T;
+  const u0 = uc - SIGN_LEN / 2, u1 = uc + SIGN_LEN / 2;
+  const dB = 0.7, dF = SHELF_D - 0.7, dC = (dB + dF) / 2, zA = z0 + SIGN_H;
+  // หน้าลาดด้านผนัง→สัน · หน้าลาดด้านกล้อง→สัน · ปลายสามเหลี่ยมสองข้าง
+  shelfFace(side, [[u0, z0, dB], [u1, z0, dB], [u1, zA, dC], [u0, zA, dC]], '#7a2f2f', 'rgba(0,0,0,.35)');
+  shelfFace(side, [[u0, z0, dF], [u1, z0, dF], [u1, zA, dC], [u0, zA, dC]], '#d0473f', 'rgba(0,0,0,.35)');
+  shelfFace(side, [[u0, z0, dB], [u0, z0, dF], [u0, zA, dC]], '#9c3a34');
+  shelfFace(side, [[u1, z0, dB], [u1, z0, dF], [u1, zA, dC]], '#9c3a34');
+  /* ข้อความ Online — เอียงให้อยู่ในระนาบเดียวกับหน้าป้ายที่ลาดเอียง
+     แมป unit ของหน้าป้าย (u = แนวยาว · slope = ฐาน→สัน) ลงเป็นเมทริกซ์ affine
+     หน้าป้ายเป็น parallelogram บนจอ (P เป็น affine) จึงแมปตรง ๆ ได้ */
+  let Au = u0, Bu = u1;
+  let A = shelfPt(side, Au, z0, dF), B = shelfPt(side, Bu, z0, dF);
+  if (B.x < A.x) { const t1 = Au; Au = Bu; Bu = t1; const t2 = A; A = B; B = t2; }   // ให้ตัวอักษรไล่ไปทางขวาจอเสมอ (กันกลับด้านบนกำแพงตะวันตก)
+  const D = shelfPt(side, Au, zA, dC);
+  const ux = B.x - A.x, uy = B.y - A.y, vx = D.x - A.x, vy = D.y - A.y;
+  const Lu = Math.hypot(ux, uy) || 1, Lv = Math.hypot(vx, vy) || 1;
+  const cxp = A.x + ux * .5 + vx * .5, cyp = A.y + uy * .5 + vy * .5;               // กึ่งกลางหน้าป้าย
+  ctx.save();
+  // local(px บนหน้าป้าย) → CSS px : แกน x = Û · แกน y = -V̂ (canvas y ลงล่าง) แล้วคูณ DPR
+  ctx.setTransform(DPR * ux / Lu, DPR * uy / Lu, DPR * -vx / Lv, DPR * -vy / Lv, DPR * cxp, DPR * cyp);
+  let fs = Lv * 0.6;
+  ctx.font = 'bold ' + fs + 'px sans-serif';
+  const tw = ctx.measureText('Online').width, maxTW = Lu * 0.86;
+  if (tw > maxTW) { fs *= maxTW / tw; ctx.font = 'bold ' + fs + 'px sans-serif'; }
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('Online', 0, 0);
+  ctx.restore();
 }
 
 /* ---------- กดรับเงิน ---------- */
