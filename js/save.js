@@ -37,7 +37,7 @@ function saveGame(){
   if(!_saveOK) return;
   try{
     const data={
-      v:1, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||0, floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
+      v:1, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||0, floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
       objs:(G.objs||[]).map(_saveObj),
       shelter:(G.shelter||[]).map(_saveObj),
       inv:(G.inv||[]).map(_saveSlug)
@@ -135,6 +135,10 @@ function loadGame(){
     G.questOrderVersion=_NUM(d.questOrderVersion,0); G.questCompleted=Array.isArray(d.questCompleted)?d.questCompleted.filter(id=>typeof id==='string'):[];
     G.rep=_NUM(d.rep,0); G.questIndex=Math.max(0,_NUM(d.questIndex,0)|0); G.questDone=!!d.questDone; G.questBase=(d.questBase&&typeof d.questBase==='object')?d.questBase:null;
     G.welcomeGiftAt=_NUM(d.welcomeGiftAt,0); G.welcomeGiftDone=!!d.welcomeGiftDone;
+    /* ledger จดหมาย 'ส่งครั้งเดียวตลอดกาล' + สถานะกดรับของ — ต้องคงข้ามรีโหลด ไม่งั้นจดหมายที่ลบไปจะถูกส่งใหม่ / กดรับซ้ำ */
+    G.mailSent=(d.mailSent&&typeof d.mailSent==='object')?d.mailSent:{};
+    G.claimed=(d.claimed&&typeof d.claimed==='object')?d.claimed:{};
+    G.larvaDeaths=_NUM(d.larvaDeaths,0)|0; G.rivalDeathMailSent=!!d.rivalDeathMailSent; G.rival100MailSent=!!d.rival100MailSent;
     G.boxStock=(d.boxStock&&Number.isFinite(d.boxStock.n)&&Number.isFinite(d.boxStock.at))
       ?{n:Math.max(0,Math.min(SLUG_BOX_MAX,d.boxStock.n|0)),at:d.boxStock.at}:null;
     G.slugDeliveries=Array.isArray(d.slugDeliveries)?d.slugDeliveries.filter(x=>x&&typeof x.id==='string'&&Number.isFinite(+x.readyAt)&&x.genes&&typeof x.genes==='object').map(x=>({id:x.id,boxIndex:_NUM(x.boxIndex,0)|0,name:String(x.name||''),readyAt:+x.readyAt,genes:_cleanGenes(x.genes),alerted:!!x.alerted})):[];
