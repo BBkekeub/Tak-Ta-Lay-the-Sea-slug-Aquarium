@@ -3,7 +3,8 @@ const FOOD_TYPES={
  anemone:{name:'ดอกไม้ทะเล',icon:'🌸',levels:[{sat:10,cap:5,h:3,color:5,gillAura:5,vigor:5},{sat:15,cap:8,h:5,color:10,gillAura:10,vigor:10},{sat:15,cap:10,h:10,color:15,gillAura:15,vigor:15}]},
  hydroid:{name:'ไฮดรอยด์',icon:'🌿',levels:[{sat:15,cap:10,h:2,gillLen:10,gillAura:10},{sat:25,cap:10,h:4,gillLen:20,gillAura:15}]},
  algae:{name:'สาหร่าย',icon:'🥬',levels:[{sat:30,cap:10,h:2,girth:3},{sat:40,cap:10,h:2,girth:5},{sat:40,cap:15,h:2,girth:5}]},
- sponge:{name:'ฟองน้ำทะเล',icon:'🧽',levels:[{sat:15,cap:10,h:2,gillLen:-10,gillAura:10},{sat:25,cap:10,h:4,gillLen:-20,gillAura:15}]}
+ sponge:{name:'ฟองน้ำทะเล',icon:'🧽',levels:[{sat:15,cap:10,h:2,gillLen:-10,gillAura:10},{sat:25,cap:10,h:4,gillLen:-20,gillAura:15}]},
+ neopetrosia:{name:'นีโอเปโทรเซีย',icon:'🧽',levels:[{sat:40,cap:2,h:2,gillLen:10,gillAura:20,color:30,vigor:20},{sat:60,cap:2,h:2,gillLen:15,gillAura:40,color:60,vigor:30}]}
 };
 for(const food of Object.values(FOOD_TYPES))for(const spec of food.levels){if(spec.gillAura!=null)spec.vigor=Math.max(spec.vigor||0,spec.gillAura);delete spec.gillAura;spec.cost=Math.max(1,Math.round(spec.sat*spec.cap*FOOD_COST_PER_SAT));}   // ราคา = ค่าอิ่ม × จำนวนคำ × อัตราใน config.js
 const FOOD_IMAGES={};
