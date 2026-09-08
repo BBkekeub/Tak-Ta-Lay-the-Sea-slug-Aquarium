@@ -981,9 +981,9 @@ function drawPerson(p){
     /* ศอกงอ "ค้าง" ตลอด ~34° แล้วงอเพิ่มแค่ ~13° ตอนแขนมาข้างหน้า
        (ชีวกลศาสตร์จริง amplitude การงอศอกแค่ ~6-15° รอบ offset ~26°)
        ของเดิมงอเพิ่มถึง ~30° เลยเห็นปลายแขน "สะบัด" — ลดแอมพลิจูดลงให้แค่ขยับนิด ๆ */
-    const flick=Math.max(0,Math.sin(armTh))*0.045*motion*armDamp;      // งอเพิ่มตอนมือมาหน้า (บาง ๆ)
-    const handFrac=0.955-flick;                                        // ระยะมือจากไหล่ (สัดส่วนความยาวแขน) น้อย=งอมาก
-    const foldE=flick/0.045;                                           // 0..1 ใช้ขยับศอก/มือเล็กน้อยตามจังหวะ
+    const flick=Math.max(0,Math.sin(armTh))*0.032*motion*armDamp;      // งอเพิ่มตอนมือมาหน้า (บาง ๆ)
+    const handFrac=0.972-flick;                                        // ฐานงอ ~27° (offset จริง) → หน้า ~40° น้อย=งอมาก
+    const foldE=flick/0.032;                                           // 0..1 ใช้ขยับศอก/มือเล็กน้อยตามจังหวะ
     /* ต้นแขนห้อยเกือบดิ่ง · มือนำหน้าข้อศอกพอประมาณ (ไม่ลากไปข้างหน้าจนสะบัด) */
     let elbow=[shoulder[0]+side*.014,shoulder[1]+swing*.32-.006,shoulder[2]-L1*(.95-.03*foldE)];
     let hand =[shoulder[0]+side*.022,shoulder[1]+swing*1.0,shoulder[2]-(L1+L2)*handFrac];
