@@ -5,6 +5,8 @@
   1) apt-get install assimp-utils ; pip install numpy fast-simplification
   2) assimp export assets/LowPolyCharacters/Male.fbx   /tmp/fbx/Male.gltf
      assimp export assets/LowPolyCharacters/Female.fbx /tmp/fbx/Female.gltf
+     assimp export assets/LowPolyCharacters/Male_Rigged_T-Pose.fbx   /tmp/fbx/Male_Rigged_T-Pose.gltf
+     assimp export assets/LowPolyCharacters/Female_Rigged_T-Pose.fbx /tmp/fbx/Female_Rigged_T-Pose.gltf
   3) python3 tools/bake-people.py         (อ่านจาก /tmp/fbx  เขียน /tmp/bake/model.json)
   4) ห่อ model.json เป็น js/people-model.js  (ดูท้ายไฟล์)
 
@@ -87,8 +89,18 @@ for s,S in (('L','Left'),('R','Right')):
               'HandPinky1','HandPinky2','HandPinky3']: PART_OF['mixamorig:%s%s'%(S,f)]='hand'+s
 for b in ['Hips','Spine','Spine1','Spine2','Neck']: PART_OF['mixamorig:'+b]='torso'
 PART_OF['mixamorig:Head']='head'
-SLOT={'Shirt':'shirt','Skin':'skin','Material':'pants','Leather':'shoe',
-      'Material.001':'hair','Material.002':'dark','Material.004':'white'}
+# ชื่อวัสดุ -> ช่องสีที่เกมสุ่มให้ (แต่ละไฟล์ .fbx ตั้งชื่อวัสดุคนละแบบ จึงต้องมีตารางของตัวเอง)
+SLOT_BY_FILE={
+ 'Male':{'Shirt':'shirt','Skin':'skin','Material':'pants','Leather':'shoe',
+         'Material.001':'hair','Material.002':'dark','Material.004':'white'},
+ 'Female':{'Shirt':'shirt','Skin':'skin','Material':'pants','Leather':'shoe',
+         'Material.001':'hair','Material.002':'dark','Material.004':'white'},
+ # ร่างที่สอง (T-pose) — เมชชิ้นเดียว ผมติดมากับหัว ไม่มีหมวกซานตา
+ 'Male_Rigged_T-Pose':{'Skin':'skin','Material.003':'shirt','Material.001':'pants',
+         'Material.002':'shoe','Material.005':'dark','Hair':'hair'},
+ 'Female_Rigged_T-Pose':{'Skin.002':'skin','Material.008':'shirt','Material.009':'pants',
+         'Material.010':'shoe','Material.011':'dark','Hair.002':'hair'},
+}
 # ชิ้นที่ไฟล์ต้นทาง "จอด" ไว้ผิดที่ (bind ต่างจากตัว) — ยังใช้ไม่ได้ ตัดออกก่อน
 SKIP={'Cap','Cap_Hair','Hat','ShortHair_2'}
 VARIANT={'Hair':'hair','PonyTail':'hair','ShortHair_1':'hair',
@@ -129,6 +141,7 @@ def reorient(V,VN,T):
     T=T.copy(); T[flip]=T[flip][:,[0,2,1]]
     return T,int(flip.sum())
 def bake(name):
+    SLOT=SLOT_BY_FILE[name]
     d=load(name); V,T,M,J,N=d['V'],d['T'],d['M'],d['J'],d['N']; jo=d['jorigin']; mats=d['matnames']
     T,nf=reorient(V,d['VN'],T); print('  กลับด้านสามเหลี่ยมให้หันออกเหมือนกัน %d หน้า'%nf)
     keep=np.array([n not in SKIP for n in N])
@@ -184,7 +197,8 @@ def bake(name):
     for kind,vs in variants.items():
         for k,v in vs.items(): print('     [%s] %-12s %4d tris'%(kind,k,len(v['t'])//3))
     return {'joints':joints,'parts':parts,'variants':variants}
-out={'male':bake('Male'),'female':bake('Female')}
+out={'male':bake('Male'),'female':bake('Female'),
+     'male2':bake('Male_Rigged_T-Pose'),'female2':bake('Female_Rigged_T-Pose')}
 json.dump(out,open('/tmp/bake/model.json','w'))
 print('ขนาด json: %.0f KB'%(len(json.dumps(out))/1024))
 

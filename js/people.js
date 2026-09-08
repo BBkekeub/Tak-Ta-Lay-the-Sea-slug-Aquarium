@@ -384,7 +384,7 @@ function planFamily(g){
   }
   // A crowded shop can temporarily have no group-sized spot. Stay together and retry.
   g.stage='planning';g.time=0;g.replan=true;
-  for(const p of g.members){p.state='wait';p.tgt={x:p.x,y:p.y};p.motion=0;}
+  for(const p of g.members){p.state='wait';p.tgt={x:p.x,y:p.y};}
   return false;
 }
 function stepFamilies(dt){
@@ -413,14 +413,14 @@ function stepFamilies(dt){
         g.firstArrivedAt=g.time;g.replan=false;
         endFamilyColumn(g);for(const p of g.members)stopRegroup(p);
       }
-      for(const p of ready){p.state='wait';p.motion=0;}
+      for(const p of ready){p.state='wait';}
       if(ready.length===g.members.length||g.time-g.firstArrivedAt>=2){
         g.stage='look';g.time=0;g.lookFor=5;
-        for(const p of ready){beginPersonBrowse(p);p._groupViewed=true;p.lookT=Infinity;p.motion=0;}
+        for(const p of ready){beginPersonBrowse(p);p._groupViewed=true;p.lookT=Infinity;}
       }
     }
     if(g.stage==='look'){
-      for(const p of ready)if(!p._groupViewed){beginPersonBrowse(p);p._groupViewed=true;p.lookT=Infinity;p.motion=0;}
+      for(const p of ready)if(!p._groupViewed){beginPersonBrowse(p);p._groupViewed=true;p.lookT=Infinity;}
       if(g.time>=g.lookFor){
         if(g.members.some(p=>p._groupViewed&&p.t>=g.lookFor&&tryCustomerOffer(p,g.focus)))continue;
         g.visits--;planFamily(g);
@@ -478,6 +478,9 @@ function makePerson(options={}){
     bagged: !kid && Math.random() < 0.35,
     modelHair: gender==='female' ? pick1(['PonyTail','ShortHair_1','ShortHair_1']) : 'Hair',
     facial: (gender==='male'&&!kid) ? pick1(['none','none','none','Moustache','Beard','BeardFull']) : 'none',
+    /* ร่าง = ไฟล์โมเดลที่ใช้ (ดูหัวไฟล์ people-model.js) — สุ่มเพื่อให้ฝูงลูกค้าไม่ใช่คนหน้าเดียวกันทั้งร้าน
+       *2 = ชุด T-pose เมชชิ้นเดียว ผมติดหัว เสื้อผ้าคนละแบบ ไม่มีทรงผม/เคราสลับ */
+    body: gender==='female' ? pick1(['female','female2']) : pick1(['male','male2']),
   };
 }
 
@@ -590,11 +593,11 @@ function stepPeople(){
     const dx = p.tgt.x - p.x, dy = p.tgt.y - p.y;
     const d  = Math.hypot(dx, dy);
     if(d < 0.7){
-      if(p._columnFollower){p.motion=0;continue;}
+      if(p._columnFollower)continue;
       if(p._regroup){stopRegroup(p);continue;}
-      if(p._yieldResume){const resume=p._yieldResume;p._yieldResume=null;p.state=resume.state;p.lookT=resume.remaining;p.t=0;p.motion=0;continue;}
-      if(p.tradeOffer){p.state='wait';p.motion=0;p.tradeOffer.arrived=true;const c=p.tradeOffer.counter;p.fdx=c.cx+oW(c)/2-p.x;p.fdy=c.cy+oH(c)/2-p.y;renderTradeOffers();continue;}
-      if(p.family){p.state='wait';p.t=0;p.lookT=Infinity;p.motion=0;continue;}
+      if(p._yieldResume){const resume=p._yieldResume;p._yieldResume=null;p.state=resume.state;p.lookT=resume.remaining;p.t=0;continue;}
+      if(p.tradeOffer){p.state='wait';p.tradeOffer.arrived=true;const c=p.tradeOffer.counter;p.fdx=c.cx+oW(c)/2-p.x;p.fdy=c.cy+oH(c)/2-p.y;renderTradeOffers();continue;}
+      if(p.family){p.state='wait';p.t=0;p.lookT=Infinity;continue;}
       if(p.state === 'leave'){ PEOPLE.splice(i,1); continue; }               // ออกจากร้าน
       if(!p.focus){ nextGoal(p); continue; }                                 // ถึงจุดเดินเล่น ไปต่อ
       beginPersonBrowse(p);
@@ -765,7 +768,7 @@ function drawPerson(p){
   // Reuse idle poses at 12 Hz and moving/gesturing poses at 30 Hz;
   // position is translated every frame so walking remains smooth.
   const poseRate=(p.motion>.05||p.action!=='watch')?30:12;
-  const poseKey=[Math.floor(p.idle*poseRate),p.action==='watch'?0:Math.round((p.actionT||0)*30),Math.round((p.catchupBoost||1)*10),Math.round(p.phase*20),Math.round((p.motion||0)*20),Math.round(p.fdx*100),Math.round(p.fdy*100),Math.round((p.headYaw||0)*100),p.action,p.state,p._squeezeUntil>_peopleT?1:0,p.focus?.id,['point','crouch'].includes(p.action)?Math.round(p.x*20):0,['point','crouch'].includes(p.action)?Math.round(p.y*20):0,p.hCm,p.outfit,p.hairCut,p.shirt,p.pants,p.skin,p.hair,p.bagged,p.accessory,p.modelHair,p.facial].join('|');
+  const poseKey=[Math.floor(p.idle*poseRate),p.action==='watch'?0:Math.round((p.actionT||0)*30),Math.round((p.catchupBoost||1)*10),Math.round(p.phase*20),Math.round((p.motion||0)*20),Math.round(p.fdx*100),Math.round(p.fdy*100),Math.round((p.headYaw||0)*100),p.action,p.state,p._squeezeUntil>_peopleT?1:0,p.focus?.id,['point','crouch'].includes(p.action)?Math.round(p.x*20):0,['point','crouch'].includes(p.action)?Math.round(p.y*20):0,p.hCm,p.outfit,p.hairCut,p.shirt,p.pants,p.skin,p.hair,p.bagged,p.accessory,p.modelHair,p.facial,p.body].join('|');
   if(p._drawPose&&p._drawPose.key===poseKey){
     const cached=p._drawPose,dx=p.x-cached.x,dy=p.y-cached.y;
     const faces=dx||dy?cached.faces.map(f=>({rgb:f.rgb,v:f.v.map(v=>[v[0]+dx,v[1]+dy,v[2]])})):cached.faces;
@@ -781,7 +784,15 @@ function drawPerson(p){
   const shoulderWidth=p.gender==='female'?.94:1;
   const motion=p.motion||0, phase=p.phase;
   let clearance=Infinity;for(const o of G.objs){if(o===moving)continue;const dx=Math.max(o.cx-p.x,0,p.x-o.cx-oW(o)),dy=Math.max(o.cy-p.y,0,p.y-o.cy-oH(o));clearance=Math.min(clearance,Math.hypot(dx,dy));}
-  const gait=Math.sin(phase)*motion*Math.min(1,Math.max(.25,clearance/6));
+  /* ---- ถ่ายน้ำหนัก + บิดตัวตอนเดิน ----
+     คนจริงไม่ได้เลื่อนตัวเป็นก้อนแล้วสลับขา: สะโพกส่ายไปทับเท้าข้างที่ยืนพื้น (~2-3 ซม.)
+     เชิงกรานหมุนตามขาที่ก้าวออกไป ส่วนอก/ไหล่หมุนสวนทาง (transverse rotation)
+     ขาดสองอย่างนี้ ท่อนบนจะนิ่งเป็นแท่ง = ต้นเหตุหลักที่ท่าเดินดู "แข็ง" */
+  const gaitAmp=motion*Math.min(1,Math.max(.25,clearance/6));
+  const sway   =-Math.sin(phase)*0.0105*gaitAmp;   // เอนไปทับเท้าข้างที่ยืนพื้น (ซ้ายยืนช่วง phase 0..π จุดกลาง π/2)
+  const pelvisA=-Math.cos(phase)*0.070*gaitAmp;    // เชิงกรานหมุนตามขาข้างที่ยื่นไปหน้า (ซ้ายยื่นสุดที่ phase=0)
+  const thoraxA= Math.cos(phase)*0.100*gaitAmp;    // อกหมุนสวนเชิงกราน ไปทางเดียวกับแขนที่แกว่งมาหน้า
+  const rotZ=(v,a)=>{const c=Math.cos(a),si=Math.sin(a);return [v[0]*c-v[1]*si, v[0]*si+v[1]*c, v[2]];};
   let bob=0;                       // ตัวขึ้น-ลงตามจังหวะก้าว คำนวณจริงหลังรู้ความยาวขา (ดูบล็อกโมเดล)
   const breath=Math.sin(p.idle*1.6)*0.0015;
   const action=p.action||'watch';
@@ -853,7 +864,7 @@ function drawPerson(p){
      โมเดลถูกเบคมาในระบบพิกัดเดียวกับ world() แล้ว (x=ข้าง y=หน้า z=สูง สูง=1)
      ที่นี่แค่หาตำแหน่งข้อต่อตามท่าทาง แล้วหมุนชิ้นส่วนไปวางตามข้อต่อนั้น
      ท่าเดิน/ชี้/ก้ม/หันหัว ยังใช้ระบบเดิมทั้งหมด แค่เปลี่ยนสิ่งที่ถูกวาดจาก "ทรงกระบอก" เป็น "เมช" */
-  const MDL=PEOPLE_MODEL[p.gender==='female'?'female':'male'], JT=MDL.joints;
+  const MDL=PEOPLE_MODEL[(p.body&&PEOPLE_MODEL[p.body])?p.body:(p.gender==='female'?'female':'male')], JT=MDL.joints;
   const SLOTC={skin:p.skin,shirt:p.shirt,pants:p.pants,shoe:p.shoe,hair:p.hair,dark:'#2b2622',white:'#efeadd'};
   const bw=build;                                   // อ้วน/ผอม = ขยายด้านข้าง (ความสูงคุมด้วย hCm)
   const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
@@ -875,16 +886,21 @@ function drawPerson(p){
      ไม่เรียก face() ทีละสามเหลี่ยมเพราะจะเรียก world() ซ้ำ 3 เท่า (เวอร์เท็กซ์หนึ่งตัวใช้ร่วมกันหลายหน้า)
      แปลงทีละเวอร์เท็กซ์ครั้งเดียวแล้วค่อยประกอบหน้า เร็วกว่า ~3 เท่า */
   const _W=[];
-  function emit(part,at,rot,stretch,shear){
+  function emit(part,at,rot,stretch,shear,twist){
     if(!part) return;
     const v=part.v,t=part.t,n=v.length/3,ax=part.axis,st=(stretch&&stretch!==1&&ax)?stretch-1:0;
-    const sh=shear||0, span=NECKZ-HIPZ;
+    const sh=shear||0, span=NECKZ-HIPZ, tw=twist||null;
     for(let i=0;i<n;i++){
       let x=v[i*3],y=v[i*3+1],z=v[i*3+2];
       if(st){const d=(x*ax[0]+y*ax[1]+z*ax[2])*st;x+=ax[0]*d;y+=ax[1]*d;z+=ax[2]*d;}
       if(rot){const nx=rot[0]*x+rot[1]*y+rot[2]*z,ny=rot[3]*x+rot[4]*y+rot[5]*z,nz=rot[6]*x+rot[7]*y+rot[8]*z;x=nx;y=ny;z=nz;}
       const wz=at[2]+z;
-      _W[i]=world([at[0]+x*bw, at[1]+y+(sh?sh*Math.max(0,wz-HIPZ)/span:0), wz]);
+      let vx=at[0]+x*bw, vy=at[1]+y+(sh?sh*Math.max(0,wz-HIPZ)/span:0);
+      if(tw){                                   // เชิงกราน→อก บิดสวนกัน ไล่ตามความสูง
+        const f=wz<=HIPZ?0:wz>=NECKZ?1:(wz-HIPZ)/span, a=tw[0]+(tw[1]-tw[0])*f, a2=a*a;
+        const ca=1-a2*0.5, sa=a*(1-a2/6), nx2=vx*ca-vy*sa;vy=vx*sa+vy*ca;vx=nx2;
+      }
+      _W[i]=world([vx, vy, wz]);
     }
     for(const run of part.s){
       const rgb0=hexToRgb(SLOTC[run[0]]||p.shirt);
@@ -947,7 +963,10 @@ function drawPerson(p){
       fy=STEPA-2*STEPA*u; fz=0;
       pitch=-0.32*Math.max(0,u-0.68)/0.32*motion;   // ถีบปลายเท้าตอนจะยกขึ้น
     }
-    const hip=[J('hip')[0],J('hip')[1],J('hip')[2]+bob];
+    /* เชิงกรานหมุน (ข้อสะโพกเลื่อนตามการหมุน) · ส่ายไปทับเท้าข้างที่ยืนพื้น
+       · ข้างที่ยกขาเชิงกรานตกลงเล็กน้อย (pelvic drop จริงราว 4°) — เท้าไม่ส่ายตาม เพราะเหยียบพื้นอยู่ */
+    const hj=rotZ(J('hip'),pelvisA), drop=(th<Math.PI?-1:1)*0.0045*gaitAmp;
+    const hip=[hj[0]+sway,hj[1],hj[2]+bob+drop];
     const ankle=[J('ankle')[0],J('ankle')[1]+fy,J('ankle')[2]+fz];
     const knee=legIK(hip,ankle,LEGL1,LEGL2);
     const rl=MDL.parts['thigh'+S],cl=MDL.parts['calf'+S],fl=MDL.parts['foot'+S];
@@ -957,12 +976,14 @@ function drawPerson(p){
     emit(fl,ankle,[1,0,0, 0,ca,-sa, 0,sa,ca],1);    // เท้าเงย/ถีบรอบแกนข้าง
   }
   /* ---- ลำตัว + หัว ---- */
-  emit(MDL.parts.torso,[JT.hips[0],JT.hips[1],JT.hips[2]+bob],null,1,lean);
-  emit(MDL.parts.head,[JT.head[0],JT.head[1]+lean,JT.head[2]+bob+breath],null,1);
+  emit(MDL.parts.torso,[JT.hips[0]+sway,JT.hips[1],JT.hips[2]+bob],null,1,lean,[pelvisA,thoraxA]);
+  /* หัวนิ่งกว่าลำตัว (คนจริงตรึงสายตาไว้) — ส่ายตามแค่ ~85% และไม่หมุนตามอก ไม่งั้นหน้าจะส่ายตามทุกก้าว */
+  const headAt=[JT.head[0]+sway*0.85,JT.head[1]+lean,JT.head[2]+bob+breath];
+  emit(MDL.parts.head,headAt,null,1);
   const hairSet=MDL.variants.hair||{},hairKey=p.modelHair&&hairSet[p.modelHair]?p.modelHair:Object.keys(hairSet)[0];
-  if(hairKey) emit(hairSet[hairKey],[JT.head[0],JT.head[1]+lean,JT.head[2]+bob+breath],null,1);
+  if(hairKey) emit(hairSet[hairKey],headAt,null,1);
   const facialSet=MDL.variants.facial||{};
-  if(p.facial&&facialSet[p.facial]) emit(facialSet[p.facial],[JT.head[0],JT.head[1]+lean,JT.head[2]+bob+breath],null,1);
+  if(p.facial&&facialSet[p.facial]) emit(facialSet[p.facial],headAt,null,1);
   /* ---- แขน: ใช้ IK เดิม แต่ความยาวท่อนมาจากโมเดลจริง ---- */
   for(const side of [-1,1]){
     posedArms=false;
@@ -971,25 +992,25 @@ function drawPerson(p){
     /* โมเดลวางสัดส่วนแขนกลับหัว (ท่อนล่าง 0.180 ยาวกว่าท่อนบน 0.154) — คนจริงท่อนบนยาวกว่า ~0.56:0.44
        ย้ายจุดศอกให้ท่อนบนยาวขึ้น/ท่อนล่างสั้นลง โดยระยะเอื้อมรวม (REACH) เท่าเดิม ปลายมือถึงที่เดิม */
     const ARMTOT=L1+L2, UARM=ARMTOT*0.56, FARM=ARMTOT*0.44;
-    const shoulder=[J('shoulder')[0],J('shoulder')[1]+lean,J('shoulder')[2]+bob];
-    /* แขนแกว่งสวนกับขาข้างเดียวกัน · ผูกกับ phase ของการเดินตรง ๆ ไม่ใช่ค่า gait ที่ถูกหรี่ไว้ */
-    const armTh=phase+(side<0?0:Math.PI);
+    /* ไหล่ติดไปกับอกที่หมุน + ส่ายตามน้ำหนัก */
+    const shj=rotZ(J('shoulder'),thoraxA);
+    const shoulder=[shj[0]+sway,shj[1]+lean,shj[2]+bob];
+    /* แขนแกว่งสวนกับขา "ข้างเดียวกัน" — ขาซ้ายยื่นสุดที่ phase=0 แขนซ้ายจึงต้องไปหลังสุดที่ phase=0
+       (ของเดิมใช้ armTh=phase ตรง ๆ แขนเลยเหลื่อมขาอยู่ 90° เดินไม่เข้าจังหวะและดูแข็ง) */
+    const armTh=phase+(side<0?-Math.PI/2:Math.PI/2);
     const armDamp=Math.min(1,Math.max(.35,clearance/6));
-    /* ไหล่แกว่งหน้า-หลังราว ±12° (เดินชมของช้า ๆ) — งานวิจัย gait ไหล่กวาดรวม ~30° */
-    const swing=Math.sin(armTh)*0.058*motion*armDamp;
+    /* แก้อาการ "ปลายแขนสะบัด": เดิมสั่งตำแหน่งมือกับศอกแยกกัน (มือแกว่ง 1.0 ศอกแกว่ง .32)
+       มุมศอกจึงเปลี่ยนเยอะทุกจังหวะ = ปลายแขนเหวี่ยง
+       ที่นี่หมุนทั้งแขนรอบไหล่เป็นชิ้นเดียว แล้วงอศอกด้วยมุมที่เกือบคงที่ (แกว่งแค่ ~7°)
+       ชีวกลศาสตร์: ไหล่กวาดรวม ~25-30° ศอกงอค้าง ~23° เพิ่มอีกนิดตอนแขนมาข้างหน้า */
+    const armA=Math.sin(armTh)*0.205*motion*armDamp;             // มุมไหล่ หน้า(+)/หลัง(−) ~±12°
+    const armE=0.36+0.11*Math.max(0,Math.sin(armTh))*motion*armDamp;  // มุมงอศอก ~21°→27°
+    const cA=Math.cos(armA),sA=Math.sin(armA),cE=Math.cos(armE),sE=Math.sin(armE);
+    const dirU=norm([side*0.052, sA, -cA]);                      // ต้นแขนกางออกนิดหนึ่ง ไม่แนบลำตัว
+    const dirF=norm([dirU[0], dirU[1]*cE-dirU[2]*sE, dirU[1]*sE+dirU[2]*cE]);
+    let elbow=[shoulder[0]+dirU[0]*UARM,shoulder[1]+dirU[1]*UARM,shoulder[2]+dirU[2]*UARM];
+    let hand =[elbow[0]+dirF[0]*FARM,  elbow[1]+dirF[1]*FARM,  elbow[2]+dirF[2]*FARM];
     const interested=p.state==='look'&&side===1, pointing=interested&&action==='point';
-    /* ศอก "งอค้าง" ตลอดการเดิน (offset ~26°) แล้วงอเพิ่มตอนแกว่งมา "ข้างหน้า" (peak ~42°+)
-       — คนจริงไม่เคยเหยียดแขนตรง และศอกงอมากตอนแขนมาหน้า ตรงข้ามกับท่าสวนสนามที่ดันแขนตรงไปหน้า
-       ของเดิมงอตอนแขนไปหลังแล้วเหยียดตรงตอนไปหน้า → เลยดูเหมือนทหารสวนสนาม แก้ให้กลับด้าน */
-    /* ศอกงอ "ค้าง" ตลอด ~34° แล้วงอเพิ่มแค่ ~13° ตอนแขนมาข้างหน้า
-       (ชีวกลศาสตร์จริง amplitude การงอศอกแค่ ~6-15° รอบ offset ~26°)
-       ของเดิมงอเพิ่มถึง ~30° เลยเห็นปลายแขน "สะบัด" — ลดแอมพลิจูดลงให้แค่ขยับนิด ๆ */
-    const flick=Math.max(0,Math.sin(armTh))*0.032*motion*armDamp;      // งอเพิ่มตอนมือมาหน้า (บาง ๆ)
-    const handFrac=0.972-flick;                                        // ฐานงอ ~27° (offset จริง) → หน้า ~40° น้อย=งอมาก
-    const foldE=flick/0.032;                                           // 0..1 ใช้ขยับศอก/มือเล็กน้อยตามจังหวะ
-    /* ต้นแขนห้อยเกือบดิ่ง · มือนำหน้าข้อศอกพอประมาณ (ไม่ลากไปข้างหน้าจนสะบัด) */
-    let elbow=[shoulder[0]+side*.014,shoulder[1]+swing*.32-.006,shoulder[2]-UARM*(.95-.03*foldE)];
-    let hand =[shoulder[0]+side*.022,shoulder[1]+swing*1.0,shoulder[2]-(L1+L2)*handFrac];
     if(interested){hand[1]+=.070;hand[2]=shoulder[2]-(L1+L2)*.62;}
     if(pointing){hand[1]+=.090*gesture;hand[2]+=.130*gesture;}
     if(side===1&&action==='chat'){hand[1]+=.055*gesture;hand[2]+=.09*gesture;}
@@ -1010,10 +1031,10 @@ function drawPerson(p){
     hand=pose.hand.slice();elbow=pose.elbow.slice();
     if(!crouch)constrainVisitorArm(p,[elbow],world,H,right,fx,fy);
     const ua=MDL.parts['arm'+S],fa=MDL.parts['fore'+S],hd=MDL.parts['hand'+S];
-    const dirU=norm(sub(elbow,shoulder)),dirF=norm(sub(hand,elbow));
-    emit(ua,shoulder,axisRot(ua.axis,dirU),dist(shoulder,elbow)/ua.len);
-    emit(fa,elbow,axisRot(fa.axis,dirF),dist(elbow,hand)/fa.len);
-    emit(hd,hand,axisRot(hd.axis,dirF),1);
+    const axU=norm(sub(elbow,shoulder)),axF=norm(sub(hand,elbow));
+    emit(ua,shoulder,axisRot(ua.axis,axU),dist(shoulder,elbow)/ua.len);
+    emit(fa,elbow,axisRot(fa.axis,axF),dist(elbow,hand)/fa.len);
+    emit(hd,hand,axisRot(hd.axis,axF),1);
   }
   posedArms=false;
 
@@ -1076,7 +1097,7 @@ function clearDoorWaiters(){
 function stepVisitorYielding(){
   if(_peopleT<nextYieldCheck)return;nextYieldCheck=_peopleT+.25;
   for(const p of PEOPLE){
-    if(p._yieldResume&&p.t>8){const saved=p._yieldResume;p._yieldResume=null;p.state=saved.state;p.lookT=saved.remaining;p.t=0;p.tgt={x:p.x,y:p.y};p.motion=0;}
+    if(p._yieldResume&&p.t>8){const saved=p._yieldResume;p._yieldResume=null;p.state=saved.state;p.lookT=saved.remaining;p.t=0;p.tgt={x:p.x,y:p.y};}
     if(p._yieldResume||p.tradeOffer||!p.focus||!['look','wait'].includes(p.state))continue;
     const passer=PEOPLE.find(q=>q!==p&&q.state==='walk'&&q.tgt&&Math.hypot(q.x-p.x,q.y-p.y)<18&&(()=>{
       const goal=q.route?.[0]||q.tgt,dx=goal.x-q.x,dy=goal.y-q.y,t=Math.max(0,Math.min(1,((p.x-q.x)*dx+(p.y-q.y)*dy)/(dx*dx+dy*dy||1)));
@@ -1237,7 +1258,7 @@ function askVisitorToStepAside(p,route){
   }
   // No room for a step: stand side-on with a 25 cm collision diameter.
   q._squeezeFacing={x:heading.y,y:-heading.x};q._squeezeUntil=_peopleT+1.5;
-  q._yieldWaitUntil=q._squeezeUntil;q._asideUntil=q._squeezeUntil;q.motion=0;
+  q._yieldWaitUntil=q._squeezeUntil;q._asideUntil=q._squeezeUntil;
   p._asideUntil=_peopleT+1.5;
   return true;
 }
