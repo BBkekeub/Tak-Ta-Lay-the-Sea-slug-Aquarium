@@ -23,7 +23,7 @@ function peopleInArea(x0,y0,x1,y1){
 /* ---------- ค่าปรับ ---------- */
 const PERSON_SPEED_CM = 82;      // ความเร็วเดินชมของ (ซม./วินาที) — ~0.88 ม./วิ เดินชิลล์ชมของ (ของเดิม 52 = 0.56 ม./วิ ช้าเป็นสโลว์โมชั่น)
 const WALK_STEP = 0.235;         // ความยาวก้าว เทียบส่วนสูง (~40 ซม. ที่ส่วนสูง 172) — 0.30 ก้าวยาวเกิน ขากางเป็นตัว A
-const WALK_LIFT = 0.020;         // ยกเท้าสูงสุดตอนก้าว เทียบส่วนสูง (~3.4 ซม.) — เดินชมของไม่ได้ยกเข่า ปลายเท้าแค่พ้นพื้น
+const WALK_LIFT = 0.027;         // ยกเท้าสูงสุดตอนเหวี่ยง เทียบส่วนสูง (~4.6 ซม.) — ยอดอยู่ช่วงต้น = ส้นตวัดหลัง ไม่ใช่ยกเข่าสวนสนาม
 const PERSON_R        = 2.5;     // รัศมีกันชนกับตู้/ของ (ช่องเล็ก ≈ 16 ซม.)
 const PERSON_EDGE     = 2.0;     // เว้นจากขอบพื้นร้าน (ช่องเล็ก)
 const LOOK_MIN = 5, LOOK_MAX = 5;    // ยืนดูตู้นานแค่ไหน (วินาที)
@@ -816,7 +816,7 @@ function drawPerson(p){
   const _yaw=-(p.headYaw||0), _yawC=Math.cos(_yaw), _yawS=Math.sin(_yaw);
   const _nodZ=(action==='nod')?Math.sin((p.actionT||0)*6)*.004*gesture:0;
   const runLean=Math.max(0,(p.catchupBoost||1)-1)*.012*motion;
-  const lean=runLean+(p.state==='look'?0.012+Math.sin(p.idle*.65)*.003:0.004*motion)+(action==='lean'?gesture*.026:0);
+  const lean=runLean+(p.state==='look'?0.012+Math.sin(p.idle*.65)*.003:0.019*motion)+(action==='lean'?gesture*.026:0);
   const shift=p.state==='look'?Math.sin(p.idle*.65)*.003:0;
   function world(v){
     v=[v[0]+shift*Math.min(1,v[2]/.5),v[1]+(action==='lean'?gesture*.026*Math.max(0,v[2]-.5):0),v[2]];
@@ -953,16 +953,27 @@ function drawPerson(p){
   for(const side of [-1,1]){
     const S=side<0?'L':'R', J=k=>JT[k+S];
     let th=(phase+(side<0?Math.PI:0))%(Math.PI*2); if(th<0)th+=Math.PI*2;
+    /* วงจรเท้าแบบตำราแอนิเมชัน: ถีบปลายเท้า → ส้นตวัดขึ้นหลัง (เข่างอ) → เหวี่ยงผ่านใต้ตัว → ลงส้นเท้า
+       จุดยกสูงสุดอยู่ "ช่วงต้น" ของการเหวี่ยง ไม่ใช่กลางก้าว จะได้เห็นเข่างอโดยไม่ดูเหมือนยกเข่าสวนสนาม
+       (ของเดิมยกสูงสุดกลางก้าวพอดี = ท่าที่ผู้ใช้บอกว่า 'ยกเข่าเยอะไป') */
+    const HEELDOWN=0.20, TOEOFF=0.34;               // มุมเชิดปลายเท้ารอลงส้น / มุมถีบปลายเท้า (เรเดียน)
     let fy,fz,pitch;
-    if(th<Math.PI){                                 // ยกเท้าไปข้างหน้า
+    if(th<Math.PI){                                 // ช่วงเหวี่ยงขาไปข้างหน้า
       const u=th/Math.PI, e=u*u*(3-2*u);            // smoothstep: ออกตัวนุ่ม ลงนุ่ม
-      fy=-STEPA+2*STEPA*e; fz=WALK_LIFT*motion*Math.sin(Math.PI*u);
-      pitch=0.20*Math.sin(Math.PI*u)*motion;        // ปลายเท้าเชิดตอนลอย
-    }else{                                          // เท้าอยู่กับพื้น
+      fy=-STEPA+2*STEPA*e-0.018*motion*Math.sin(Math.PI*u);   // ดึงเท้าเข้าใต้ตัวตอนผ่าน = เข่างอเพิ่ม
+      fz=WALK_LIFT*motion*Math.sin(Math.PI*Math.pow(u,0.70)); // ยอดอยู่ราว 30% ของช่วง = ส้นตวัดไปหลัง
+      pitch=(u<0.32? -TOEOFF*(1-u/0.32)                       // เพิ่งถีบเสร็จ ปลายเท้ายังชี้ลง
+                   : HEELDOWN*Math.pow((u-0.32)/0.68,2))*motion;   // แล้วค่อยเชิดขึ้นรอลงส้น
+    }else{                                          // ช่วงเท้าอยู่กับพื้น
       const u=(th-Math.PI)/Math.PI;
       fy=STEPA-2*STEPA*u; fz=0;
-      pitch=-0.32*Math.max(0,u-0.68)/0.32*motion;   // ถีบปลายเท้าตอนจะยกขึ้น
+      pitch=(u<0.20? HEELDOWN*(1-u/0.20)            // ลงส้นก่อน แล้วคลี่ฝ่าเท้าลงจนราบ
+            : u<0.68? 0
+            : -TOEOFF*Math.pow((u-0.68)/0.32,2))*motion;      // ถีบปลายเท้าตอนจะยกขึ้น
     }
+    /* หมุนเท้ารอบข้อเท้าเฉย ๆ ส้น/ปลายเท้าจะจมพื้น — ยกข้อเท้าชดเชยตามมุม
+       (คนจริงก็ยกข้อเท้าขึ้นตอนถีบปลายเท้าอยู่แล้ว ไม่ใช่การโกง) */
+    fz+=Math.max(0,pitch)*0.030+Math.max(0,-pitch)*0.050;
     /* เชิงกรานหมุน (ข้อสะโพกเลื่อนตามการหมุน) · ส่ายไปทับเท้าข้างที่ยืนพื้น
        · ข้างที่ยกขาเชิงกรานตกลงเล็กน้อย (pelvic drop จริงราว 4°) — เท้าไม่ส่ายตาม เพราะเหยียบพื้นอยู่ */
     const hj=rotZ(J('hip'),pelvisA), drop=(th<Math.PI?-1:1)*0.0045*gaitAmp;
