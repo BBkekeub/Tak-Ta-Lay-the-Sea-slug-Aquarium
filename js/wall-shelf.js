@@ -168,15 +168,25 @@ function drawShelfSign(r, tier) {
   shelfFace(side, [[u0, z0, dF], [u1, z0, dF], [u1, zA, dC], [u0, zA, dC]], '#d0473f', 'rgba(0,0,0,.35)');
   shelfFace(side, [[u0, z0, dB], [u0, z0, dF], [u0, zA, dC]], '#9c3a34');
   shelfFace(side, [[u1, z0, dB], [u1, z0, dF], [u1, zA, dC]], '#9c3a34');
-  // ข้อความ Online บนหน้าด้านกล้อง (แนวนอน อ่านง่ายแบบป้ายตั้งโต๊ะ)
-  const tp = shelfPt(side, uc, (z0 + zA) / 2, (dF + dC) / 2);
+  /* ข้อความ Online — เอียงให้อยู่ในระนาบเดียวกับหน้าป้ายที่ลาดเอียง
+     แมป unit ของหน้าป้าย (u = แนวยาว · slope = ฐาน→สัน) ลงเป็นเมทริกซ์ affine
+     หน้าป้ายเป็น parallelogram บนจอ (P เป็น affine) จึงแมปตรง ๆ ได้ */
+  let Au = u0, Bu = u1;
+  let A = shelfPt(side, Au, z0, dF), B = shelfPt(side, Bu, z0, dF);
+  if (B.x < A.x) { const t1 = Au; Au = Bu; Bu = t1; const t2 = A; A = B; B = t2; }   // ให้ตัวอักษรไล่ไปทางขวาจอเสมอ (กันกลับด้านบนกำแพงตะวันตก)
+  const D = shelfPt(side, Au, zA, dC);
+  const ux = B.x - A.x, uy = B.y - A.y, vx = D.x - A.x, vy = D.y - A.y;
+  const Lu = Math.hypot(ux, uy) || 1, Lv = Math.hypot(vx, vy) || 1;
+  const cxp = A.x + ux * .5 + vx * .5, cyp = A.y + uy * .5 + vy * .5;               // กึ่งกลางหน้าป้าย
   ctx.save();
-  let fs = Math.max(6, SIGN_H * cam.zoom * 0.42);
+  // local(px บนหน้าป้าย) → CSS px : แกน x = Û · แกน y = -V̂ (canvas y ลงล่าง) แล้วคูณ DPR
+  ctx.setTransform(DPR * ux / Lu, DPR * uy / Lu, DPR * -vx / Lv, DPR * -vy / Lv, DPR * cxp, DPR * cyp);
+  let fs = Lv * 0.6;
   ctx.font = 'bold ' + fs + 'px sans-serif';
-  const maxW = SIGN_LEN * TW * cam.zoom * 1.5, tw = ctx.measureText('Online').width;
-  if (tw > maxW) { fs *= maxW / tw; ctx.font = 'bold ' + fs + 'px sans-serif'; }
+  const tw = ctx.measureText('Online').width, maxTW = Lu * 0.86;
+  if (tw > maxTW) { fs *= maxTW / tw; ctx.font = 'bold ' + fs + 'px sans-serif'; }
   ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('Online', tp.x, tp.y);
+  ctx.fillText('Online', 0, 0);
   ctx.restore();
 }
 
