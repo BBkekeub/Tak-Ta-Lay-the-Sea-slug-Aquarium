@@ -223,6 +223,7 @@ function foodUI(){
  function levels(){level.innerHTML='';FOOD_TYPES[type.value].levels.forEach((sp,i)=>{const op=document.createElement('option');op.value=i+1;op.textContent='ระดับ '+(i+1);level.appendChild(op);});syncChoice();update();}
  /* เปิด/ปิดโหมดวางอาหาร — ปิดแล้วอาหารในตู้จะลากย้ายไม่ได้ (กันเผลอลากตอนดูทาก) */
  function foodModeSet(on){
+  if(on&&curTank) enterExclusiveMode('food');            // เปิดวางอาหาร = ปิดจัดของ/แปรงขัดให้เอง
   foodMode=!!on&&!!curTank; syncChoice(); foodHover=null;
   chooseBtn.textContent=foodMode?'✓ ปิดโหมดวางอาหาร':'🌸 เปิดโหมดวางอาหาร';
   chooseBtn.setAttribute('aria-pressed',String(foodMode));
@@ -233,10 +234,10 @@ function foodUI(){
   update();
  }
  window.foodModeSet=foodModeSet;
+ registerMode('food','tank',()=>foodMode,()=>foodModeSet(false));
  type.onchange=levels;level.onchange=()=>{syncChoice();update();};levels();
  chooseBtn.onclick=()=>foodModeSet(!foodMode);
  cancelBtn.onclick=()=>foodModeSet(false);
- for(const id of ['ovBack','ovBuild'])document.getElementById(id).addEventListener('click',()=>foodModeSet(false));
  foodModeSet(false);
  let placingPointer=false;
  tankCv.addEventListener('pointerdown',e=>{

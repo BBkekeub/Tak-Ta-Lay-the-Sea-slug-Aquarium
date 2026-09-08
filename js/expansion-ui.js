@@ -6,7 +6,8 @@
  const buy=document.createElement('button'),cancel=document.createElement('button');buy.className=cancel.className='tbtn';cancel.textContent='ยกเลิก';controls.append(buy,cancel);expandButton.parentElement.after(controls);
  function update(){const cost=expandCost(selected.size,floorArea());buy.textContent='ซื้อ '+selected.size+' ช่อง · '+cost.toLocaleString()+' เหรียญ';buy.disabled=!selected.size||G.coin<cost;}
  function stop(){active=false;drag=false;selected.clear();controls.hidden=true;cv.style.cursor='';update();}
- expandButton.onclick=()=>{restoreHeldRotation();active=true;placingWallDoor=false;buyKey=null;moving=null;grab=null;selected.clear();controls.hidden=false;cv.style.cursor='crosshair';update();};cancel.onclick=stop;
+ registerMode('expand','floor',()=>active,stop);
+ expandButton.onclick=()=>{enterExclusiveMode('expand');active=true;selected.clear();controls.hidden=false;cv.style.cursor='crosshair';update();};cancel.onclick=stop;   // เลือกช่องขยาย = เลิกถือของ/เลิกวางประตู
  document.querySelector('.rail').addEventListener('click',e=>{if(active&&e.target.closest('button')&&e.target!==expandButton&&!controls.contains(e.target))stop();},true);
  buy.onclick=()=>{const result=commitFloorTiles([...selected.values()]);if(!result.ok){toast(result.reason,'bad');return;}selected.clear();update();syncHUD();saveGame();toast('เพิ่ม '+result.count+' ช่อง −'+result.cost+' เหรียญ','good');stop();finishConstruction();};
  const oldMode=setMode;setMode=function(m){stop();return oldMode(m);};

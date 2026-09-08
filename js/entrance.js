@@ -65,9 +65,10 @@ function shopOpeningIssue(){
   return '';
 }
 let placingWallDoor=false,wallDoorHover=null,wallDoorDown=null;
+registerMode('doorPlace','floor',()=>placingWallDoor,()=>{placingWallDoor=false;wallDoorHover=null;wallDoorDown=null;});
 function placeEntrance(){
   if(peopleOn){toast('ปิดร้านก่อนย้ายประตู','bad');return;}
-  setMode('build');placingWallDoor=true;buyKey=null;wallDoorHover=null;
+  setMode('build');enterExclusiveMode('doorPlace');placingWallDoor=true;wallDoorHover=null;   // วางประตู = เลิกถือของ/เลิกเลือกช่องขยาย
   toast('คลิกกำแพงเพื่อวางประตู 1×2 เมตร · ใช้ 2 คอลัมน์ · Esc ยกเลิก');
 }
 function removeEntrance(){if(peopleOn){toast('ปิดร้านก่อนเก็บประตู','bad');return;}G.door=null;saveGame();syncPeopleBtn();finishConstruction();}

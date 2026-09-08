@@ -835,6 +835,7 @@ function buildShop(){
     el.innerHTML='<div class="ic">'+d.icon+'</div><div class="nm">'+d.name+'</div>'+
       '<div class="pr">'+d.price+' เหรียญ</div><div class="dm">'+(d.w*CM_PER_CELL)+'×'+(d.h*CM_PER_CELL)+(d.kind==='tank'?'×'+tankGlassCm(d):'')+' ซม.'+(d.kind==='tank'?' · จุ '+tankCap(d):'')+'</div>';
     el.onclick=()=>{ buyKey = (buyKey===k? null : k);   // กดซ้ำ = วางมือ
+      if(buyKey) enterExclusiveMode('holding');          // หยิบของ = เลิกวางประตู/เลิกเลือกช่องขยาย
       buyRot=0; if(buyKey) setTool('place'); buildShop(); };
     box.appendChild(el);
   });
@@ -851,6 +852,11 @@ function setTool(t){
   document.getElementById('toolHint').textContent=hints[t];
   cv.classList.toggle('placing', t==='place');
 }
+/* ถือของจะวางอยู่ก็นับเป็นโหมดหนึ่ง — คลิกบนพื้นแปลว่า "วาง" ไม่ใช่ "เลือก" */
+registerMode('holding','floor',()=>!!buyKey||!!moving,()=>{
+  restoreHeldRotation(); moving=null; movingByClick=false; grab=null; buyKey=null;
+  cv.classList.remove('placing'); if(typeof buildShop==='function') buildShop();
+});
 function setMode(m){
   appMode=m;
   document.body.classList.toggle('mode-view', m==='view');

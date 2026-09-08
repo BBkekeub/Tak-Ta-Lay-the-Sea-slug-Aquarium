@@ -912,6 +912,7 @@ function tankFitZoom(){
 function tankZoomRange(){ const f=tankFitZoom(); return { min:f*phoneZoomOutScale(), max:Math.max(f*1.2, 3.5) }; }
 function fitTankZoom(){ tankCam.zoom = tankFitZoom(); }
 function enterTank(o, focus){
+  if(typeof exitModes==='function') exitModes('tank');
   curTank=o; tankMode=true; selSlug=null; tankBuildMode=false; ov.classList.add('on');
   document.getElementById('ovBuild').textContent='🔧 จัดของ: ปิด';
   document.getElementById('ovTitle').textContent=o.def.name+' · '+(o.def.w*CM_PER_CELL)+'×'+(o.def.h*CM_PER_CELL)+'×'+tankGlassCm(o.def)+' ซม. · จุได้ '+tankCap(o.def)+' ตัว';
@@ -926,14 +927,17 @@ function enterTank(o, focus){
   syncOv();
   if(!tankLoopOn){ tankLoopOn=true; drawTank(); }
 }
-function exitTank(){ tankMode=false; curTank=null; ov.classList.remove('on');
+function exitTank(){ if(typeof exitModes==='function') exitModes('tank');
+  tankMode=false; curTank=null; ov.classList.remove('on');
   tankBuildMode=false; selDecorKey=null; selDecor=null; decorHover=null; dragGhost=null;
   const b=document.getElementById('ovBuild'); if(b) b.textContent='🔧 จัดของ: ปิด'; }
 function syncOv(){ if(curTank) document.getElementById('ovCount').textContent=curTank.slugs.length; }
 
 document.getElementById('ovBack').onclick=exitTank;
+registerMode('tankDecor','tank',()=>tankBuildMode,()=>{ if(tankBuildMode) document.getElementById('ovBuild').click(); });
 document.getElementById('ovBuild').onclick=()=>{
   tankBuildMode=!tankBuildMode;
+  if(tankBuildMode) enterExclusiveMode('tankDecor');      // เปิดจัดของ = ปิดวางอาหาร/แปรงขัดให้เอง
   document.getElementById('ovBuild').textContent='🔧 จัดของ: '+(tankBuildMode?'เปิด':'ปิด');
   if(tankBuildMode){
     selDecorKey=null;                                  // ยังไม่เลือกของ = ยังไม่โชว์กริดวาง (เหลือง)

@@ -88,13 +88,14 @@ function scrubTank(o,x,y,now=Date.now()){
  const cursor=document.createElement('div');cursor.style.cssText='position:absolute;pointer-events:none;z-index:4;width:170px;height:170px;border:2px solid #e5d9b799;border-radius:50%;background:#d5edc012;box-sizing:border-box;display:none';ov.querySelector('.ov-body').append(cursor);
  const update=()=>{if(curTank){const text=(tankBrush?'✓ เก็บแปรง':'🧹 ทำความสะอาด')+' · '+Math.round(tankCleanliness(curTank))+'%';if(button.textContent!==text)button.textContent=text;}};
  function stop(){tankBrush=false;brushDown=false;brushPoint=null;cursor.style.display='none';update();}
- button.onclick=()=>{if(tankBrush){stop();return;}tankBrush=true;if(typeof foodModeSet==='function')foodModeSet(false);foodChoice=null;foodHover=null;if(tankBuildMode)document.getElementById('ovBuild').click();tankBrush=true;cancelHold();pendSlug=null;update();};
+ registerMode('brush','tank',()=>tankBrush,stop);
+ button.onclick=()=>{if(tankBrush){stop();return;}enterExclusiveMode('brush');tankBrush=true;cancelHold();pendSlug=null;update();};   // เปิดแปรง = ปิดจัดของ/วางอาหารให้เอง
  function brush(e){const p=tankXY(e);cursor.style.display='block';cursor.style.left=(p.mx-85)+'px';cursor.style.top=(p.my-85)+'px';if(brushDown){const prev=brushPoint||p,n=Math.max(1,Math.ceil(Math.hypot(p.mx-prev.mx,p.my-prev.my)/35));for(let i=1;i<=n;i++)scrubTank(curTank,prev.mx+(p.mx-prev.mx)*i/n,prev.my+(p.my-prev.my)*i/n);brushPoint=p;update();}}
  ov.querySelector('.ov-body').addEventListener('pointerdown',e=>{if(!tankBrush||e.target!==tankCv)return;e.stopImmediatePropagation();e.preventDefault();brushDown=true;brushPoint=null;tankCv.setPointerCapture(e.pointerId);brush(e);},true);
  ov.querySelector('.ov-body').addEventListener('pointermove',e=>{if(!tankBrush||e.target!==tankCv)return;e.stopImmediatePropagation();brush(e);},true);
  ov.querySelector('.ov-body').addEventListener('pointerup',e=>{if(!tankBrush||e.target!==tankCv)return;e.stopImmediatePropagation();brush(e);brushDown=false;brushPoint=null;saveGame();},true);
  ov.querySelector('.ov-body').addEventListener('pointercancel',()=>{brushDown=false;brushPoint=null;});
- for(const id of ['ovBack','ovBuild','foodChoose','ovAdd'])document.getElementById(id).addEventListener('click',()=>{if(id!=='ovBuild'||tankBuildMode)stop();});
+ document.getElementById('ovAdd').addEventListener('click',stop);   // ใส่ทากลงตู้ไม่ใช่โหมด แต่ต้องเก็บแปรงก่อน
  window.addEventListener('keydown',e=>{if(e.key==='Escape')stop();});
  setInterval(()=>{for(const o of [...G.objs,...G.shelter])if(o.type==='tank')tankHygiene(o);update();},1000);update();
 })();
