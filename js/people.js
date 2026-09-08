@@ -739,8 +739,7 @@ function paintPersonMesh(faces,p,H,snapshot=false){
 }
 
 // Fixed upper-arm and forearm lengths; gestures move the joints, never stretch them.
-function solvePersonArm(shoulder,wantedHand,preferredElbow,maxReach=.215){
-  const upper=.115,lower=.115;
+function solvePersonArm(shoulder,wantedHand,preferredElbow,maxReach=.215,upper=maxReach/2,lower=maxReach/2){
   const delta=wantedHand.map((x,i)=>x-shoulder[i]);
   const raw=Math.hypot(...delta),distance=Math.max(.035,Math.min(maxReach,raw));
   const direction=raw>1e-8?delta.map(x=>x/raw):[0,0,-1];
@@ -998,10 +997,10 @@ function drawPerson(p){
       elbow=[side*.125,shoulder[1]+.025,shoulder[2]-L1*.80];
       posedArms=true;
     }
-    let pose=solvePersonArm(shoulder,hand,elbow,REACH);
+    let pose=solvePersonArm(shoulder,hand,elbow,REACH,L1,L2);
     hand=pose.hand.slice();elbow=pose.elbow.slice();
     if(!crouch)constrainVisitorArm(p,[hand],world,H,right,fx,fy);
-    pose=solvePersonArm(shoulder,hand,elbow,REACH);
+    pose=solvePersonArm(shoulder,hand,elbow,REACH,L1,L2);
     hand=pose.hand.slice();elbow=pose.elbow.slice();
     if(!crouch)constrainVisitorArm(p,[elbow],world,H,right,fx,fy);
     const ua=MDL.parts['arm'+S],fa=MDL.parts['fore'+S],hd=MDL.parts['hand'+S];
