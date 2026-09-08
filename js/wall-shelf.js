@@ -134,7 +134,7 @@ function shelfSlug(L) {
 function drawShelfTank(slot, L, i) {
   const side = slot.side, hw = SHELF_BOX / 2, z0 = slot.z, z1 = z0 + SHELF_BOX_H;
   const d0 = (SHELF_D - SHELF_BOX) / 2, d1 = d0 + SHELF_BOX;
-  const sold = !!L.soldAt;
+  const sold = !!L.soldAt, uL = slot.u - hw, uR = slot.u + hw;
   const baseH = .6 * ZUNIT;                                  // ฐานตู้ทึบ (สูงจากพื้นชั้น)
   /* วาดของ "ทึบ" ให้ครบก่อน (ผนังหลัง + ฐาน) แล้วค่อยวางทาก ทากจะได้ไม่โดนโครงตู้/คานทับ
      ปิดท้ายด้วยกระจกหน้า+ฝาบน (โปร่งใส) ที่วางทับทากได้โดยยังเห็นทากทะลุ */
@@ -163,6 +163,17 @@ function drawShelfTank(slot, L, i) {
   ctx.globalAlpha = 1;
   shelfFace(side, [[slot.u - hw, z1, d0], [slot.u + hw, z1, d0], [slot.u + hw, z1, d1], [slot.u - hw, z1, d1]], 'rgba(150,200,220,.16)', 'rgba(180,220,240,.35)');   // ฝาบน
 
+  /* ขายได้แล้ว: กดที่ "ตัวตู้" รับเงินได้ด้วย ไม่ต้องเล็งเหรียญเล็ก ๆ อย่างเดียว
+     กรอบกดคำนวณจากมุมทั้ง 8 ของตู้ที่ฉายลงจอ (กรอบสี่เหลี่ยมครอบเงาตู้พอดี) */
+  if (sold) {
+    const pts = [];
+    for (const u of [uL, uR]) for (const zz of [z0, z1]) for (const dd of [d0, d1]) pts.push(shelfPt(side, u, zz, dd));
+    _shelfHits.push({
+      i, key: L.key,
+      x: Math.min(...pts.map(q => q.x)), y: Math.min(...pts.map(q => q.y)),
+      right: Math.max(...pts.map(q => q.x)), bottom: Math.max(...pts.map(q => q.y))
+    });
+  }
   return sold;
 }
 /* ขายได้แล้ว — เหรียญลอยเหนือตู้ กดเพื่อรับเงิน (วาดหลังตู้ทุกใบ จะได้ไม่โดนทับ) */
