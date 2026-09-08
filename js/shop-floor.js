@@ -366,9 +366,7 @@ function drawFloor(){
 
 
   drawEntrance();
-  if(typeof drawWallShelf==='function')drawWallShelf();      // ชั้นวางติดผนัง — อยู่บนกำแพง วาดพร้อมประตู ของในห้องจะทับได้ถูกต้อง
   drawWallDoorGrid();
-  if(typeof drawWallShelfGrid==='function')drawWallShelfGrid();
   // กริดย่อยบนช่องใหญ่ที่ hover (เฉพาะโหมดก่อสร้าง)
   if(appMode==='build' && hoverCell && (tool==='place' || moving)){
     const bx=Math.floor(hoverCell.cx/SUB), by=Math.floor(hoverCell.cy/SUB);
@@ -396,6 +394,10 @@ function drawFloor(){
   visitors.forEach(drawPersonShadow);
   list.forEach(o=>{if(o!==moving&&onScreen(o))drawObject(o);});
   drawShopCaustics(list);
+  // ชั้นวางติดผนังสูง 140–190 ซม. — ตู้ (สูงสุด 135 ซม.) อยู่หน้ากำแพงแต่ไม่มีทางบังชั้นได้จริง
+  // จึงวาด "หลังวัตถุ" (ให้ทับตู้ที่เตี้ยกว่า) แต่ "ก่อนคน" (คนสูง 170 ซม. ยืนหน้าชั้นยังบังชั้นล่างได้ถูก)
+  if(typeof drawWallShelf==='function')drawWallShelf();
+  if(typeof drawWallShelfGrid==='function')drawWallShelfGrid();
   beginPersonBatch(visitors);
   try{visitors.forEach(drawPerson);}finally{endPersonBatch();}
 

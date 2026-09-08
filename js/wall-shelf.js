@@ -15,7 +15,7 @@ const SHELF_SLOTS    = SHELF_PER_TIER * SHELF_TIERS;   // = 6 · ผูกกั
 const SHELF_W        = 3 * SUB;           // กว้าง 3 คอลัมน์ = 120 ซม.
 const SHELF_D        = 4;                 // ลึก 20 ซม. (ยื่นออกจากผนัง)
 const SHELF_T        = 0.7 * ZUNIT;       // หนาแผ่นชั้น 3.5 ซม. (แผ่นบาง ๆ แบบชั้นลอย)
-const SHELF_Z        = [19 * ZUNIT, 30 * ZUNIT];       // ความสูงชั้นล่าง/ชั้นบน (95 / 150 ซม.)
+const SHELF_Z        = [28 * ZUNIT, 38 * ZUNIT];       // ความสูงชั้นล่าง/ชั้นบน (140 / 190 ซม.) — ยกให้พ้นหัวตู้ทุกขนาด (ตู้ใหญ่สุดสูง 135 ซม.) + ของตกแต่งสูง ๆ ไม่ทับ · เพดานห้อง 240 ซม.
 const SHELF_BOX      = 4;                 // ตู้เล็กกว้าง-ลึก 20 ซม.
 const SHELF_BOX_H    = 4.5 * ZUNIT;       // ตู้เล็กสูง 22.5 ซม.
 
@@ -104,35 +104,42 @@ function shelfSlug(L) {
 }
 function drawShelfTank(slot, L, i) {
   const side = slot.side, hw = SHELF_BOX / 2, z0 = slot.z, z1 = z0 + SHELF_BOX_H;
-  const d0 = (SHELF_D - SHELF_BOX) / 2 + .2, d1 = d0 + SHELF_BOX;
+  const d0 = (SHELF_D - SHELF_BOX) / 2, d1 = d0 + SHELF_BOX;
   const sold = !!L.soldAt;
-  // ตัวตู้: น้ำโปร่ง + ขอบกระจก (กระจกใส วาดหน้าไกลก่อนแล้วค่อยหน้าใกล้)
-  ctx.globalAlpha = .30;
-  shelfFace(side, [[slot.u - hw, z0, d0], [slot.u + hw, z0, d0], [slot.u + hw, z1, d0], [slot.u - hw, z1, d0]], '#7fc4e8');
+  const baseH = .6 * ZUNIT;                                  // ฐานตู้ทึบ (สูงจากพื้นชั้น)
+  /* วาดของ "ทึบ" ให้ครบก่อน (ผนังหลัง + ฐาน) แล้วค่อยวางทาก ทากจะได้ไม่โดนโครงตู้/คานทับ
+     ปิดท้ายด้วยกระจกหน้า+ฝาบน (โปร่งใส) ที่วางทับทากได้โดยยังเห็นทากทะลุ */
+  ctx.globalAlpha = .28;
+  shelfFace(side, [[slot.u - hw, z0, d0], [slot.u + hw, z0, d0], [slot.u + hw, z1, d0], [slot.u - hw, z1, d0]], '#7fc4e8');   // ผนังกระจกด้านไกล
   ctx.globalAlpha = 1;
-  // ทาก: สไปรต์แบนวางกลางตู้
-  const s = shelfSlug(L), c = shelfPt(side, slot.u, z0 + SHELF_BOX_H * .45, (d0 + d1) / 2);
+  shelfBox(side, slot.u - hw, slot.u + hw, z0, z0 + baseH, d0, d1, '#2b3a42', '#1d282e', '#243138', 'rgba(0,0,0,.5)');        // ฐานตู้ทึบ
+  // ทาก: ย่อให้พอดี "ภายในตู้" (เหนือฐาน) วางกึ่งกลาง — วาดหลังฐาน จึงไม่โดนตัดครึ่งตัว
+  const s = shelfSlug(L);
   if (s && typeof slugSprite === 'function') {
     try {
-      const sp = slugSprite(s), w = 7.5 * TW * cam.zoom, h = w * sp.c.height / sp.c.width;
-      ctx.globalAlpha = sold ? .45 : 1;
+      const sp = slugSprite(s);
+      const innerH = (SHELF_BOX_H - baseH) * cam.zoom;                 // ความสูงภายในตู้ (px บนจอ)
+      const innerW = SHELF_BOX * TW * cam.zoom * 1.7;                  // ความกว้างหน้าตู้โดยประมาณ (px)
+      const scale = Math.min(innerW * .92 / sp.c.width, innerH * .92 / sp.c.height);
+      const w = sp.c.width * scale, h = sp.c.height * scale;
+      const c = shelfPt(side, slot.u, z0 + baseH + (SHELF_BOX_H - baseH) * .5, (d0 + d1) / 2);
+      ctx.globalAlpha = sold ? .5 : 1;
       ctx.drawImage(sp.c, c.x - w / 2, c.y - h / 2, w, h);
       ctx.globalAlpha = 1;
     } catch (e) { }
   }
-  // กระจกด้านหน้า + โครงตู้
-  ctx.globalAlpha = .22;
-  shelfFace(side, [[slot.u - hw, z0, d1], [slot.u + hw, z0, d1], [slot.u + hw, z1, d1], [slot.u - hw, z1, d1]], '#cfe9f6');
+  // กระจกด้านหน้า + ฝาบน (โปร่งใส) — วาดหลังทาก
+  ctx.globalAlpha = .20;
+  shelfFace(side, [[slot.u - hw, z0, d1], [slot.u + hw, z0, d1], [slot.u + hw, z1, d1], [slot.u - hw, z1, d1]], '#cfe9f6');   // กระจกด้านหน้า
   ctx.globalAlpha = 1;
-  shelfBox(side, slot.u - hw, slot.u + hw, z0, z0 + .7 * ZUNIT, d0, d1, '#2b3a42', '#1d282e', '#243138', 'rgba(0,0,0,.5)');
-  shelfFace(side, [[slot.u - hw, z1, d0], [slot.u + hw, z1, d0], [slot.u + hw, z1, d1], [slot.u - hw, z1, d1]], 'rgba(150,200,220,.18)', 'rgba(180,220,240,.35)');
+  shelfFace(side, [[slot.u - hw, z1, d0], [slot.u + hw, z1, d0], [slot.u + hw, z1, d1], [slot.u - hw, z1, d1]], 'rgba(150,200,220,.16)', 'rgba(180,220,240,.35)');   // ฝาบน
 
   return sold;
 }
 /* ขายได้แล้ว — เหรียญลอยเหนือตู้ กดเพื่อรับเงิน (วาดหลังตู้ทุกใบ จะได้ไม่โดนทับ) */
 function drawShelfCoin(slot, L, i) {
   const side = slot.side, hw = SHELF_BOX / 2, z1 = slot.z + SHELF_BOX_H;
-  const d0 = (SHELF_D - SHELF_BOX) / 2 + .2, d1 = d0 + SHELF_BOX;
+  const d0 = (SHELF_D - SHELF_BOX) / 2, d1 = d0 + SHELF_BOX;
   const p = shelfPt(side, slot.u, z1 + 3.0 * ZUNIT, (d0 + d1) / 2);
   const rad = Math.max(13, 19 * cam.zoom), pulse = Math.sin(performance.now() / 240);
   ctx.save(); ctx.translate(p.x, p.y - 3 * pulse);
