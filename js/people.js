@@ -470,7 +470,7 @@ function makePerson(options={}){
     skin: pick1(P_SKIN), hair: pick1(kid?P_HAIR.filter(c=>c!=='#8a8f94'):P_HAIR), shirt: pick1(P_SHIRT), pants: pick1(P_PANTS),
     shoe: Math.random()<0.5 ? '#23262b' : '#3a2f28',
     lean: (Math.random()<0.5?-1:1) * (0.03 + Math.random()*0.05),
-    build: (kid?0.87:gender==='female'?0.86:0.94) + Math.random()*0.16,
+    build: (kid?1.00:gender==='female'?0.86:0.94) + Math.random()*0.16,   // เด็กอวบกว่าเมื่อเทียบส่วนสูง ไม่ใช่ผอมกว่า
     hairStyle: (Math.random()*3)|0,
     accessory: kid ? pick1(['none','backpack','backpack']) : 'none',
     motion: 0, route: [], routeGoal: null,
@@ -827,9 +827,19 @@ function drawPerson(p){
     }
     if(!posedArms&&crouch&&v[2]>HEADCUT){const y=v[1]-lean,z=v[2]-HEADCUT,a=-.65*crouch;v[1]=lean+y*Math.cos(a)+z*Math.sin(a);v[2]=HEADCUT+z*Math.cos(a)-y*Math.sin(a);}
     if(!posedArms)v=inspectPose(v);
-    /* เด็ก: ขาสั้นลงนิด หัวดูโตขึ้นโดยไม่ต้องมีโมเดลแยก */
-    const z=p.kid?(v[2]<HIPZ?v[2]*.93:v[2]-HIPZ*.07):v[2];
-    return [p.x+(right[0]*v[0]+fx*v[1])*H,p.y+(right[1]*v[0]+fy*v[1])*H,(z+jump)*H];
+    /* ---- สัดส่วนเด็ก (ไม่ต้องมีโมเดลแยก) ----
+       ผู้ใหญ่ในโมเดลสูงราว 5.6 หัว · เด็กวัยประถมจริงราว 4.5-5 หัว
+       ของเดิมแค่ย่อขา 7% = เอาผู้ใหญ่มาย่อทั้งตัว หัวเล็กลงตามส่วนสูงด้วย เลยดูเป็นผู้ใหญ่แคระ
+       ที่นี่ย่อขาแล้ว "ขยายหัว" รอบข้อต่อคอทั้งสามแกน หัวจึงโตเมื่อเทียบกับตัว */
+    let vx=v[0],vy=v[1],z=v[2];
+    if(p.kid){
+      if(z<HIPZ) z*=KID_LEG; else z-=HIPZ*(1-KID_LEG);
+      if(v[2]>HEADCUT){
+        const nz=NECKZ-HIPZ*(1-KID_LEG), py=lean+.009;
+        z=nz+(z-nz)*KID_HEAD; vx*=KID_HEAD; vy=py+(vy-py)*KID_HEAD;
+      }
+    }
+    return [p.x+(right[0]*vx+fx*vy)*H,p.y+(right[1]*vx+fy*vy)*H,(z+jump)*H];
   }
   /* twoSided: หน้าที่หันหนีกล้องจะถูก "กลับด้าน" แทนที่จะถูกทิ้ง
      เมชจากไฟล์ .fbx วนหน้าคนละแบบกับทรงที่โค้ดปั้นเอง ถ้าทิ้งเลยจะเป็นรูพรุนทั้งตัว
@@ -882,6 +892,12 @@ function drawPerson(p){
             kz*kx*C-ky*s, kz*ky*C+kx*s, c+kz*kz*C];
   }
   const HIPZ=JT.hips[2],NECKZ=JT.neck[2],HEADCUT=NECKZ;
+  /* ช่วงที่ลำตัว "บิด/เอน" ไล่จาก 0 ถึงเต็ม — ต้องจบที่อก ไม่ใช่คอ
+     เพราะไหล่ (z≈0.78) กับโคนคอของชิ้นหัวอยู่ "ต่ำกว่าคอ" ถ้าไล่ไปจบที่คอ สองจุดนั้นจะได้ค่าไม่เต็ม
+     แต่แขนกับหัวถูกยึดด้วยค่าเต็ม → ลำตัวกับไหล่/คอเสื้อเหลื่อมกันเป็นรอยต่อ
+     (กายวิภาคก็ตรงกว่า: อกขึ้นไปเป็นก้อนแข็ง บิดกันที่กระดูกสันหลังช่วงล่าง) */
+  const TWZ=JT.chest[2];
+  const KID_LEG=0.88, KID_HEAD=1.20;              // เด็ก: ขาสั้นลง 12% · หัวโตขึ้น 20%
   /* วางชิ้นส่วนหนึ่งชิ้น: หมุน → ยืดตามความยาวข้อต่อ → ย้ายไปข้อต่อ → แปลงเป็นพิกัดโลก → ปั๊มสามเหลี่ยม
      ไม่เรียก face() ทีละสามเหลี่ยมเพราะจะเรียก world() ซ้ำ 3 เท่า (เวอร์เท็กซ์หนึ่งตัวใช้ร่วมกันหลายหน้า)
      แปลงทีละเวอร์เท็กซ์ครั้งเดียวแล้วค่อยประกอบหน้า เร็วกว่า ~3 เท่า */
@@ -889,15 +905,20 @@ function drawPerson(p){
   function emit(part,at,rot,stretch,shear,twist){
     if(!part) return;
     const v=part.v,t=part.t,n=v.length/3,ax=part.axis,st=(stretch&&stretch!==1&&ax)?stretch-1:0;
-    const sh=shear||0, span=NECKZ-HIPZ, tw=twist||null;
+    const sh=shear||0, span=TWZ-HIPZ, tw=twist||null;
     for(let i=0;i<n;i++){
       let x=v[i*3],y=v[i*3+1],z=v[i*3+2];
       if(st){const d=(x*ax[0]+y*ax[1]+z*ax[2])*st;x+=ax[0]*d;y+=ax[1]*d;z+=ax[2]*d;}
       if(rot){const nx=rot[0]*x+rot[1]*y+rot[2]*z,ny=rot[3]*x+rot[4]*y+rot[5]*z,nz=rot[6]*x+rot[7]*y+rot[8]*z;x=nx;y=ny;z=nz;}
       const wz=at[2]+z;
-      let vx=at[0]+x*bw, vy=at[1]+y+(sh?sh*Math.max(0,wz-HIPZ)/span:0);
+      const f=wz<=HIPZ?0:wz>=TWZ?1:(wz-HIPZ)/span;     // 0 ที่สะโพก → 1 ที่อก (ใช้ร่วมกันทั้งเอนและบิด)
+      /* bw (อ้วน/ผอม) ต้องคูณ "ทั้งจุดข้อต่อและตัวเมช" ไม่ใช่เมชอย่างเดียว
+         ของเดิม at[0]+x*bw → ลำตัวถูกย่อ/ขยายด้านข้าง แต่ข้อไหล่/ข้อสะโพกอยู่ที่เดิม
+         build 0.94 (ค่าปกติของผู้ชาย) ทำให้ลำตัวแคบเข้า ~1 ซม. แต่แขนไม่ขยับตาม
+         → เกิดรูดำที่หัวไหล่/วงแขน ซึ่งคือ 'คอเสื้อกับหัวไหล่แปลก ๆ' ที่เห็น */
+      let vx=(at[0]+x)*bw, vy=at[1]+y+(sh?sh*f:0);
       if(tw){                                   // เชิงกราน→อก บิดสวนกัน ไล่ตามความสูง
-        const f=wz<=HIPZ?0:wz>=NECKZ?1:(wz-HIPZ)/span, a=tw[0]+(tw[1]-tw[0])*f, a2=a*a;
+        const a=tw[0]+(tw[1]-tw[0])*f, a2=a*a;
         const ca=1-a2*0.5, sa=a*(1-a2/6), nx2=vx*ca-vy*sa;vy=vx*sa+vy*ca;vx=nx2;
       }
       _W[i]=world([vx, vy, wz]);
@@ -999,7 +1020,8 @@ function drawPerson(p){
   for(const side of [-1,1]){
     posedArms=false;
     const S=side<0?'L':'R', J=k=>JT[k+S];
-    const L1=dist(J('shoulder'),J('elbow')), L2=dist(J('elbow'),J('wrist')), REACH=(L1+L2)*.985;
+    const KARM=p.kid?0.93:1;                       // ย่อขาแล้วต้องย่อแขนตาม ไม่งั้นมือห้อยเลยเข่า
+    const L1=dist(J('shoulder'),J('elbow'))*KARM, L2=dist(J('elbow'),J('wrist'))*KARM, REACH=(L1+L2)*.985;
     /* โมเดลวางสัดส่วนแขนกลับหัว (ท่อนล่าง 0.180 ยาวกว่าท่อนบน 0.154) — คนจริงท่อนบนยาวกว่า ~0.56:0.44
        ย้ายจุดศอกให้ท่อนบนยาวขึ้น/ท่อนล่างสั้นลง โดยระยะเอื้อมรวม (REACH) เท่าเดิม ปลายมือถึงที่เดิม */
     const ARMTOT=L1+L2, UARM=ARMTOT*0.56, FARM=ARMTOT*0.44;
