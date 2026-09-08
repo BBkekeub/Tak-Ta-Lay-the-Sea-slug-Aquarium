@@ -13,7 +13,7 @@ const foodClamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /* อิ่มเกินค่านี้ = ไม่เดินไปกิน (เดิมกินทุกชิ้นแม้อิ่มเต็ม ค่าอิ่มส่วนเกินถูกทิ้ง) */
 const FOOD_HUNGRY=90;
 /* อาหารที่ไม่มีใครกินจะเน่าหายไปเอง — กันเศษอาหารค้างจนพื้นตู้เต็ม 8 ชิ้นแล้ววางใหม่ไม่ได้ */
-const FOOD_SPOIL_MS=15*60*1000;
+const FOOD_SPOIL_MS=5*60*60*1000;
 function foodStats(s,now=Date.now()){
  if(!Number.isFinite(s.satiety))s.satiety=50;
  if(!Array.isArray(s.foodBuffs))s.foodBuffs=[];
