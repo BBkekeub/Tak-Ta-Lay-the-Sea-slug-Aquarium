@@ -474,6 +474,8 @@ function makePerson(options={}){
     motion: 0, route: [], routeGoal: null,
     action: 'watch', actionT:0, actionDuration:0, headYaw:0, socialCooldown:1+Math.random()*4,
     bagged: !kid && Math.random() < 0.35,
+    modelHair: gender==='female' ? pick1(['PonyTail','ShortHair_1','ShortHair_1']) : 'Hair',
+    facial: (gender==='male'&&!kid) ? pick1(['none','none','none','Moustache','Beard','BeardFull']) : 'none',
   };
 }
 
@@ -760,7 +762,7 @@ function drawPerson(p){
   // Reuse idle poses at 12 Hz and moving/gesturing poses at 30 Hz;
   // position is translated every frame so walking remains smooth.
   const poseRate=(p.motion>.05||p.action!=='watch')?30:12;
-  const poseKey=[Math.floor(p.idle*poseRate),p.action==='watch'?0:Math.round((p.actionT||0)*30),Math.round((p.catchupBoost||1)*10),Math.round(p.phase*20),Math.round((p.motion||0)*20),Math.round(p.fdx*100),Math.round(p.fdy*100),Math.round((p.headYaw||0)*100),p.action,p.state,p._squeezeUntil>_peopleT?1:0,p.focus?.id,['point','crouch'].includes(p.action)?Math.round(p.x*20):0,['point','crouch'].includes(p.action)?Math.round(p.y*20):0,p.hCm,p.outfit,p.hairCut,p.shirt,p.pants,p.skin,p.hair,p.bagged,p.accessory].join('|');
+  const poseKey=[Math.floor(p.idle*poseRate),p.action==='watch'?0:Math.round((p.actionT||0)*30),Math.round((p.catchupBoost||1)*10),Math.round(p.phase*20),Math.round((p.motion||0)*20),Math.round(p.fdx*100),Math.round(p.fdy*100),Math.round((p.headYaw||0)*100),p.action,p.state,p._squeezeUntil>_peopleT?1:0,p.focus?.id,['point','crouch'].includes(p.action)?Math.round(p.x*20):0,['point','crouch'].includes(p.action)?Math.round(p.y*20):0,p.hCm,p.outfit,p.hairCut,p.shirt,p.pants,p.skin,p.hair,p.bagged,p.accessory,p.modelHair,p.facial].join('|');
   if(p._drawPose&&p._drawPose.key===poseKey){
     const cached=p._drawPose,dx=p.x-cached.x,dy=p.y-cached.y;
     const faces=dx||dy?cached.faces.map(f=>({rgb:f.rgb,v:f.v.map(v=>[v[0]+dx,v[1]+dy,v[2]])})):cached.faces;
@@ -787,38 +789,46 @@ function drawPerson(p){
   let posedArms=false;
   function inspectPose(v){
     v=v.slice();if(!crouch)return v;
-    if(v[2]>=.515){
-      const y=v[1],z=v[2]-.515,a=crouch*1.4;
+    if(v[2]>=HIPZ){
+      const y=v[1],z=v[2]-HIPZ,a=crouch*1.4;
       v[1]=y*Math.cos(a)+z*Math.sin(a)-.065*crouch;
-      v[2]=.515+z*Math.cos(a)-y*Math.sin(a)-.04*crouch;
+      v[2]=HIPZ+z*Math.cos(a)-y*Math.sin(a)-.04*crouch;
     }else{
-      const t=Math.max(0,Math.min(1,(v[2]-.05)/.465));
+      const t=Math.max(0,Math.min(1,(v[2]-.05)/(HIPZ-.05)));
       v[1]+=Math.sin(Math.PI*t)*.07*crouch-.065*crouch*t;v[2]-=.04*crouch*t;
     }return v;
   }
+  /* ตรีโกณของการหันหัว/พยักหน้า คิดครั้งเดียวต่อคน — เดิมคิดใหม่ทุกเวอร์เท็กซ์ (หลักหมื่นครั้งต่อเฟรม) */
+  const _yaw=-(p.headYaw||0), _yawC=Math.cos(_yaw), _yawS=Math.sin(_yaw);
+  const _nodZ=(action==='nod')?Math.sin((p.actionT||0)*6)*.004*gesture:0;
   const runLean=Math.max(0,(p.catchupBoost||1)-1)*.012*motion;
   const lean=runLean+(p.state==='look'?0.012+Math.sin(p.idle*.65)*.003:0.004*motion)+(action==='lean'?gesture*.026:0);
   const shift=p.state==='look'?Math.sin(p.idle*.65)*.003:0;
   function world(v){
     v=[v[0]+shift*Math.min(1,v[2]/.5),v[1]+(action==='lean'?gesture*.026*Math.max(0,v[2]-.5):0),v[2]];
-    if(v[2]>.855){
-      v[0]*=2.15;v[1]=lean+.009+(v[1]-(lean+.009))*1.85;
-      const angle=-(p.headYaw||0),x=v[0],y=v[1]-(lean+.009);
-      v[0]=x*Math.cos(angle)-y*Math.sin(angle);v[1]=lean+.009+x*Math.sin(angle)+y*Math.cos(angle);
-      if(action==='nod')v[2]+=Math.sin((p.actionT||0)*6)*.004*gesture;
+    if(v[2]>HEADCUT){
+      const x=v[0],y=v[1]-(lean+.009);
+      v[0]=x*_yawC-y*_yawS;v[1]=lean+.009+x*_yawS+y*_yawC;
+      v[2]+=_nodZ;
     }
-    if(!posedArms&&crouch&&v[2]>.855){const y=v[1]-lean,z=v[2]-.855,a=-.65*crouch;v[1]=lean+y*Math.cos(a)+z*Math.sin(a);v[2]=.855+z*Math.cos(a)-y*Math.sin(a);}
+    if(!posedArms&&crouch&&v[2]>HEADCUT){const y=v[1]-lean,z=v[2]-HEADCUT,a=-.65*crouch;v[1]=lean+y*Math.cos(a)+z*Math.sin(a);v[2]=HEADCUT+z*Math.cos(a)-y*Math.sin(a);}
     if(!posedArms)v=inspectPose(v);
-    // Compact legs/torso and a larger head share the mascot's rounded proportions.
-    const shapedZ=v[2]<.515?v[2]*(.335/.515):v[2]<.855?.335+(v[2]-.515)*(.295/.34):.63+(v[2]-.855)*2.1;
-    const z=p.kid?(shapedZ<.40?shapedZ*.94:.376+(shapedZ-.40)*1.045):shapedZ;
+    /* เด็ก: ขาสั้นลงนิด หัวดูโตขึ้นโดยไม่ต้องมีโมเดลแยก */
+    const z=p.kid?(v[2]<HIPZ?v[2]*.93:v[2]-HIPZ*.07):v[2];
     return [p.x+(right[0]*v[0]+fx*v[1])*H,p.y+(right[1]*v[0]+fy*v[1])*H,(z+jump)*H];
   }
-  function face(vertices,color,shade=0){
-    const v=vertices.map(world),a=v[0],u=v[1].map((x,i)=>x-a[i]),w=v[2].map((x,i)=>x-a[i]);
+  /* twoSided: หน้าที่หันหนีกล้องจะถูก "กลับด้าน" แทนที่จะถูกทิ้ง
+     เมชจากไฟล์ .fbx วนหน้าคนละแบบกับทรงที่โค้ดปั้นเอง ถ้าทิ้งเลยจะเป็นรูพรุนทั้งตัว
+     ตัวเรนเดอร์มี depth buffer อยู่แล้ว วาดสองด้านจึงถูกต้องและไม่เพี้ยน */
+  function face(vertices,color,shade=0,twoSided=false){
+    let v=vertices.map(world);
+    let a=v[0],u=v[1].map((x,i)=>x-a[i]),w=v[2].map((x,i)=>x-a[i]);
     let norm=[u[1]*w[2]-u[2]*w[1],u[2]*w[0]-u[0]*w[2],u[0]*w[1]-u[1]*w[0]];
     const len=Math.hypot(...norm)||1;norm=norm.map(x=>x/len);
-    if(norm[0]+norm[1]+norm[2]<=0) return;
+    if(norm[0]+norm[1]+norm[2]<=0){
+      if(!twoSided) return;
+      v=[v[0],v[2],v[1]];norm=norm.map(x=>-x);
+    }
     const light=norm[0]*-.28+norm[1]*.36+norm[2]*.75;
     faces.push({v,rgb:shadeRgb(hexToRgb(color),shade+light*16-5),depth:v.reduce((s,v)=>s+v[0]+v[1]+v[2],0)/v.length});
   }
@@ -836,148 +846,114 @@ function drawPerson(p){
     for(let i=0;i<8;i++)face([rr[0][i],rr[0][(i+1)%8],rr[1][(i+1)%8],rr[1][i]],color);
     face([...rr[0]].reverse(),color);face(rr[1],color);
   }
-  // Foot separation stays lateral; stride follows the actual direction of travel.
+  /* ---------- ประกอบร่างจากโมเดลจริง (js/people-model.js) ----------
+     โมเดลถูกเบคมาในระบบพิกัดเดียวกับ world() แล้ว (x=ข้าง y=หน้า z=สูง สูง=1)
+     ที่นี่แค่หาตำแหน่งข้อต่อตามท่าทาง แล้วหมุนชิ้นส่วนไปวางตามข้อต่อนั้น
+     ท่าเดิน/ชี้/ก้ม/หันหัว ยังใช้ระบบเดิมทั้งหมด แค่เปลี่ยนสิ่งที่ถูกวาดจาก "ทรงกระบอก" เป็น "เมช" */
+  const MDL=PEOPLE_MODEL[p.gender==='female'?'female':'male'], JT=MDL.joints;
+  const SLOTC={skin:p.skin,shirt:p.shirt,pants:p.pants,shoe:p.shoe,hair:p.hair,dark:'#2b2622',white:'#efeadd'};
+  const bw=build;                                   // อ้วน/ผอม = ขยายด้านข้าง (ความสูงคุมด้วย hCm)
+  const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+  const norm=v=>{const l=Math.hypot(v[0],v[1],v[2])||1;return [v[0]/l,v[1]/l,v[2]/l];};
+  const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
+  /* เมทริกซ์หมุนที่พาแกน a ไปทับแกน b (สูตร Rodrigues) — ใช้หมุนท่อนแขน/ขาไปตามข้อต่อ */
+  function axisRot(a,b){
+    const d=a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+    let kx=a[1]*b[2]-a[2]*b[1],ky=a[2]*b[0]-a[0]*b[2],kz=a[0]*b[1]-a[1]*b[0];
+    const s=Math.hypot(kx,ky,kz);
+    if(s<1e-7) return d>0?null:[-1,0,0,0,-1,0,0,0,1];
+    kx/=s;ky/=s;kz/=s;const c=d,C=1-c;
+    return [c+kx*kx*C, kx*ky*C-kz*s, kx*kz*C+ky*s,
+            ky*kx*C+kz*s, c+ky*ky*C, ky*kz*C-kx*s,
+            kz*kx*C-ky*s, kz*ky*C+kx*s, c+kz*kz*C];
+  }
+  const HIPZ=JT.hips[2],NECKZ=JT.neck[2],HEADCUT=NECKZ;
+  /* วางชิ้นส่วนหนึ่งชิ้น: หมุน → ยืดตามความยาวข้อต่อ → ย้ายไปข้อต่อ → แปลงเป็นพิกัดโลก → ปั๊มสามเหลี่ยม
+     ไม่เรียก face() ทีละสามเหลี่ยมเพราะจะเรียก world() ซ้ำ 3 เท่า (เวอร์เท็กซ์หนึ่งตัวใช้ร่วมกันหลายหน้า)
+     แปลงทีละเวอร์เท็กซ์ครั้งเดียวแล้วค่อยประกอบหน้า เร็วกว่า ~3 เท่า */
+  const _W=[];
+  function emit(part,at,rot,stretch,shear){
+    if(!part) return;
+    const v=part.v,t=part.t,n=v.length/3,ax=part.axis,st=(stretch&&stretch!==1&&ax)?stretch-1:0;
+    const sh=shear||0, span=NECKZ-HIPZ;
+    for(let i=0;i<n;i++){
+      let x=v[i*3],y=v[i*3+1],z=v[i*3+2];
+      if(st){const d=(x*ax[0]+y*ax[1]+z*ax[2])*st;x+=ax[0]*d;y+=ax[1]*d;z+=ax[2]*d;}
+      if(rot){const nx=rot[0]*x+rot[1]*y+rot[2]*z,ny=rot[3]*x+rot[4]*y+rot[5]*z,nz=rot[6]*x+rot[7]*y+rot[8]*z;x=nx;y=ny;z=nz;}
+      const wz=at[2]+z;
+      _W[i]=world([at[0]+x*bw, at[1]+y+(sh?sh*Math.max(0,wz-HIPZ)/span:0), wz]);
+    }
+    for(const run of part.s){
+      const rgb0=hexToRgb(SLOTC[run[0]]||p.shirt);
+      for(let k=run[1],e=run[1]+run[2];k<e;k++){
+        const A=_W[t[k*3]],B=_W[t[k*3+1]],C=_W[t[k*3+2]];
+        const ux=B[0]-A[0],uy=B[1]-A[1],uz=B[2]-A[2],wx=C[0]-A[0],wy=C[1]-A[1],wz=C[2]-A[2];
+        let nx=uy*wz-uz*wy,ny=uz*wx-ux*wz,nz=ux*wy-uy*wx;
+        const L=Math.hypot(nx,ny,nz)||1;nx/=L;ny/=L;nz/=L;
+        let vv;
+        if(nx+ny+nz<=0){vv=[A,C,B];nx=-nx;ny=-ny;nz=-nz;}else vv=[A,B,C];   // หันหนีกล้อง = กลับด้าน ไม่ทิ้ง
+        faces.push({v:vv,rgb:shadeRgb(rgb0,(nx*-.28+ny*.36+nz*.75)*16-5),
+                    depth:(A[0]+A[1]+A[2]+B[0]+B[1]+B[2]+C[0]+C[1]+C[2])/3});
+      }
+    }
+  }
+  /* ---- ขา: สะโพก → เข่า → ข้อเท้า (ท่าเดินเดิม) ---- */
   for(const side of [-1,1]){
-    const s=Math.sin(phase+(side<0?Math.PI:0)), stride=s*.075*motion;
-    const lift=Math.max(0,Math.cos(phase+(side<0?Math.PI:0)))*.026*motion;
-    const hip=[side*.055*build,0,.515+bob];
-    const knee=[side*.058*build,stride*.45+.012*motion,.285+bob+lift*.4];
-    const ankle=[side*.060*build,stride,.038+lift];
-    limb(hip,knee,.068*build,.054,skirt?p.skin:p.pants);
-    limb(knee,ankle,.055,.043,skirt||p.outfit==='shorts'?p.skin:p.pants);
-    rings([[ankle[0],stride+.034,.016+lift,.060,.096],[ankle[0],stride+.034,.042+lift,.061,.092],[ankle[0],stride+.010,.084+lift,.043,.056]],p.shoe,8);
-    rings([[ankle[0],stride+.034,.009+lift,.061,.096],[ankle[0],stride+.034,.022+lift,.061,.096]],'#c9c7b7',8);
+    const S=side<0?'L':'R', J=k=>JT[k+S];
+    const sw=Math.sin(phase+(side<0?Math.PI:0)), stride=sw*.075*motion;
+    const lift=Math.max(0,Math.cos(phase+(side<0?Math.PI:0)))*.030*motion;
+    const hip=[J('hip')[0],J('hip')[1],J('hip')[2]+bob];
+    const knee=[J('knee')[0],J('knee')[1]+stride*.45+.012*motion,J('knee')[2]+bob+lift*.45];
+    const ankle=[J('ankle')[0],J('ankle')[1]+stride,J('ankle')[2]+lift];
+    const rl=MDL.parts['thigh'+S],cl=MDL.parts['calf'+S],fl=MDL.parts['foot'+S];
+    emit(rl,hip,axisRot(rl.axis,norm(sub(knee,hip))),dist(hip,knee)/rl.len);
+    emit(cl,knee,axisRot(cl.axis,norm(sub(ankle,knee))),dist(knee,ankle)/cl.len);
+    emit(fl,ankle,null,1);                       // เท้าวางราบกับพื้นเสมอ ไม่หมุนตามน่อง
   }
-  if(!skirt)rings([[0,0,.495+bob,.093*build,.056],[0,0,.555+bob,.092*build,.060]],p.pants);
-  const top=.822+bob+breath;
-  rings([[0,lean*.3,.502+bob,.104*build,.067],[0,lean*.3,.529+bob,.108*build,.069],[0,lean*.3,.543+bob,.104*build,.067],[0,lean*.6,.610+bob,.105*build,.068],[0,lean,.740+bob,.124*build*shoulderWidth,.072],[0,lean,top-.028,.112*build*shoulderWidth,.062],[0,lean,top,.055*build,.038]],p.shirt);
-  rings([[0,lean*.3,.523+bob,.107*build,.069],[0,lean*.3,.553+bob,.105*build,.068]],p.shirt,8);
-  if(skirt){
-    const hem=p.kid?.365:.325,cloth=p.outfit==='dress'?p.shirt:p.pants;
-    rings([[gait*.003,0,hem+bob,.172*build,.108],[0,0,.45+bob,.146*build,.091],[0,lean*.3,.543+bob,.118*build,.076]],cloth,12);
-  }
-  // Neck and a narrow cloth collar, with no broad shiny shoulder highlight.
-  rings([[0,lean,top-.002,.046,.041],[0,lean+.001,top+.016,.041,.038]],p.shirt);
-  rings([[0,lean,top+.006,.034,.034],[0,lean+.005,.858+bob,.035,.036]],p.skin);
+  /* ---- ลำตัว + หัว ---- */
+  emit(MDL.parts.torso,[JT.hips[0],JT.hips[1],JT.hips[2]+bob],null,1,lean);
+  emit(MDL.parts.head,[JT.head[0],JT.head[1]+lean,JT.head[2]+bob+breath],null,1);
+  const hairSet=MDL.variants.hair||{},hairKey=p.modelHair&&hairSet[p.modelHair]?p.modelHair:Object.keys(hairSet)[0];
+  if(hairKey) emit(hairSet[hairKey],[JT.head[0],JT.head[1]+lean,JT.head[2]+bob+breath],null,1);
+  const facialSet=MDL.variants.facial||{};
+  if(p.facial&&facialSet[p.facial]) emit(facialSet[p.facial],[JT.head[0],JT.head[1]+lean,JT.head[2]+bob+breath],null,1);
+  /* ---- แขน: ใช้ IK เดิม แต่ความยาวท่อนมาจากโมเดลจริง ---- */
   for(const side of [-1,1]){
     posedArms=false;
-    const shoulder=[side*.112*build*shoulderWidth,lean,top-.046];
+    const S=side<0?'L':'R', J=k=>JT[k+S];
+    const L1=dist(J('shoulder'),J('elbow')), L2=dist(J('elbow'),J('wrist')), REACH=(L1+L2)*.985;
+    const shoulder=[J('shoulder')[0],J('shoulder')[1]+lean,J('shoulder')[2]+bob];
     const swing=-side*gait*.047;
-    const elbow=[side*.126*build,lean+swing*.6,.670+bob];
-    const interested=p.state==='look'&&side===1;
-    const pointing=interested&&action==='point';
-    const hand=[side*(interested?.090:.119)*build,lean+swing+(pointing?.062+.088*gesture:interested?.062:.012),pointing?.626+bob+.124*gesture:interested?.626+bob:.554+bob];
+    const interested=p.state==='look'&&side===1, pointing=interested&&action==='point';
+    let elbow=[shoulder[0]+side*.012,shoulder[1]+swing*.6-.010,shoulder[2]-L1*.94];
+    let hand =[shoulder[0]+side*.020,shoulder[1]+swing,shoulder[2]-(L1+L2)*.90];
+    if(interested){hand[1]+=.070;hand[2]=shoulder[2]-(L1+L2)*.62;}
+    if(pointing){hand[1]+=.090*gesture;hand[2]+=.130*gesture;}
     if(side===1&&action==='chat'){hand[1]+=.055*gesture;hand[2]+=.09*gesture;}
-    if(side===1&&action==='point'){hand[1]+=.07*gesture;hand[2]+=.035*gesture;}
     if(side===-1&&action==='adjust'){hand[0]*=1-.6*gesture;hand[1]+=.065*gesture;hand[2]+=.16*gesture;}
-    if(action==='chin'&&side===1){hand[0]+=(.026-hand[0])*gesture;hand[1]+=(lean+.055-hand[1])*gesture;hand[2]+=(.874+bob-hand[2])*gesture+Math.sin(p.actionT*7)*.003*gesture;}
-    if(action==='jump'&&p.kid){hand[0]+=(side*.155-hand[0])*gesture;hand[1]+=(lean+.015-hand[1])*gesture;hand[2]+=(.90+bob-hand[2])*gesture;elbow[0]+=(side*.15-elbow[0])*gesture;}
-    const relaxed=p.state!=='look'||action==='watch';
-    if(relaxed){
-      hand[0]=shoulder[0]+side*.003;
-      hand[1]=shoulder[1]+swing*.65;
-      hand[2]=shoulder[2]-.228+Math.abs(swing)*.05;
-      elbow[0]=shoulder[0];elbow[1]=shoulder[1]-.016+swing*.3;elbow[2]=shoulder[2]-.114;
-    }
+    if(action==='chin'&&side===1){const tgt=[side*.030,lean+.060,JT.head[2]-.030+bob];for(let i=0;i<3;i++)hand[i]+=(tgt[i]-hand[i])*gesture;}
+    if(action==='jump'&&p.kid){hand[0]+=(side*.170-hand[0])*gesture;hand[1]+=(lean+.015-hand[1])*gesture;hand[2]+=(shoulder[2]+.10-hand[2])*gesture;elbow[0]+=(side*.16-elbow[0])*gesture;}
     if(crouch){
       const sh=inspectPose(shoulder),rest=inspectPose(hand);
-      const knee=inspectPose([side*.05*build,.028,.32+bob]);
-      for(let i=0;i<3;i++){shoulder[i]=sh[i];hand[i]=rest[i]+(knee[i]-rest[i])*gesture;}
-      elbow[0]=side*.115*build;elbow[1]=shoulder[1]+.025;elbow[2]=shoulder[2]-.09;
+      const kneeT=inspectPose([side*.055,.030,JT['knee'+S][2]+.03+bob]);
+      for(let i=0;i<3;i++){shoulder[i]=sh[i];hand[i]=rest[i]+(kneeT[i]-rest[i])*gesture;}
+      elbow=[side*.125,shoulder[1]+.025,shoulder[2]-L1*.80];
       posedArms=true;
-    }else elbow[1]=Math.min(elbow[1],shoulder[1]-.012);
-    const armPose=solvePersonArm(shoulder,hand,elbow,(relaxed||crouch)?.229:.215);
-    for(let axis=0;axis<3;axis++){hand[axis]=armPose.hand[axis];elbow[axis]=armPose.elbow[axis];}
+    }
+    let pose=solvePersonArm(shoulder,hand,elbow,REACH);
+    hand=pose.hand.slice();elbow=pose.elbow.slice();
     if(!crouch)constrainVisitorArm(p,[hand],world,H,right,fx,fy);
-    // Re-solve the joint after limiting the hand instead of flattening the
-    // forearm into the body by independently translating both joints.
-    const limitedPose=solvePersonArm(shoulder,hand,elbow,(relaxed||crouch)?.229:.215);
-    for(let axis=0;axis<3;axis++){hand[axis]=limitedPose.hand[axis];elbow[axis]=limitedPose.elbow[axis];}
+    pose=solvePersonArm(shoulder,hand,elbow,REACH);
+    hand=pose.hand.slice();elbow=pose.elbow.slice();
     if(!crouch)constrainVisitorArm(p,[elbow],world,H,right,fx,fy);
-    const cuff=shoulder.map((x,i)=>x+(elbow[i]-x)*.67);
-    limb(shoulder,cuff,.048*build,.040,p.shirt);
-    limb(cuff,elbow,.035,.031,p.skin);limb(elbow,hand,.032,.023,p.skin);
-    rings([[hand[0],hand[1],hand[2]-.030,.018,.022],[hand[0],hand[1]+.002,hand[2]-.014,.026,.026],[hand[0],hand[1],hand[2]+.009,.021,.019]],p.skin,8);
+    const ua=MDL.parts['arm'+S],fa=MDL.parts['fore'+S],hd=MDL.parts['hand'+S];
+    const dirU=norm(sub(elbow,shoulder)),dirF=norm(sub(hand,elbow));
+    emit(ua,shoulder,axisRot(ua.axis,dirU),dist(shoulder,elbow)/ua.len);
+    emit(fa,elbow,axisRot(fa.axis,dirF),dist(elbow,hand)/fa.len);
+    emit(hd,hand,axisRot(hd.axis,dirF),1);
   }
   posedArms=false;
-  // Face is a shaped jaw and brow in 3D; facial features turn with the head.
-  const hz=.923+bob, hy=lean+.009, hs=p.kid?1.13:1;
-  const headRows=[[-.065,.020,.024],[-.048,.033,.035],[-.025,.048,.045],[.008,.050,.045],[.034,.047,.041],[.056,.038,.034],[.074,.020,.022],[.080,.001,.001]];
-  const sides=12;
-  const scalp=headRows.map(([z,rx,ry])=>Array.from({length:sides},(_,i)=>{
-    const a=i*Math.PI*2/sides;return [Math.cos(a)*rx*hs,hy+Math.sin(a)*ry*hs,hz+z*hs];
-  }));
-  for(let j=0;j<scalp.length-1;j++)for(let i=0;i<sides;i++){
-    const front=Math.sin((i+.5)*Math.PI*2/sides);
-    const hairline=front>.45?(p.hairCut==='crop'?.030:p.hairCut==='sidepart'?.016:.021):front>0?-.008:-.030;
-    const col=(headRows[j][0]+headRows[j+1][0])/2>hairline?p.hair:p.skin;
-    face([scalp[j][i],scalp[j][(i+1)%sides],scalp[j+1][(i+1)%sides],scalp[j+1][i]],col);
-  }
-  for(const side of [-1,1]) rings([[side*.046*hs,hy,hz-.025,.006,.009],[side*.048*hs,hy,hz-.008,.008,.011],[side*.046*hs,hy,hz+.006,.005,.008]],p.skin,8);
-  // Ten silhouettes, built from a small number of low-poly hair sections.
-  const cut=p.hairCut,sway=Math.sin(phase)*motion*.009;
-  if(['bob','long'].includes(cut)){
-    const bottom=cut==='long'?.861:.864;
-    const rows=[[bottom,.049,.038],[bottom+.018,.059,.044],[.925,.057,.050],[.979,.040,.039]];
-    for(let j=0;j<rows.length-1;j++)for(let i=0;i<16;i++){
-      const a=i*Math.PI/8,b=(i+1)*Math.PI/8;
-      if(Math.sin((a+b)/2)>.48)continue;
-      const point=(r,a)=>[Math.cos(a)*r[1]*hs+(cut==='long'?sway*(1-r[0]):0),hy+Math.sin(a)*r[2]*hs-.004,r[0]+bob];
-      face([point(rows[j],a),point(rows[j],b),point(rows[j+1],b),point(rows[j+1],a)],p.hair,i%3===0?3:0);
-    }
-  }
-  if(['short','sidepart','quiff'].includes(cut)){
-    // Broad asymmetric tufts, each a closed four-face wedge.
-    for(let i=0;i<5;i++){
-      const x=(i-2)*.019,base=.979+bob,tipX=x+(cut==='sidepart'?-.018:.009),tipZ=base+(cut==='quiff'?.055:.032)+(i%2)*.009;
-      const a=[x-.013,hy+.030,base],b=[x+.013,hy+.032,base],c=[x,hy-.023,base+.006],t=[tipX,hy+.019,tipZ];
-      face([a,b,t],p.hair,3);face([b,c,t],p.hair,-5);face([c,a,t],p.hair,7);face([c,b,a],p.hair);
-    }
-    for(let i=0;i<3;i++){const x=(i-1)*.025;face([[x-.015,hy+.039,.976+bob],[x+.015,hy+.042,.975+bob],[x+.007,hy+.052,.943+bob]],p.hair,i*3);}
-  }
-  if(cut==='curly'){
-    for(let i=0;i<8;i++){
-      const a=i*Math.PI/4,x=Math.cos(a)*.034*hs,y=hy+Math.sin(a)*.032*hs,z=.982+bob+(i%2)*.009;
-      rings([[x,y,z-.019,.013,.014],[x,y,z,.025*hs,.024*hs],[x-.003,y,z+.023,.016,.017],[x-.003,y,z+.029,.002,.003]],p.hair,6);
-    }
-    rings([[0,hy,1.004+bob,.026,.027],[0,hy,1.033+bob,.018,.018],[0,hy,1.040+bob,.002,.002]],p.hair,8);
-  }
-  if(cut==='ponytail'){
-    rings([[sway,hy-.087,.788+bob,.007,.009],[sway*.7,hy-.094,.847+bob,.016,.019],[0,hy-.070,.929+bob,.022,.023],[0,hy-.055,.951+bob,.009,.010]],p.hair,8);
-    rings([[0,hy-.073,.915+bob,.023,.023],[0,hy-.070,.923+bob,.022,.023]],p.shirt,8);
-  }
-  if(cut==='bun'){
-    rings([[0,hy-.022,.965+bob,.023,.023],[0,hy-.036,1.004+bob,.029,.028],[0,hy-.042,1.034+bob,.026,.025],[0,hy-.040,1.048+bob,.010,.011]],p.hair,10);
-    rings([[0,hy-.036,.988+bob,.022,.020],[0,hy-.036,.992+bob,.023,.021]],p.shirt,8);
-  }
-  if(cut==='twintails')for(const side of [-1,1]){
-    const x=side*.052*hs;
-    rings([[x+side*.018+sway,hy-.032,.827+bob,.006,.009],[x+side*.011+sway*.6,hy-.037,.866+bob,.016,.018],[x,hy-.027,.923+bob,.018,.020],[x-side*.003,hy-.016,.942+bob,.009,.011]],p.hair,8);
-    rings([[x,hy-.026,.921+bob,.020,.021],[x,hy-.025,.929+bob,.020,.020]],p.shirt,8);
-  }
-  // Bob fringe follows the forehead; long hair keeps a clean centre part.
-  if(cut==='bob')for(const side of [-1,1]){
-    face([[side*.002,hy+.044,.970+bob],[side*.041,hy+.035,.964+bob],[side*.035,hy+.047,.932+bob],[side*.006,hy+.050,.945+bob]],p.hair,2);
-  }
 
-
-  // Features sit outside the cheek surface and retain outward (+forward) winding.
-  const feature=(v,color,shade=0)=>face(v,color,shade);
-  const y=hy+.047*hs,blink=Math.sin(p.idle*1.7)>.993;
-  feature([[-.006,y,hz+.004],[.006,y,hz+.004],[.008,y+.008,hz-.015],[0,y+.012,hz-.022],[-.008,y+.008,hz-.015]],p.skin,-5);
-  for(const side of [-1,1]){
-   const x=side*.021*hs;
-   /* ตาเป็นวงแปดเหลี่ยม (ไม่ใช่สี่เหลี่ยมแบน) — สไตล์ low-poly ดูที่รูปทรงรวม ไม่ใช่รายละเอียดหน้า */
-   const disc=(cx,cz,r,rz,depth,color,shade=0)=>feature(Array.from({length:8},(_,i)=>{
-     const a=-i*Math.PI/4+Math.PI/8;return [cx+Math.cos(a)*r,y+depth,cz+Math.sin(a)*rz];}),color,shade);
-   feature([[x-.0115,y-.001,hz+.0205],[x+.0115,y-.001,hz+.0195],[x+.011,y+.001,hz+.0170],[x-.011,y+.001,hz+.0180]],p.hair,8);
-   if(!blink){
-    disc(x,hz+.002,.0125,.0130,.002,'#f6f1e6');
-    disc(x+side*.0012,hz+.001,.0072,.0076,.0035,'#3a322b');
-    disc(x-side*.0028,hz+.005,.0026,.0027,.0048,'#ffffff',16);
-   }else feature([[x-.011,y+.002,hz+.003],[x+.011,y+.002,hz+.003],[x+.011,y+.003,hz-.001],[x-.011,y+.003,hz-.001]],'#4b3c32');
-  }
-  feature([[-.010,y-.003,hz-.032],[0,y-.001,hz-.034],[.010,y-.003,hz-.032],[.007,y-.001,hz-.037],[-.007,y-.001,hz-.037]],p.skin,-26);
   if(p.bagged){
     // Strap lies against the front and back of the body instead of floating over it.
     for(const sign of [-1,1])for(let i=0;i<14;i++){
