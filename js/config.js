@@ -154,6 +154,7 @@ const G = {
   stats: {earned:0,spent:0,sec:0,sold:0,fed:0,cleaned:0,bred:0,ordered:0},   // สถิติเศรษฐกิจ (econ-stats.js)               // สต็อกกล่องสุ่มทาก {n, at} — ดู slug-box-shop.js
   bw: START_BW, bh: START_BH,   // พื้นที่ปัจจุบัน (ช่องใหญ่)
   objs: [],                     // ของที่วางบนพื้น {id,type,_key,cx,cy,def,slugs:[]}
+  shelf: null,                  // ชั้นวางติดผนัง {side,offset} — ทากที่ลงขายตลาดโลกไปโชว์บนนี้ (wall-shelf.js)
   shelter: [],                  // ตู้ที่ถอดมาพักชั่วคราว
   inv: [],                      // ทากในคลัง (ยังไม่ลงตู้)
   seq: 1,

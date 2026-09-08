@@ -13,7 +13,7 @@
   /* ===== ค่าปรับได้ ===== */
   const REFRESH_MS = 3 * 60 * 60 * 1000;  // เทรนเปลี่ยนทุก 3 ชม.
   const SELL_MS    = 3 * 60 * 60 * 1000;  // ลิมิตเวลาต่อการลงขาย 1 ครั้ง
-  const MAX_LIST   = 5;                   // ลงขายพร้อมกันได้กี่ตัว (คุมรายได้ต่อชั่วโมง — ดูหมายเหตุท้ายไฟล์)
+  const MAX_LIST   = 6;                   // = จำนวนช่องบนชั้นวางติดผนัง (SHELF_SLOTS ใน wall-shelf.js) ทากที่ลงขายไปโผล่บนชั้นนั้น
 
   // มูลค่ารายยีน = ฐาน 100 เหรียญ × ตัวคูณตาม "% ตรงกับเป้า"
   //   ตรงเป๊ะทุกยีน = 11 × 100 × 2   = 2,200 เหรียญ
@@ -221,7 +221,10 @@
 
   function listSlug(entry, ask) {
     const m = market();
-    if (m.listings.length >= MAX_LIST) { say('ลงขายพร้อมกันได้สูงสุด ' + MAX_LIST + ' ตัว', 'bad'); return false; }
+    if (typeof shelfRect === 'function' && !shelfRect()) {
+      say('ต้องติดตั้ง "ชั้นวางติดผนัง" ก่อน — ทากที่ลงขายจะไปวางโชว์บนชั้นนั้น (โหมดก่อสร้าง)', 'bad'); return false;
+    }
+    if (m.listings.length >= MAX_LIST) { say('ชั้นวางเต็มแล้ว (' + MAX_LIST + ' ช่อง)', 'bad'); return false; }
     if (totalShopSlugsSafe() <= 2) { say('ต้องเหลือทากในร้านอย่างน้อย 2 ตัว', 'bad'); return false; }
     const s = entry.slug, value = valueOf(s.genes, m.trend.target);
     ask = Math.max(1, Math.round(+ask || value));
@@ -243,10 +246,25 @@
     return true;
   }
 
+  /* กดเหรียญบนชั้นวาง = รับเงินก้อนนั้น แล้วช่องว่างลงให้ลงขายตัวใหม่ได้ */
+  function collectSold(key) {
+    const m = market(), i = m.listings.findIndex(L => L.key === key);
+    if (i < 0) return false;
+    const L = m.listings[i];
+    if (!L.soldAt) return false;
+    m.listings.splice(i, 1);
+    G.coin += L.soldPrice;
+    if (G.stats) G.stats.sold = (G.stats.sold || 0) + 1;
+    say('รับเงินขายทาก ' + L.id + ' +' + L.soldPrice.toLocaleString() + ' เหรียญ', 'good');
+    persist(); if (typeof syncShelfPanel === 'function') syncShelfPanel();
+    if (marketDialog.open) renderMarket(true);
+    return true;
+  }
   function say(msg, kind) { if (typeof toast === 'function') toast(msg, kind); }
   function persist() {
     if (typeof saveGame === 'function') saveGame();
     if (typeof syncHUD === 'function') syncHUD();
+    if (typeof syncShelfPanel === 'function') syncShelfPanel();   // ป้ายบอกจำนวนช่องบนชั้นวางในแผงก่อสร้าง
   }
 
   /* ---------- เดินเวลา ---------- */
@@ -256,18 +274,22 @@
     let coins = 0, sold = 0, back = [], changed = false;
     for (let i = m.listings.length - 1; i >= 0; i--) {
       const L = m.listings[i];
+      if (L.soldAt) {
+        /* ขายได้แล้วแต่ยังไม่กดรับ — ค้างไว้ในช่องบนชั้นวาง เหรียญลอยรออยู่ ไม่เข้าเงินอัตโนมัติ
+           (ไม่ splice ไม่หมดอายุ ช่องนั้นถือว่ายังถูกใช้อยู่จนกว่าจะกดรับ) */
+        if (!L.announced) { L.announced = true; sold++; changed = true; }
+        continue;
+      }
       advance(L, Math.min(t, L.listedAt + SELL_MS));
       if (L.soldAt) {
-        m.listings.splice(i, 1); G.coin += L.soldPrice; coins += L.soldPrice; sold++;
-        if (G.stats) G.stats.sold = (G.stats.sold || 0) + 1;
-        changed = true;
+        L.announced = true; sold++; changed = true;
       } else if (t >= L.listedAt + SELL_MS) {
         m.listings.splice(i, 1);
         (G.inv ||= []).push(unpackSlug(L.slug || { id: L.id, genes: L.genes }));
         back.push(L.id); changed = true;
       }
     }
-    if (sold) say('🌐 ตลาดโลกขายทากได้ ' + sold + ' ตัว +' + coins.toLocaleString() + ' เหรียญ', 'good');
+    if (sold) say('🌐 ตลาดโลกขายทากได้ ' + sold + ' ตัว — กดเหรียญบนชั้นวางเพื่อรับเงิน', 'good');
     if (back.length) say('🌐 ขายไม่ออกใน 3 ชม. — ทาก ' + back.join(', ') + ' กลับเข้าคลังทากแล้ว', 'bad');
     if (changed) persist();
     if (marketDialog.open) { changed ? renderMarket(true) : refreshLive(); }
@@ -372,6 +394,13 @@
   }
 
   function listingRowHtml(L) {
+    /* ขายได้แล้วแต่ยังไม่กดรับ — แถวนี้ยังกินช่องบนชั้นวางอยู่ ต้องไปกดเหรียญบนชั้นเท่านั้น */
+    if (L.soldAt) return `<div style="display:flex;align-items:center;gap:10px;padding:9px;border-bottom:1px solid #2c3a3a">
+      <canvas data-mk-list="${esc(L.key)}" width="90" height="60" style="width:70px;height:auto;background:#0f1e22;border-radius:6px"></canvas>
+      <div style="flex:1;min-width:0;font-size:12px">
+        <b style="font-size:13px;color:#f1c66d">ขายได้แล้ว ${coin(L.soldPrice)}</b><br>
+        <span style="opacity:.8">${esc(L.id)} · กดเหรียญ ฿ เหนือตู้บนชั้นวางเพื่อรับเงิน</span>
+      </div></div>`;
     const t = now(), frac = clamp((t - L.listedAt) / SELL_MS, 0, 1);
     const disc = haggle(frac), offer = Math.round(L.ask * (1 - disc));
     const r = offer / L.value, dead = r >= R_DEAD;
@@ -449,7 +478,7 @@
           <canvas data-mk-show="${i}" width="240" height="168" style="width:100%;height:auto;background:#0f1e22;border-radius:6px;cursor:zoom-in"></canvas>
           <div style="margin-top:4px;font-size:12px">ราคากลาง <b>${coin(c.value)}</b></div></div>`).join('')}</div>
 
-      <h3 style="margin:16px 0 6px">กำลังขาย (<span data-mk-count>${listings.length}</span>/${MAX_LIST})</h3>
+      <h3 style="margin:16px 0 6px">บนชั้นวาง (<span data-mk-count>${listings.length}</span>/${MAX_LIST} ช่อง)</h3>
       <div data-mk-listings>${listings.length ? listings.map(listingRowHtml).join('')
         : '<p style="font-size:12px;opacity:.7">ยังไม่มีทากในตลาด — เลือกจากด้านล่างมาลงขายได้เลย</p>'}</div>
 
@@ -498,7 +527,7 @@
   }
 
   window.openWorldMarket = function () { renderMarket(true); if (!marketDialog.open) marketDialog.showModal(); startAnim(); };
-  window.WorldMarket = { market, listSlug, unlist, tick, valueOf, breakdown, matchPct, multOf,
+  window.WorldMarket = { market, listSlug, unlist, tick, collectSold, MAX_LIST, valueOf, breakdown, matchPct, multOf,
                          timeToSell, simulate, GENE_BASE, GENE_RANGE, MATCH_BANDS, FULL_VALUE, FLOOR_VALUE };
 
   setInterval(tick, 1000);

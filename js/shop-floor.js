@@ -366,7 +366,9 @@ function drawFloor(){
 
 
   drawEntrance();
+  if(typeof drawWallShelf==='function')drawWallShelf();      // ชั้นวางติดผนัง — อยู่บนกำแพง วาดพร้อมประตู ของในห้องจะทับได้ถูกต้อง
   drawWallDoorGrid();
+  if(typeof drawWallShelfGrid==='function')drawWallShelfGrid();
   // กริดย่อยบนช่องใหญ่ที่ hover (เฉพาะโหมดก่อสร้าง)
   if(appMode==='build' && hoverCell && (tool==='place' || moving)){
     const bx=Math.floor(hoverCell.cx/SUB), by=Math.floor(hoverCell.cy/SUB);

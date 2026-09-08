@@ -103,7 +103,7 @@
       </div>
 
       <div class="sec">
-        <h2>ประตูเข้า–ออก</h2><p>ประตูไม้กว้าง 1 เมตร × สูง 2 เมตร</p><button class="tbtn" onclick="placeEntrance()">🚪 เลือกตำแหน่งบนกำแพง</button><button class="tbtn" onclick="removeEntrance()">เก็บประตู</button><p id="doorPosition" style="font-size:12px">กดเลือกตำแหน่ง แล้วคลิกกำแพง<br>คอลัมน์ละ 50 ซม. · ประตูใช้ 2 คอลัมน์<br>Esc ยกเลิก · ลากเพื่อเลื่อนกล้อง</p></div><div class="sec"><h2>เคาน์เตอร์เสนอราคา</h2><p style="font-size:12px">ลูกค้าผู้ใหญ่ประมาณ 4% สนใจซื้อ (ปรับที่ BUY_CHANCE) · ขายเมื่อคุณยอมรับเท่านั้น</p><button class="tbtn" onclick="placeTradeCounter()">＋ วางเคาน์เตอร์ 2×1 ช่องใหญ่ (ฟรี)</button><div id="tradeOffers" aria-live="polite"></div></div><div class="sec"><h2>คลังทาก <span id="invTag">0 ตัวรอลงตู้</span></h2>
+        <h2>ประตูเข้า–ออก</h2><p>ประตูไม้กว้าง 1 เมตร × สูง 2 เมตร</p><button class="tbtn" onclick="placeEntrance()">🚪 เลือกตำแหน่งบนกำแพง</button><button class="tbtn" onclick="removeEntrance()">เก็บประตู</button><p id="doorPosition" style="font-size:12px">กดเลือกตำแหน่ง แล้วคลิกกำแพง<br>คอลัมน์ละ 50 ซม. · ประตูใช้ 2 คอลัมน์<br>Esc ยกเลิก · ลากเพื่อเลื่อนกล้อง</p></div><div class="sec"><h2>ชั้นวางติดผนัง (ตลาดโลก)</h2><p style="font-size:12px">2 ชั้น ชั้นละ 3 ช่อง รวม 6 ช่อง · ทากที่ลงขายในตลาดโลกจะมาโชว์เป็นตู้เล็กบนชั้นนี้<br>ตัวไหนขายได้จะมีเหรียญ ฿ ลอยเหนือตู้ — กดเพื่อรับเงิน</p><button class="tbtn" onclick="placeWallShelf()">🧱 เลือกตำแหน่งบนกำแพง</button><button class="tbtn" onclick="removeWallShelf()">เก็บชั้นวาง</button><p id="shelfStatus" style="font-size:12px">ยังไม่ได้ติดตั้ง</p></div><div class="sec"><h2>เคาน์เตอร์เสนอราคา</h2><p style="font-size:12px">ลูกค้าผู้ใหญ่ประมาณ 4% สนใจซื้อ (ปรับที่ BUY_CHANCE) · ขายเมื่อคุณยอมรับเท่านั้น</p><button class="tbtn" onclick="placeTradeCounter()">＋ วางเคาน์เตอร์ 2×1 ช่องใหญ่ (ฟรี)</button><div id="tradeOffers" aria-live="polite"></div></div><div class="sec"><h2>คลังทาก <span id="invTag">0 ตัวรอลงตู้</span></h2>
         <div class="list" id="inv"></div>
       </div>
 
@@ -143,6 +143,7 @@
 <script src="js/boot.js"></script><script src="js/context-ui.js"></script><script src="js/expansion-ui.js"></script><script src="js/slug-box-shop.js"></script><script src="js/slug-transfer.js"></script>
 <script src="js/breeding-picker.js"></script><script src="js/tank-sidebar.js"></script><script src="js/tank-hygiene.js"></script><script src="js/econ-stats.js"></script><script src="js/cat-seller.js"></script><script src="js/quests.js"></script><script src="js/tank-decor-ui.js"></script><script src="js/rival-mail.js"></script>
 <script src="js/world-market.js"></script>
+<script src="js/wall-shelf.js"></script>
 <script src="js/breed-news.js"></script>
 </body>
 </html>

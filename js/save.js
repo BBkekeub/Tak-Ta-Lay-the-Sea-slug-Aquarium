@@ -37,7 +37,7 @@ function saveGame(){
   if(!_saveOK) return;
   try{
     const data={
-      v:1, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||0, floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
+      v:1, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||0, floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
       objs:(G.objs||[]).map(_saveObj),
       shelter:(G.shelter||[]).map(_saveObj),
       inv:(G.inv||[]).map(_saveSlug)
@@ -164,6 +164,8 @@ function loadGame(){
     G.floorTiles=Array.isArray(d.floorTiles)&&d.floorTiles.length?d.floorTiles.filter(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isInteger)&&p[0]>=0&&p[1]>=0&&p[0]<G.bw&&p[1]<G.bh):null;floorRevision++;
     G.seq=Math.max(1, _NUM(d.seq, G.seq)|0);
     G.door=entranceRect(d.door||null)?{side:d.door.side,offset:d.door.offset}:null;
+    /* ชั้นวางติดผนัง — ตรวจซ้ำด้วย shelfRect() เผื่อพื้นที่ร้านหดลงจนชั้นเลยขอบกำแพง */
+    G.shelf=(typeof shelfRect==='function'&&shelfRect(d.shelf||null))?{side:d.shelf.side,offset:d.shelf.offset}:(d.shelf&&['north','west'].includes(d.shelf.side)&&Number.isInteger(d.shelf.offset)?{side:d.shelf.side,offset:d.shelf.offset}:null);
     G.objs   =(Array.isArray(d.objs)?d.objs:[]).map(_loadObj).filter(Boolean);
     G.shelter=(Array.isArray(d.shelter)?d.shelter:[]).map(_loadObj).filter(Boolean);
     G.inv    =(Array.isArray(d.inv)?d.inv:[]).map(_loadSlug);
