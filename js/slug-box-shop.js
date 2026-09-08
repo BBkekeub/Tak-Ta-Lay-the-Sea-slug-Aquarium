@@ -18,6 +18,23 @@ function slugBoxWaitText(){const ms=slugBoxWait();if(!ms)return 'สต็อก
 
 /* ---- พัสดุที่กำลังส่ง / ถึงแล้ว ---- */
 function slugDeliveries(){return G.slugDeliveries ||= [];}
+
+/* ---- แจกของฟรี "ครั้งเดียวตลอดกาล" ----
+   ทุกจุดที่แจกทาก/กล่อง/เงินฟรี (ของขวัญต้อนรับ · จดหมายคู่แข่ง · รางวัลเควส) ต้องผ่านตรงนี้
+   เดิมต่างคนต่างใช้ธงของตัวเอง (welcomeGiftDone · rivalDeathMailSent · questCompleted)
+   ธงไหนหายหรือถูกเขียนทับ (เช่นตอนย้ายลำดับเควส) ของชิ้นนั้นก็ถูกแจกใหม่ทุกครั้งที่เข้าเกม
+   สมุด G.granted เป็นชั้นสุดท้าย: คีย์ไหนติดแล้วติดตลอด ไม่มีใครลบ และเข้าเซฟด้วย
+   ชั้นสำรอง: ถ้าสมุดหาย แต่พัสดุไอดีเดิมยังค้างอยู่ในคิว ก็ถือว่าแจกไปแล้ว
+   (ไอดีพัสดุจึงต้องคงที่ ห้ามใช้ Date.now() ต่อท้าย) */
+function grantOnce(key,fn){
+ G.granted ||= {};
+ if(G.granted[key]) return false;
+ if(slugDeliveries().some(d=>d&&typeof d.id==='string'&&d.id.startsWith(key))){G.granted[key]=true;return false;}
+ G.granted[key]=true;
+ try{ fn(key); }catch(e){ console.warn('[grantOnce] '+key,e); }
+ if(typeof saveGame==='function') saveGame();
+ return true;
+}
 function slugDeliveryReady(d){return Date.now()>=d.readyAt;}
 function slugDeliveryReadyCount(){return slugDeliveries().filter(slugDeliveryReady).length;}
 function slugDeliveryWaitText(d){const ms=d.readyAt-Date.now();if(ms<=0)return 'ถึงแล้ว — เปิดได้';const s=Math.ceil(ms/1000);return 'ส่งถึงในอีก '+s+' วินาที';}

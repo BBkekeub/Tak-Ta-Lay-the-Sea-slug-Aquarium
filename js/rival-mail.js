@@ -52,13 +52,19 @@
       receiveComputerMessage({ id: id, type: 'online', title: title, body: body });
   }
 
+  /* กล่องแถมจากคู่แข่ง — ครั้งเดียวตลอดกาลต่อระดับ ผ่านสมุด grantOnce
+     ธง rivalDeathMailSent/rival100MailSent อย่างเดียวไม่พอ ถ้าเซฟไม่ติดกล่องจะถูกแจกใหม่ */
   function grantBox(idx) {
+    if (typeof grantOnce === 'function') { grantOnce('rival-box-' + idx, function(){ pushRivalBox(idx); }); return; }
+    pushRivalBox(idx);
+  }
+  function pushRivalBox(idx) {
     try {
       if (typeof slugDeliveries !== 'function' || typeof SLUG_BOXES === 'undefined' || typeof rollBoxGenes !== 'function') return;
       var box = SLUG_BOXES[idx];
       if (!box) return;
       slugDeliveries().push({
-        id: 'rival' + Date.now() + '_' + Math.floor(Math.random() * 10000),
+        id: 'rival-box-' + idx,
         boxIndex: idx,
         name: box.name,
         readyAt: Date.now() + 1500,

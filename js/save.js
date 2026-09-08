@@ -37,13 +37,18 @@ function saveGame(){
   if(!_saveOK) return;
   try{
     const data={
-      v:1, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||0, floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
+      v:1, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||0, floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
       objs:(G.objs||[]).map(_saveObj),
       shelter:(G.shelter||[]).map(_saveObj),
       inv:(G.inv||[]).map(_saveSlug)
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-  }catch(e){ _saveOK=false; console.warn('[save] เซฟไม่ได้ (localStorage?)', e); }
+  }catch(e){
+    /* เซฟพังเงียบ ๆ = อาการปลายทางคือ "จดหมายครั้งเดียวกลับมาอีก / เงินได้ซ้ำ" เพราะ ledger ไม่ถูกบันทึก
+       ต้องบอกผู้เล่นครั้งเดียว ไม่ใช่ปิดเงียบ */
+    _saveOK=false; console.warn('[save] เซฟไม่ได้ (localStorage?)', e);
+    if(typeof toast==='function') toast('⚠️ เซฟไม่สำเร็จ — ความคืบหน้าจะไม่ถูกบันทึก (พื้นที่เก็บข้อมูลเบราว์เซอร์เต็ม?)','bad');
+  }
 }
 
 /* ---- โหลดกลับ: ใส่ def/spec คืน + ล้างทุกตัวเลขให้ finite เสมอ ---- */
@@ -138,7 +143,19 @@ function loadGame(){
     /* ledger จดหมาย 'ส่งครั้งเดียวตลอดกาล' + สถานะกดรับของ — ต้องคงข้ามรีโหลด ไม่งั้นจดหมายที่ลบไปจะถูกส่งใหม่ / กดรับซ้ำ */
     G.mailSent=(d.mailSent&&typeof d.mailSent==='object')?d.mailSent:{};
     G.claimed=(d.claimed&&typeof d.claimed==='object')?d.claimed:{};
+    /* ย้ายข้อมูลเซฟเก่าที่ทำก่อนมี ledger: ถ้าจดหมาย 'ครั้งเดียว' เคยเข้ากล่องมาแล้ว (หรือกดรับไปแล้ว)
+       ให้ถือว่าส่งไปแล้ว ไม่งั้นเซฟเก่าจะถูกส่งจดหมายซ้ำอีกหนึ่งรอบหลังอัปเดต
+       ใช้สตริงตรง ๆ ไม่อ้าง FIVE_MIN_GIFT เพราะ cat-seller.js โหลดทีหลังไฟล์นี้ */
+    for(const m of G.computerInbox){ if(m.id==='five-minute-gift'||m.id==='welcome-gift'||m.id.startsWith('rival-')) G.mailSent[m.id]=true; if(m.claimed) G.claimed[m.id]=true; }
+    for(const k in G.claimed) if(G.claimed[k]) G.mailSent[k]=true;
     G.larvaDeaths=_NUM(d.larvaDeaths,0)|0; G.rivalDeathMailSent=!!d.rivalDeathMailSent; G.rival100MailSent=!!d.rival100MailSent;
+    /* สมุด "ของฟรีที่แจกไปแล้ว" (grantOnce ใน slug-box-shop.js) — ต้องคงข้ามรีโหลด
+       เซฟเก่ายังไม่มีสมุดนี้ จึงเติมจากธงเดิมก่อน ไม่งั้นของขวัญ/กล่องคู่แข่งจะถูกแจกซ้ำอีกหนึ่งรอบ */
+    G.granted=(d.granted&&typeof d.granted==='object')?d.granted:{};
+    if(G.welcomeGiftDone) G.granted['welcome-gift']=true;
+    if(G.rivalDeathMailSent) G.granted['rival-box-0']=true;
+    if(G.rival100MailSent)   G.granted['rival-box-1']=true;
+    for(const id of G.questCompleted) G.granted['quest-'+id]=true;
     G.boxStock=(d.boxStock&&Number.isFinite(d.boxStock.n)&&Number.isFinite(d.boxStock.at))
       ?{n:Math.max(0,Math.min(SLUG_BOX_MAX,d.boxStock.n|0)),at:d.boxStock.at}:null;
     G.slugDeliveries=Array.isArray(d.slugDeliveries)?d.slugDeliveries.filter(x=>x&&typeof x.id==='string'&&Number.isFinite(+x.readyAt)&&x.genes&&typeof x.genes==='object').map(x=>({id:x.id,boxIndex:_NUM(x.boxIndex,0)|0,name:String(x.name||''),readyAt:+x.readyAt,genes:_cleanGenes(x.genes),alerted:!!x.alerted})):[];

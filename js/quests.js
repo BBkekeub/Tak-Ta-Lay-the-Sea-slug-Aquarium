@@ -121,11 +121,17 @@
   bindToggle();
  }
 
+ /* รางวัลเควสต้องได้ครั้งเดียวต่อเควส แม้ questIndex จะถูกย้อน/ย้ายลำดับ
+    (บล็อกย้ายลำดับด้านบนเขียน G.questCompleted ใหม่ได้ เควสที่เคยจบจึงอาจถูกนับใหม่) */
  function grant(q){
+  if(typeof grantOnce!=='function'){ grantReward(q); return; }
+  if(!grantOnce('quest-'+q.id, ()=>grantReward(q))) return;
+ }
+ function grantReward(q){
   const r=q.reward||{};
   if(r.coin) G.coin=(G.coin||0)+r.coin;
   if(r.rep)  G.rep =(G.rep||0)+r.rep;
-  if(Number.isFinite(r.box)&&typeof SLUG_BOXES!=='undefined'&&typeof rollBoxGenes==='function'){const _bx=SLUG_BOXES[r.box];if(_bx){const _has=(G.objs||[]).some(o=>o&&o._key==='counter');if(_has&&typeof slugDeliveries==='function')slugDeliveries().push({id:'quest'+Date.now()+'_'+Math.floor(Math.random()*10000),boxIndex:r.box,name:_bx.name,readyAt:Date.now()+1500,genes:rollBoxGenes(_bx),alerted:false});else if(Array.isArray(G.inv)&&typeof makeSlug==='function')G.inv.push(makeSlug(rollBoxGenes(_bx)));}}
+  if(Number.isFinite(r.box)&&typeof SLUG_BOXES!=='undefined'&&typeof rollBoxGenes==='function'){const _bx=SLUG_BOXES[r.box];if(_bx){const _has=(G.objs||[]).some(o=>o&&o._key==='counter');if(_has&&typeof slugDeliveries==='function')slugDeliveries().push({id:'quest-'+q.id+'-box',boxIndex:r.box,name:_bx.name,readyAt:Date.now()+1500,genes:rollBoxGenes(_bx),alerted:false});else if(Array.isArray(G.inv)&&typeof makeSlug==='function')G.inv.push(makeSlug(rollBoxGenes(_bx)));}}
   const parts=[]; if(r.coin)parts.push('+'+r.coin+' เหรียญ'); if(r.rep)parts.push('+'+r.rep+' ชื่อเสียง');
   if(typeof toast==='function') toast('✅ เควสสำเร็จ: '+q.t+(parts.length?' · '+parts.join(' · '):'')+(r.txt?' · '+r.txt:''),'good');
   if(typeof syncHUD==='function') syncHUD();
@@ -156,13 +162,20 @@
 
  /* ---- ของขวัญต้อนรับร้านใหม่ (ครั้งเดียว หลังเริ่ม ~3 นาที) ---- */
  function welcomeGift(){
-  if(G.welcomeGiftDone) return; G.welcomeGiftDone=true;
+  if(G.welcomeGiftDone) return;
+  /* ธง welcomeGiftDone อย่างเดียวไม่พอ — ถ้าเซฟไม่ติดสักรอบ ทาก 2 ตัวจะถูกแจกใหม่ทุกครั้งที่เข้าเกม */
+  if(typeof grantOnce==='function' && !grantOnce('welcome-gift',()=>giveWelcomeGift())) { G.welcomeGiftDone=true; return; }
+  if(typeof grantOnce==='function'){ G.welcomeGiftDone=true; if(typeof saveGame==='function')saveGame(); return; }
+  giveWelcomeGift();
+ }
+ function giveWelcomeGift(){
+  G.welcomeGiftDone=true;
   const greeting='สวัสดีเจ้าของร้านใหม่! เห็นเพิ่งเปิดร้านทากทะเล สงสารคนเปิดร้านใหม่ เลยส่งทากมาให้ 2 ตัวเป็นของขวัญต้อนรับ เผื่อช่วยตั้งตัวช่วงแรก ๆ อ่ะ ๆ ขอให้ขายดีนะ 🐚 — ร้านทากข้างบ้าน';
   if(typeof receiveComputerMessage==='function') receiveComputerMessage({type:'online', id:'welcome-gift', title:'ของขวัญต้อนรับร้านใหม่ 🎁', body:greeting});
   const box=(typeof SLUG_BOXES!=='undefined')?SLUG_BOXES[0]:null;   // ระดับ 1 (ปกติ)
   const hasCounter=(G.objs||[]).some(o=>o&&o._key==='counter');
   if(box && typeof slugDeliveries==='function' && typeof rollBoxGenes==='function' && hasCounter){
-   for(let i=0;i<2;i++) slugDeliveries().push({id:'welcome_'+i+'_'+Date.now(), boxIndex:0, name:box.name+'(ของขวัญ)', readyAt:Date.now(), genes:rollBoxGenes(box), alerted:true});
+   for(let i=0;i<2;i++) slugDeliveries().push({id:'welcome-gift-'+i, boxIndex:0, name:box.name+'(ของขวัญ)', readyAt:Date.now(), genes:rollBoxGenes(box), alerted:true});
    if(typeof toast==='function') toast('📬 มีคนส่งของขวัญต้อนรับมาให้! เปิดกล่องของขวัญที่เคาน์เตอร์ได้เลย','good');
   } else {
    for(let i=0;i<2;i++){ const g=(box&&typeof rollBoxGenes==='function')?rollBoxGenes(box):undefined; G.inv.push(makeSlug(g)); }

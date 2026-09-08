@@ -251,7 +251,7 @@ function renderComputer(){
  }
  const _clr=computerDialog.querySelector('[data-clearlog]');
  if(_clr)_clr.onclick=()=>{G.computerLog=[];saveGame();renderComputer();};
- for(const m of (list?computerInbox():[])){const card=document.createElement('details'),title=document.createElement('summary'),body=document.createElement('p');card.style.cssText='padding:14px;margin:8px 0;border:1px solid #526663;border-radius:8px';title.textContent=(m.read?'':'!! · ')+(m.type==='quest'?'เควส · ':'ออนไลน์ · ')+m.title;body.textContent=m.body;body.style.whiteSpace="pre-line";card.append(title,body);if(m.id==='five-minute-gift'){const claim=document.createElement('button');claim.className='tbtn';claim.dataset.claimGift='';claim.textContent=m.claimed?'รับเงินแล้ว ✓':'รับเงินแนบ 500 เหรียญ';claim.disabled=!!m.claimed;claim.onclick=()=>{if(claimFiveMinuteGift()){claim.disabled=true;claim.textContent='รับเงินแล้ว ✓';}};card.append(claim);}const _del=document.createElement('button');_del.className='tbtn';_del.textContent='🗑 ลบจดหมาย';_del.style.cssText='margin-top:8px;display:block';_del.onclick=(ev)=>{ev.preventDefault();ev.stopPropagation();const _a=computerInbox(),_i=_a.indexOf(m);if(_i>=0)_a.splice(_i,1);if(typeof saveGame==='function')saveGame();renderComputer();};card.append(_del);card.ontoggle=()=>{if(card.open&&!m.read){m.read=true;title.textContent=(m.type==='quest'?'เควส · ':'ออนไลน์ · ')+m.title;syncTabBadges();saveGame();}};list.append(card);}
+ for(const m of (list?computerInbox():[])){const card=document.createElement('details'),title=document.createElement('summary'),body=document.createElement('p');card.style.cssText='padding:14px;margin:8px 0;border:1px solid #526663;border-radius:8px';title.textContent=(m.read?'':'!! · ')+(m.type==='quest'?'เควส · ':'ออนไลน์ · ')+m.title;body.textContent=m.body;body.style.whiteSpace="pre-line";card.append(title,body);if(m.id===FIVE_MIN_GIFT){const _got=!!m.claimed||!!G.claimed?.[FIVE_MIN_GIFT];const claim=document.createElement('button');claim.className='tbtn';claim.dataset.claimGift='';claim.textContent=_got?'รับเงินแล้ว ✓':'รับเงินแนบ 500 เหรียญ';claim.disabled=_got;claim.onclick=()=>{if(claimFiveMinuteGift()){claim.disabled=true;claim.textContent='รับเงินแล้ว ✓';}};card.append(claim);}const _del=document.createElement('button');_del.className='tbtn';_del.textContent='🗑 ลบจดหมาย';_del.style.cssText='margin-top:8px;display:block';_del.onclick=(ev)=>{ev.preventDefault();ev.stopPropagation();const _a=computerInbox(),_i=_a.indexOf(m);if(_i>=0)_a.splice(_i,1);if(typeof saveGame==='function')saveGame();renderComputer();};card.append(_del);card.ontoggle=()=>{if(card.open&&!m.read){m.read=true;title.textContent=(m.type==='quest'?'เควส · ':'ออนไลน์ · ')+m.title;syncTabBadges();saveGame();}};list.append(card);}
  computerDialog.querySelector('[data-close]').onclick=()=>computerDialog.close();
  computerDialog.querySelector('[data-offers]').onclick=()=>{computerDialog.close();const b=[...document.querySelectorAll('.context-nav button')].find(b=>b.textContent.startsWith('ข้อเสนอ'));if(b&&b.getAttribute('aria-expanded')!=='true')b.click();renderTradeOffers(true);};
  computerDialog.querySelector('[data-orderbox]').onclick=()=>{computerDialog.close();if(typeof openSlugShopDialog==='function')openSlugShopDialog();};
@@ -263,11 +263,18 @@ cv.addEventListener('pointerdown',e=>{computerPointer={x:e.clientX,y:e.clientY};
 cv.addEventListener('pointerup',e=>{if(appMode!=='view'||!computerPointer)return;const down=computerPointer;computerPointer=null;if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>5)return;const {sx,sy}=screenXY(e),o=[...G.objs].reverse().find(o=>o._key==='counter'&&o!==moving&&o._computerHit&&sx>=o._computerHit.x&&sx<=o._computerHit.right&&sy>=o._computerHit.y&&sy<=o._computerHit.bottom);if(o){dragging=false;cv.classList.remove('panning','placing');e.stopImmediatePropagation();openCounterComputer();}},true);
 
 // Uses the existing visible-play timer; no new interval or render loop.
+var FIVE_MIN_GIFT='five-minute-gift';
 function checkFiveMinuteMail(){
- if((G.stats?.sec||0)<300||computerInbox().some(m=>m.id==='five-minute-gift'))return;
- receiveComputerMessage({id:'five-minute-gift',type:'online',title:'เศษเงินจากผู้หวังดี',body:'ว้าววววววววววววววว ร้านกระจอกจริง ๆ เลย!\n\nอะ ๆ เอาเศษเงินไปพัฒนาร้านซะ อย่าให้เป็นภาระสังคัง… เอ๊ย สังคม!\n\n— ผู้หวังดีที่รวยกว่า\n\nเงินแนบ: 500 เหรียญ'});
+ /* กันส่งซ้ำสามชั้น: เคยส่งแล้ว (ledger) · เคยกดรับเงินแล้ว · หรือจดหมายยังอยู่ในกล่อง
+    ชั้น ledger สำคัญสุด เพราะผู้เล่นลบจดหมายทิ้งได้ ลบแล้วต้องไม่ถูกส่งกลับมาอีก */
+ if(G.mailSent?.[FIVE_MIN_GIFT]||G.claimed?.[FIVE_MIN_GIFT])return;
+ if((G.stats?.sec||0)<300||computerInbox().some(m=>m.id===FIVE_MIN_GIFT))return;
+ receiveComputerMessage({id:FIVE_MIN_GIFT,type:'online',title:'เศษเงินจากผู้หวังดี',body:'ว้าววววววววววววววว ร้านกระจอกจริง ๆ เลย!\n\nอะ ๆ เอาเศษเงินไปพัฒนาร้านซะ อย่าให้เป็นภาระสังคัง… เอ๊ย สังคม!\n\n— ผู้หวังดีที่รวยกว่า\n\nเงินแนบ: 500 เหรียญ'});
 }
 function claimFiveMinuteGift(){
- const mail=computerInbox().find(m=>m.id==='five-minute-gift');if(!mail||mail.claimed)return false;G.claimed||={};if(G.claimed['five-minute-gift']){mail.claimed=true;if(typeof saveGame==='function')saveGame();return false;}G.claimed['five-minute-gift']=true;
+ const mail=computerInbox().find(m=>m.id===FIVE_MIN_GIFT);if(!mail||mail.claimed)return false;
+ G.claimed||={};G.mailSent||={};
+ if(G.claimed[FIVE_MIN_GIFT]){mail.claimed=true;if(typeof saveGame==='function')saveGame();return false;}
+ G.claimed[FIVE_MIN_GIFT]=true;G.mailSent[FIVE_MIN_GIFT]=true;   // ปิดตายทั้งสองสมุด เผื่อผู้เล่นลบจดหมายทิ้งทีหลัง
  mail.claimed=true;mail.read=true;G.coin+=500;syncHUD();saveGame();toast('รับเงินจากผู้หวังดี +500 เหรียญ','good');return true;
 }
