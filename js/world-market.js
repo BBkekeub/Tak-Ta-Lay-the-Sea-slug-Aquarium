@@ -427,7 +427,7 @@
     return `<div style="padding:8px;border-bottom:1px solid #202b2b">
       <div style="display:flex;align-items:center;gap:8px">
         <canvas data-mk-avail="${i}" width="80" height="54" style="width:56px;height:auto;background:#0f1e22;border-radius:6px"></canvas>
-        <div style="flex:1;min-width:0;font-size:12px">${esc(e.slug.id)}<br>ราคากลาง <b>${coin(e.value)}</b> <span style="opacity:.6">(${Math.round(e.value / FULL_VALUE * 100)}% ของเต็ม)</span></div>
+        <div style="flex:1;min-width:0;font-size:12px">${esc(SlugBrowser.name(e.slug))}<br>ราคากลาง <b>${coin(e.value)}</b> <span style="opacity:.6">(${Math.round(e.value / FULL_VALUE * 100)}% ของเต็ม)</span></div>
         <label style="font-size:11px;opacity:.8">ตั้งราคา<br>
           <input data-ask="${i}" type="number" min="1" step="10" value="${Math.round(draft)}" style="width:96px;background:#0f1e22;color:#e5dcc4;border:1px solid #47605f;border-radius:6px;padding:5px"></label>
         <button class="tbtn" data-list="${i}">ลงขาย</button>
@@ -461,9 +461,9 @@
     let _all = availableSlugs().map(e => ({ ...e, target: t.target, value: valueOf(e.slug.genes, t.target) }))
                              .sort((a, b) => b.value - a.value);
     const _q = _availFilter.trim().toLowerCase();
-    if (_q) _all = _all.filter(e => String(e.slug.id).toLowerCase().includes(_q));
+    if (_q) _all = _all.filter(e => (String(e.slug.id)+' '+SlugBrowser.name(e.slug)).toLowerCase().includes(_q));
     const _total = _all.length;
-    _avail = _all.slice(0, 60);
+    _avail = SlugBrowser.apply(_all,'market',e=>e.slug).slice(0,60);
     const listings = m.listings.slice().sort((a, b) => b.prog - a.prog);
 
     marketDialog.innerHTML =
@@ -488,11 +488,12 @@
         ${_avail.length ? _avail.map(availRowHtml).join('')
           : '<p style="font-size:12px;opacity:.7;padding:8px">ไม่มีทากที่ลงขายได้ (ตัวที่กำลังผสม/ถือ/มีข้อเสนอ จะลงไม่ได้)</p>'}</div>`;
 
+    SlugBrowser.mount(marketDialog,'market',()=>renderMarket(true));
     showcase.forEach((c, i) => paint(marketDialog.querySelector(`[data-mk-show="${i}"]`), 'show' + i + t.refreshAt, c.genes));
     showcase.forEach((c, i) => { const cv = marketDialog.querySelector(`[data-mk-show="${i}"]`); if (cv) cv.onclick = () => openZoom(c.genes, c.value); });
     startAnim();
     for (const L of listings) paint(marketDialog.querySelector(`[data-mk-list="${CSS.escape(L.key)}"]`), L.key, L.genes);
-    _avail.forEach((e, i) => { const cv = marketDialog.querySelector(`[data-mk-avail="${i}"]`); if (cv) { try { drawSlugPortrait(cv, e.slug); } catch (err) {} } });
+    _avail.forEach((e, i) => { const cv = marketDialog.querySelector(`[data-mk-avail="${i}"]`); if (cv) { try { drawSlugPortrait(cv, e.slug); SlugBrowser.heart(cv.parentElement,e.slug,()=>renderMarket(true),'market'); } catch (err) {} } });
 
     marketDialog.querySelector('[data-close]').onclick = () => marketDialog.close();
     bindListingButtons();

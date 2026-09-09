@@ -106,26 +106,28 @@ function renderTradeOffers(force=false){
   for(const offer of TRADE_OFFERS)notifyTradeArrival(offer);
   const el=document.getElementById('tradeOffers');if(!el)return;
   // Do not replace an open native picker during the one-second countdown update.
+  if(!force&&el.parentElement.contains(document.activeElement)&&document.activeElement.closest('.slugFilters'))return;
   if(!force&&el.contains(document.activeElement)&&document.activeElement.tagName==='SELECT')return;
   const html=TRADE_OFFERS.map(o=>{
     if(o.sell)return typeof sellOfferCard==='function'?sellOfferCard(o):'';
     o.requestedId ||= o.slug.id;
-    o.choices=tradeAlternatives(o);
-    const name=tradeEscape(o.slug.id),tank=tradeEscape(o.tank.def.name+' '+o.tank.id);
+    o.choices=SlugBrowser.apply(tradeAlternatives(o),'trade',c=>c.slug);
+    const name=tradeEscape(SlugBrowser.name(o.slug)),tank=tradeEscape(o.tank.def.name+' '+o.tank.id);
     return `<div class="trade-offer-card">
       <div class="trade-offer-heading"><b>${o.price.toLocaleString()} <span>เหรียญ</span></b><span class="trade-status">${o.arrived?'รอคำตอบ':'กำลังเดินมา'}</span></div>
       <div style="display:flex;align-items:center;gap:8px;margin:8px 0"><canvas data-trade-slug="${o.id}" width="120" height="80" style="width:100px;height:66px;background:#17262b;border-radius:6px"></canvas><div><b>ขายทาก ${name}</b><br><small>${tank}<br>ลูกค้าขอเดิม: ${tradeEscape(o.requestedId)}</small></div></div>
       <button class="tbtn" onclick="inspectTradeSlug(${o.id})">ดูทาก ${name} ในตู้</button>
       <label style="display:block;margin:8px 0;font-size:12px">เลือกตัวที่จะขายแทน (ทากในตู้หน้าร้าน)
       <select style="display:block;width:100%;margin-top:5px;background:#202025;color:#eadcc4;padding:6px" onchange="chooseTradeSlug(${o.id},Number(this.value))">
-      ${o.choices.map((c,i)=>`<option value="${i}" ${c.slug===o.slug?'selected':''}>${tradeEscape(c.slug.id)} · ${tradeEscape(c.tank.id)} · ${c.price} เหรียญ · ตรง ${c.matched.length}/${o.p.preferences.length}</option>`).join('')}</select></label>
+      ${o.choices.map((c,i)=>`<option value="${i}" ${c.slug===o.slug?'selected':''}>${c.slug.favorite?'♥ ':''}${tradeEscape(SlugBrowser.name(c.slug))} · ${tradeEscape(c.tank.id)} · ${c.price} เหรียญ · ตรง ${c.matched.length}/${o.p.preferences.length}</option>`).join('')}</select></label>
       <small class="trade-conditions"><strong>ตรง ${o.matched.length}/${o.p.preferences.length} เงื่อนไข</strong><br>${o.p.preferences.map(c=>`<span class="trade-condition ${o.matched.includes(c)?'matched':'unmatched'}">${o.matched.includes(c)?'✓':'—'} ยีน${TRADE_GENES[c.key]} ${Math.min(c.lo,c.hi)}–${Math.max(c.lo,c.hi)}% · ตัวนี้ ${Number(o.slug.genes[c.key]).toFixed(1)}% (${tradeConditionPrice(c.lo,c.hi)} เหรียญ)</span>`).join('')}<br>แสดงเฉพาะตัวที่ลูกค้ารับซื้อและยังไม่มีข้อเสนออื่นจอง<br>ราคาจากยีนกำเนิด · รออีก ${Math.max(0,Math.ceil(90-o.age))} วินาที</small><br>
       <div class="trade-actions"><button class="tbtn trade-accept" ${o.arrived?'':'disabled'} onclick="finishTrade(${o.id},true)">ขาย ${name} · ${o.price} เหรียญ</button> <button class="tbtn" onclick="finishTrade(${o.id})">ปฏิเสธ</button></div></div>`;
   }).join('')||'<p style="font-size:12px">ยังไม่มีข้อเสนอ · เว้นทางเดินหน้าเคาน์เตอร์อย่างน้อย 1 ช่องใหญ่</p>';
-  if(el.innerHTML===html)return;
-  el.innerHTML=html;
+  if(!force&&el.innerHTML===html)return;
+  el.innerHTML=html;SlugBrowser.mount(el.parentElement,'trade',()=>renderTradeOffers(true));
   for(const canvas of el.querySelectorAll('canvas[data-trade-slug]')){
     const o=TRADE_OFFERS.find(o=>o.id===Number(canvas.dataset.tradeSlug));if(!o)continue;
+    SlugBrowser.heart(canvas.parentElement,o.slug,()=>renderTradeOffers(true));
     const sprite=slugSprite(o.slug);if(!sprite)continue;
     const ratio=Math.min(112/sprite.c.width,72/sprite.c.height),w=sprite.c.width*ratio,h=sprite.c.height*ratio;
     canvas.getContext('2d').drawImage(sprite.c,(120-w)/2,(80-h)/2,w,h);

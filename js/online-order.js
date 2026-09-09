@@ -217,6 +217,8 @@
 
    var list=candidates().map(function(c){ return {c:c, m:geneMatch(o,c.s)}; });
    list.sort(function(a,b){ return (b.m.ok-a.m.ok) || (a.m.rows.reduce(function(n,r){return n+r.off/r.tol;},0)-b.m.rows.reduce(function(n,r){return n+r.off/r.tol;},0)); });
+   list=SlugBrowser.apply(list,'order',x=>x.c.s);
+   SlugBrowser.mount(box,'order',paint);
    var okList=list.filter(function(x){return x.m.ok;});
 
    var title=document.createElement('div');
@@ -240,9 +242,9 @@
     var pv=document.createElement('canvas'); pv.width=180; pv.height=132;
     pv.style.cssText='width:100%;height:auto;display:block';
     try{ if(typeof drawSlugPortrait==='function') drawSlugPortrait(pv,s); }catch(e){}
-    cell.append(pv);
+    cell.append(pv);SlugBrowser.heart(cell,s,paint,'order');
     var cap=document.createElement('div');
-    cap.innerHTML='<b>'+esc(s.id)+'</b> '+(x.m.ok?'<span style="color:#a6d68a">ตรงสเปก ✓</span>':'')
+    cap.innerHTML='<b>'+esc(SlugBrowser.name(s))+'</b> '+(x.m.ok?'<span style="color:#a6d68a">ตรงสเปก ✓</span>':'')
       +'<br>'+x.m.rows.map(function(r){
         return '<span style="color:'+(r.ok?'#a6d68a':'#e0a37c')+'">'+esc(label(r.k))+' '+Math.round(r.mine)+'</span>';
       }).join('<br>');

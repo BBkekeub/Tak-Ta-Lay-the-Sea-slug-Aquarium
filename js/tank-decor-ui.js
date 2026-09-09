@@ -57,15 +57,16 @@
  const shop=document.getElementById('shop'),stage=document.querySelector('.stage-wrap');
  const oldSection=shop.closest('.sec');
  const dock=document.createElement('aside');dock.id='floorBuildDock';dock.setAttribute('aria-label','สร้างของในร้าน');
- dock.innerHTML='<div class="floorBuildHead"><div class="decorTabs" role="tablist" aria-label="หมวดของในร้าน"></div><button class="tbtn floorBuildTools">เครื่องมือ</button><button class="tbtn floorBuildDone">✓ เสร็จสิ้น</button></div><div class="floorBuildSelection"><span aria-live="polite">เลือกของเพื่อวาง</span><button class="tbtn floorBuildCancel" hidden>ยกเลิกเลือก</button></div>';
+ dock.innerHTML='<div class="floorBuildHead"><div class="decorTabs" role="tablist" aria-label="หมวดของในร้าน"></div><div class="floorBuildActions" role="group" aria-label="เครื่องมือก่อสร้าง"></div><button class="tbtn floorBuildDone">✓ เสร็จสิ้น</button></div><div class="floorBuildSelection"><span aria-live="polite">เลือกของเพื่อวาง</span><button class="tbtn floorBuildCancel" hidden>ยกเลิกเลือก</button></div>';
  dock.append(shop);stage.append(dock);oldSection.remove();
  const tabs=dock.querySelector('.decorTabs'),selection=dock.querySelector('.floorBuildSelection span'),cancel=dock.querySelector('.floorBuildCancel');
- const categories=['ตู้เลี้ยง','เพาะพันธุ์','ของตกแต่ง','เคาน์เตอร์','เล่นกับทาก'];let active='ตู้เลี้ยง';
- const category=(k,d)=>d.playTable?'เล่นกับทาก':d.breeder?'เพาะพันธุ์':d.kind==='tank'?'ตู้เลี้ยง':k==='counter'?'เคาน์เตอร์':'ของตกแต่ง';
+ const categories=['ตู้เลี้ยง','เพาะพันธุ์','ของตกแต่ง','อุปกรณ์สำคัญ'];let active='ตู้เลี้ยง';
+ const category=(k,d)=>(!d||d.playTable||k==='counter')?'อุปกรณ์สำคัญ':d.breeder?'เพาะพันธุ์':d.kind==='tank'?'ตู้เลี้ยง':'ของตกแต่ง';
  function selectCategory(name){active=name;for(const b of tabs.children){const on=b.textContent===name;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;}for(const b of shop.children)b.hidden=category(b.dataset.k,CATALOG[b.dataset.k])!==name;}
  for(const name of categories){const b=document.createElement('button');b.type='button';b.textContent=name;b.setAttribute('role','tab');b.setAttribute('aria-controls','shop');b.onclick=()=>{selectCategory(name);shop.scrollLeft=0;};b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const next=tabs.children[(categories.indexOf(name)+(e.key==='ArrowRight'?1:categories.length-1))%categories.length];next.click();next.focus();};tabs.append(b);}
  shop.setAttribute('role','tabpanel');shop.setAttribute('aria-label','ของสำหรับหน้าร้าน');
  function paintProduct(canvas,key,rotation=0){
+  if(key==='wall-door'||key==='wall-shelf'){paintWallProduct(canvas,key);return;}
   const d=CATALOG[key],o={id:'preview-'+key,type:d.kind,_key:key,def:d,cx:0,cy:0,rot:rotation,slugs:[],decor:[]};
   const saved={ctx,CW,CH,x:cam.x,y:cam.y,zoom:cam.zoom};
   try{
@@ -114,16 +115,80 @@
   for(const canvas of visiblePreviews)updatePreview(canvas);
  };
  shop.replaceChildren();
- dock.querySelector('.floorBuildTools').onclick=()=>toggleFloorBuildTools();
+
+ // Move the real controls so their listeners, selected state and keyboard shortcuts survive.
+ const actions=dock.querySelector('.floorBuildActions');
+ for(const b of document.querySelectorAll('.rail .tool')){
+  b.textContent=({place:'วาง / ย้าย',sell:'ขายทิ้ง',remove:'เก็บ'})[b.dataset.tool];
+  b.addEventListener('click',()=>{exitModes('floor');setTool(b.dataset.tool);buildShop();});actions.append(b);
+ }
+ const rotate=document.getElementById('bRotate');rotate.style.width='';rotate.setAttribute('aria-label','กลับด้าน หมุน 90 องศา');actions.prepend(rotate);
+ const hint=document.getElementById('toolHint');hint.className='floorBuildHint';dock.querySelector('.floorBuildSelection').append(hint);
+ // Expansion stays inline; retain its confirmation controls and selected-cell cost.
+ const expansion=document.getElementById('expW').closest('.sec');
+ const expandDetails=document.createElement('details');expandDetails.className='floorBuildExpansion';
+ const expandSummary=document.createElement('summary');expandSummary.textContent='ขยายร้าน';expandDetails.append(expandSummary);
+ while(expansion.firstChild)expandDetails.append(expansion.firstChild);
+ expansion.remove();dock.querySelector('.floorBuildSelection').append(expandDetails);
+ dock.addEventListener('click',e=>{if(e.target.closest('button')&&!expandDetails.contains(e.target))expandDetails.open=false;});
+ // Wall fixtures use the same product list, but never become floor CATALOG objects.
+ function paintWallProduct(canvas,key){
+  if(typeof drawWallShelf!=='function')return;
+  const saved={ctx,CW,CH,x:cam.x,y:cam.y,zoom:cam.zoom};
+  try{
+   ctx=canvas.getContext('2d');CW=canvas.width;CH=canvas.height;cam.zoom=1;cam.x=0;cam.y=0;
+   const shelf=key==='wall-shelf',w=shelf?SHELF_W:2*SUB,low=shelf?SHELF_Z[0]:0,high=shelf?SHELF_Z[1]+SHELF_BOX_H+SHELF_T:40*ZUNIT;
+   const points=[P(0,0,low),P(w,0,low),P(0,0,high),P(w,shelf?SHELF_D:0,high)];
+   const xs=points.map(p=>p.x-CW/2),ys=points.map(p=>p.y-CH/2);
+   const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+   cam.x=(x0+x1)/2;cam.y=(y0+y1)/2;cam.zoom=Math.min((CW-30)/(x1-x0),(CH-28)/(y1-y0));
+   ctx.clearRect(0,0,CW,CH);ctx.save();
+   try{if(shelf)drawWallShelf({side:'north',offset:0});else drawDoorLeaf({side:'north',offset:0},true);}finally{ctx.restore();}
+  }finally{ctx=saved.ctx;CW=saved.CW;CH=saved.CH;cam.x=saved.x;cam.y=saved.y;cam.zoom=saved.zoom;}
+ }
+ window.addEventListener('load',()=>{
+  for(const [key,label,start]of [['wall-door','ประตู',placeEntrance],['wall-shelf','ชั้นวางติดผนัง',placeWallShelf]]){
+   const b=document.createElement('button');b.type='button';b.className='item';b.dataset.k=key;
+   const icon=document.createElement('canvas');icon.className='productImage';icon.width=256;icon.height=176;icon.dataset.product=key;icon.setAttribute('aria-hidden','true');
+   const title=document.createElement('span');title.className='nm';title.textContent=label;
+   const price=document.createElement('b');price.className='pr';price.textContent='ฟรี · ติดกำแพง';b.append(icon,title,price);
+   b.onclick=()=>{setTool('place');start();selectCategory('อุปกรณ์สำคัญ');selection.textContent=label+' · แตะกำแพงเพื่อวาง';};shop.append(b);previewObserver.observe(icon);
+  }
+  for(const b of document.querySelectorAll('.rail button[onclick*="Entrance"],.rail button[onclick*="WallShelf"],.rail button[onclick*="TradeCounter"]'))b.remove();
+  selectCategory(active);previewRevision++;for(const canvas of visiblePreviews)updatePreview(canvas);
+ });
+ // Pick wall fixtures on their actual wall footprint; empty wall drags still pan the camera.
+ let wallPress=null;
+ function wallFixtureAt(e){
+  const {sx,sy}=screenXY(e);
+  for(const [key,d,w,lo,hi]of [['shelf',G.shelf,typeof SHELF_W==='undefined'?0:SHELF_W,typeof SHELF_Z==='undefined'?0:SHELF_Z[0],typeof SHELF_Z==='undefined'?0:SHELF_Z[1]+SHELF_BOX_H+SHELF_T],['door',G.door,2*SUB,0,40*ZUNIT]]){
+   if(!d)continue;
+   const a=wallPoint(d.side,d.offset,0),b=wallPoint(d.side,d.offset+w,0),f=(sx-a.x)/(b.x-a.x);
+   if(f<0||f>1)continue;
+   const z=(a.y+(b.y-a.y)*f-sy)/cam.zoom;if(z>=lo&&z<=hi)return key;
+  }return null;
+ }
+ cv.addEventListener('pointerdown',e=>{
+  wallPress=null;if(appMode!=='build'||buyKey||moving||placingWallDoor||typeof placingShelf==='undefined'||placingShelf||[...APP_MODES.values()].some(m=>m.group==='floor'&&m.isOn()))return;
+  const key=wallFixtureAt(e);if(key)wallPress={key,x:e.clientX,y:e.clientY};
+ },true);
+ cv.addEventListener('pointerup',e=>{
+  const press=wallPress;wallPress=null;if(!press||Math.hypot(e.clientX-press.x,e.clientY-press.y)>6||wallFixtureAt(e)!==press.key)return;
+  e.stopImmediatePropagation();dragging=false;grab=null;cv.classList.remove('panning','placing');
+  if(tool==='remove'||tool==='sell'){if(press.key==='door')removeEntrance();else removeWallShelf();}
+  else if(press.key==='door')placeEntrance();else placeWallShelf();
+ },true);
+ cv.addEventListener('pointercancel',()=>{wallPress=null;});
+
  cancel.onclick=()=>{buyKey=null;buildShop();};dock.querySelector('.floorBuildDone').onclick=()=>setMode('view');
  for(const dir of [-1,1]){const b=document.createElement('button');b.className='floorBuildNav '+(dir<0?'prev':'next');b.textContent=dir<0?'‹':'›';b.setAttribute('aria-label',dir<0?'เลื่อนซ้าย':'เลื่อนขวา');b.onclick=()=>shop.scrollBy({left:dir*Math.max(100,shop.clientWidth-100),behavior:'auto'});dock.append(b);}
  const style=document.createElement('style');style.textContent=`
- #floorBuildDock{display:none;position:absolute;left:0;bottom:0;width:100%;height:208px;box-sizing:border-box;padding:6px 10px;background:#142b2e;border-top:1px solid #997f49;z-index:8;color:#e7d8b4}
+ #floorBuildDock{display:none;position:absolute;left:0;bottom:0;width:100%;height:250px;box-sizing:border-box;padding:6px 10px;background:#142b2e;border-top:1px solid #997f49;z-index:8;color:#e7d8b4}
  body.mode-build:not(.inside-tank) #floorBuildDock{display:block}
- body.mode-build:not(.inside-tank) #cv{height:calc(100% - 208px)}
- body.mode-build:not(.inside-tank) .zoombar{bottom:224px}
+ body.mode-build:not(.inside-tank) #cv{height:calc(100% - 250px)}
+ body.mode-build:not(.inside-tank) .zoombar{bottom:266px}
  #floorBuildDock [hidden]{display:none!important}
- .floorBuildHead{display:flex;justify-content:space-between;align-items:center;gap:8px;height:28px}
+ .floorBuildHead{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px;height:88px}.floorBuildHead>.decorTabs{flex-basis:100%!important;height:36px}.floorBuildActions{display:flex;flex:1;gap:5px;min-width:0}.floorBuildActions button{min-height:40px;white-space:nowrap;padding:5px 10px!important;font-size:12px!important}.floorBuildHint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;color:#b5c3ba}.floorBuildExpansion{margin-left:auto;position:relative;flex-shrink:0}.floorBuildExpansion summary{cursor:pointer;padding:6px 10px}.floorBuildExpansion[open]{position:absolute;right:8px;bottom:150px;width:min(360px,calc(100% - 32px));padding:12px;background:#20383a;border:1px solid #997f49;border-radius:10px;z-index:3}.floorBuildExpansion h2{display:none}.floorBuildExpansion .hint{font-size:12px}.floorBuildExpansion .toolrow{display:flex}.floorBuildExpansion button{min-height:40px}.floorBuildExpansion [hidden]{display:none!important}
  #floorBuildDock .decorTabs{flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
  #floorBuildDock .decorTabs button{white-space:nowrap;padding:4px 10px}
  #floorBuildDock .floorBuildDone{flex-shrink:0;padding:5px 12px;background:#c6a459;color:#172b2d;border-color:#e2cc90;font-weight:700}
@@ -140,7 +205,7 @@
  #floorBuildDock .productImage{display:block;width:124px;height:86px;flex-shrink:0;object-fit:contain;background:radial-gradient(ellipse at 50% 65%,#65827866,transparent 72%);cursor:pointer;touch-action:auto}
  #floorBuildDock .nm{width:100%;font-size:11px;line-height:16px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  #floorBuildDock .pr{width:100%;text-align:center;font-size:12px;line-height:21px;border-top:1px solid #ffffff14;color:#f5d990;background:#142b2e;border-radius:0 0 4px 4px}
- .floorBuildNav{position:absolute;top:66px;bottom:12px;width:28px;border:0;border-radius:6px;background:#102426;color:#dcc78e;font-size:26px;cursor:pointer}.floorBuildNav.prev{left:7px}.floorBuildNav.next{right:7px}
+ .floorBuildNav{position:absolute;top:126px;bottom:12px;width:28px;border:0;border-radius:6px;background:#102426;color:#dcc78e;font-size:26px;cursor:pointer}.floorBuildNav.prev{left:7px}.floorBuildNav.next{right:7px}
  `;document.head.append(style);
  buildShop();resize();
 })();

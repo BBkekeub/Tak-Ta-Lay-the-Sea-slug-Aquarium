@@ -256,7 +256,7 @@ function slugTraits(g){
   return {energy,bold,curious,social,shy,sleepy};
 }
 const SLUG_NICKS=['ปุ๊กปิ๊ก','ตุ๊กติ๊ก','น้องวุ้น','เจ้าจุด','ฟองเต้าหู้','มะนาว','ข้าวปั้น','เต่าหอย','ป๋องแป๋ง','ดุ๊กดิ๊ก','หมึกกรอบ','ซูชิ','วาซาบิ','เยลลี่','บ๊วย','ลูกตาล','งับงับ','จิ๋ว','อ้วนกลม','สาหร่าย','ต้มจืด','ไข่ดาว'];
-function slugNick(s){ let h=0; const id=''+s.id; for(let i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))>>>0; return SLUG_NICKS[h%SLUG_NICKS.length]; }
+function slugNick(s){ if(s.nickname)return s.nickname;let h=0; const id=''+s.id; for(let i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))>>>0; return SLUG_NICKS[h%SLUG_NICKS.length]; }
 function slugPersona(t){
   if(!t) return 'เรื่อยเปื่อย';
   const items=[['จอมพลัง',t.energy*(0.6+t.bold*0.8)],['นักผจญภัย',t.bold],['นักสำรวจ',t.curious],

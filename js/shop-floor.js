@@ -937,11 +937,13 @@ function syncHUD(){
   const inv=document.getElementById('inv'); inv.innerHTML='';
   document.getElementById('invTag').textContent=G.inv.length+' ตัวรอลงตู้';
   if(!G.inv.length) inv.innerHTML='<div class="empty">คลังว่าง</div>';
-  G.inv.forEach(s=>{
+  SlugBrowser.mount(inv.parentElement,'inventory',syncHUD);
+  const visibleInv=SlugBrowser.apply(G.inv,'inventory');if(G.inv.length&&!visibleInv.length)inv.innerHTML='<div class="empty">ไม่พบทากที่ตรงตัวกรอง</div>';
+  visibleInv.forEach(s=>{
     const el=document.createElement('div'); el.className='row';
     el.innerHTML='<span class="sw" style="background:'+slugBaseHex(s.genes)+'"></span>'+
-      '<div class="info"><div class="t">ทาก '+s.id+'</div><div class="s">หงอน '+gillCount(s.genes)+' · ลาย '+spotCount(s.genes)+'</div></div>';
-    inv.appendChild(el);
+      '<div class="info"><div class="t">ทาก '+SlugBrowser.htmlName(s)+'</div><div class="s">หงอน '+gillCount(s.genes)+' · ลาย '+spotCount(s.genes)+'</div></div>';
+    SlugBrowser.heart(el,s,syncHUD,'inventory');inv.appendChild(el);
   });
 
   const shelf=document.getElementById('shelf'); shelf.innerHTML='';

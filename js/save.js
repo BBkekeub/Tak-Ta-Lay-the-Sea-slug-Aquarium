@@ -13,7 +13,7 @@ const DEFAULT_GENE = { bodyDepth:45, gillDepth:45, mainC:200, accC:200, len:50, 
 /* ---- เก็บเฉพาะข้อมูลที่ "จำเป็น" — ตัดแคชแคนวาส/ตัวชี้ runtime ออกหมด ---- */
 function _saveSlug(s){
   return {
-    id:s.id, breedZone:!!s.breedZone, breedLife:s.breedLife??50, genes:s.genes, traits:s.traits, personality:s.personality,
+    id:s.id, favorite:!!s.favorite, nickname:typeof s.nickname==='string'?s.nickname:'', breedZone:!!s.breedZone, breedLife:s.breedLife??50, genes:s.genes, traits:s.traits, personality:s.personality,
     fx:Number.isFinite(s.fx)?s.fx:s._lastGoodFx, fy:Number.isFinite(s.fy)?s.fy:s._lastGoodFy, dir:s.dir, ph:s.ph, spd:s.spd,
     state:s.state, stt:s.stt, flip:!!s.flip, wall:s.wall||null,
     satiety:s.satiety, foodBuffs:s.foodBuffs, climbZ:s.climbZ
@@ -79,7 +79,7 @@ function _loadSlug(o){
   const traits=(o.traits && typeof o.traits==='object') ? o.traits
              : (typeof slugTraits==='function' ? slugTraits(genes) : {});
   return {
-    id:o.id || ('s'+(G.seq++)), breedZone:!!o.breedZone, breedLife:_NUM(o.breedLife,50), genes, traits,
+    id:o.id || ('s'+(G.seq++)), favorite:!!o.favorite, nickname:typeof o.nickname==='string'?Array.from(o.nickname.trim()).slice(0,32).join(''):'', breedZone:!!o.breedZone, breedLife:_NUM(o.breedLife,50), genes, traits,
     personality:_NUM(o.personality, _NUM(traits.shy, 0.5)),
     fx:_NUM(o.fx,1), fy:_NUM(o.fy,1),
     dir:_NUM(o.dir,0), ph:_NUM(o.ph,0), spd:_NUM(o.spd,1),

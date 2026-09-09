@@ -44,7 +44,7 @@ function playTableModel(o){
  box(0,0,10,10,12,.65,'#ead4ae','#9d7049','#c2996a');
  for(const b of boxes)b.wood=true;
  box(.25,.25,6,6,12.65,.25,'#dbbd85','#a99370','#b6a37e'); // 30×30 cm main tank
- box(.25,.25,6,6,12.9,4.4,'rgba(169,224,230,.22)','rgba(120,193,204,.33)','rgba(185,235,235,.32)');
+ box(.25,.25,6,6,12.9,4.4,'rgba(169,224,230,.22)','rgba(120,193,204,.33)','rgba(185,235,235,.32)').slugTank=true;
  box(.25,.25,6,.12,17.3,.15,'#d9efea','#a7c7c4','#c1dfd8');
  box(.25,6.13,6,.12,17.3,.15,'#d9efea','#a7c7c4','#c1dfd8');
  box(.25,.25,.12,6,17.3,.15,'#d9efea','#a7c7c4','#c1dfd8');
@@ -116,11 +116,19 @@ function drawPlayTableWoodBase(o){
  }
  const p=P(o.cx,o.cy,0),scale=cam.zoom/cached.zoom;ctx.drawImage(cached.image,p.x-cached.anchor.x*scale,p.y-cached.anchor.y*scale,768*scale,768*scale);return true;
 }
+function drawPlayTableResident(o){
+ if(!G.objs.includes(o)||!engineReady)return;
+ const slug=PlayTable.displaySlug(o);if(!slug)return;
+ const spr=slugSprite(slug),q=counterLocal(o.def,o.rot,3.25,3.5),p=P(o.cx+q[0],o.cy+q[1],12.95*ZUNIT);
+ const scale=Math.min(4.1*TW*cam.zoom/spr.w,2.8*ZUNIT*cam.zoom/spr.h),w=spr.w*scale,h=spr.h*scale;
+ ctx.save();ctx.translate(p.x,p.y-h*.38);if(slug.flip)ctx.scale(-1,1);ctx.drawImage(spr.c,-w/2,-h/2,w,h);ctx.restore();
+}
 function drawPlayTable(o){
  if(document.hidden||!onScreen(o))return;
  const woodReady=drawPlayTableWoodBase(o);
  for(const b of playTableModel(o)){
   if(b.wood&&woodReady)continue;
+  if(b.slugTank)drawPlayTableResident(o);
   if(b.foodNursery)drawPlayTableFood(o,true);
   isoBox(b.x,b.y,b.w,b.h,b.z,b.height,b.top,b.right,b.front);
   if(b.wood)drawPlayTableWood(o,b);
@@ -144,7 +152,7 @@ const PlayTable=(()=>{
  #playTableView::backdrop{background:#09171bd9}#playTableView header{height:76px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:#1c3639;border-bottom:1px solid #d8bd7a38}
  #playTableView h2{margin:0;font-size:22px;font-weight:600}#playTableView small{color:#c2ac80;font-size:11px}#playTableView .playLayout{display:flex;height:calc(100% - 76px)}
  #playTableView .playScene{position:relative;flex:1;min-width:0;min-height:0;background:#193e43}#playTableView canvas{width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
- #playTableView .playControls{width:230px;box-sizing:border-box;padding:22px 18px;display:flex;flex-direction:column;gap:22px;background:#142b2e}
+ #playTableView .playControls{width:230px;box-sizing:border-box;padding:22px 18px;overflow:auto;display:flex;flex-direction:column;gap:22px;background:#142b2e}
  #playTableView label{display:grid;gap:8px;font-size:12px;color:#c6d8ce}#playTableView select{width:100%;padding:10px 8px;border:1px solid #617971;border-radius:8px;color:#f4e6c7;background:#233f40;font:inherit}
  #playTableView progress{display:block;width:100%;height:8px;margin-top:10px;accent-color:#8ecea8}#playTableView output{float:right;color:#e9c77d;font-size:12px}.playSat,.playAffection{font-size:12px;color:#cedbd0}
  #playTableView .playToolRow{display:flex;gap:8px}#playTableView .playToolRow button{flex:1;white-space:nowrap;padding:10px 6px}#playTableView button.on{background:#d7ba79;color:#1c302c;border-color:#efd49a}
@@ -183,16 +191,29 @@ const PlayTable=(()=>{
 
 
  function available(){
-  const all=[...(G.inv||[]),...[...G.objs,...G.shelter].flatMap(o=>o.slugs||[])];
-  return [...new Set(all)].filter(s=>!s.breedZone&&!G.objs.concat(G.shelter).some(o=>o.breeding?.parents?.includes(s))&&!TRADE_OFFERS.some(o=>o.slug===s));
+  const tanks=[...(G.objs||[]),...(G.shelter||[])].filter(o=>o.type==='tank');
+  const listed=new Set(typeof WorldMarket==='object'?(WorldMarket.market().listings||[]).map(l=>l.id):[]);
+  const all=[...(G.inv||[]),...tanks.flatMap(o=>o.slugs||[])];
+  return [...new Set(all)].filter(s=>!listed.has(s.id)&&!s.breedZone&&!tanks.some(o=>o.breeding?.parents?.includes(s))&&!TRADE_OFFERS.some(o=>o.slug===s));
  }
- function pickSlug(){slug=options[Number(picker.value)]||null;session=PlayTableLogic.create();input.held=false;pointer=null;spriteKey='';releaseSprites();lastUI='';status.textContent='';refresh();}
+ function syncPicker(force=false){
+  const fresh=SlugBrowser.apply(available(),'play');if(!force&&fresh.length===options.length&&fresh.every((s,i)=>s===options[i]))return;
+  SlugBrowser.mount(dialog.querySelector('.playControls'),'play',()=>syncPicker(true));
+  const previous=slug;options=fresh;picker.replaceChildren();
+  if(!options.length){const op=document.createElement('option');op.textContent='ยังไม่มีทากว่าง';picker.append(op);}
+  options.forEach((s,i)=>{const op=document.createElement('option');op.value=i;op.textContent=(s.favorite?'♥ ':'')+SlugBrowser.name(s)+' · อิ่ม '+Math.round(s.satiety??50);picker.append(op);});
+  picker.disabled=!options.length;const index=options.indexOf(previous);picker.value=String(Math.max(0,index));
+  if(force||index<0){pickSlug();updateTool();}else{lastUI='';refresh();}
+ }
+ let displayOptions=[],displayCheck=0;
+ function displaySlug(o){const now=performance.now();if(now>=displayCheck){displayOptions=available();displayCheck=now+1000;}return displayOptions.includes(o._playSlug)?o._playSlug:displayOptions[0]||null;}
+ function pickSlug(){const candidate=options[Number(picker.value)];if(candidate&&!available().includes(candidate)){syncPicker(true);return;}slug=candidate||null;if(table)table._playSlug=slug;displayCheck=0;session=PlayTableLogic.create();input.held=false;pointer=null;spriteKey='';releaseSprites();lastUI='';status.textContent='';const label=picker.parentElement;label.querySelectorAll('.slugFavorite').forEach(el=>el.remove());if(slug)SlugBrowser.heart(label,slug,()=>syncPicker(true));refresh();}
  function releaseSprites(){if(sprites)for(const c of Object.values(sprites)){c.width=0;c.height=0;}sprites=null;animatedParts=null;}
  function refresh(){
   const sat=Math.min(100,Math.max(0,slug?.satiety??0)),key=[slug?.id,Math.ceil(sat),Math.floor(session.pet*100),mode,session.happy>0].join('|');if(key===lastUI)return;lastUI=key;
   output.textContent=Math.round(sat)+' / 100';satBar.value=sat;petBar.value=session.pet;
-  if(slug&&picker.selectedOptions[0])picker.selectedOptions[0].textContent=slug.id+' · อิ่ม '+Math.round(sat);
-  greeting.textContent=slug?(session.happy>0?'ชอบที่สุดเลย!':sat>=100?'อิ่มแล้ว มาเล่นด้วยกันต่อสิ':slug.id):'เลือกทากมาเล่นด้วยกัน';
+  if(slug&&picker.selectedOptions[0])picker.selectedOptions[0].textContent=(slug.favorite?'♥ ':'')+SlugBrowser.name(slug)+' · อิ่ม '+Math.round(sat);
+  greeting.textContent=slug?(session.happy>0?'ชอบที่สุดเลย!':sat>=100?'อิ่มแล้ว มาเล่นด้วยกันต่อสิ':SlugBrowser.name(slug)):'เลือกทากมาเล่นด้วยกัน';
   dialog.querySelector('.playAffection').hidden=false;
   for(const b of dialog.querySelectorAll('[data-mode]'))b.classList.toggle('on',b.dataset.mode===mode);
  }
@@ -239,7 +260,7 @@ const PlayTable=(()=>{
   metrics.frames++;
  }
  function frame(now){raf=0;if(!dialog.open||document.hidden)return;const dt=Math.min(.1,(now-(last||now))/1000);last=now;
-  if(now>=nextCheck){nextCheck=now+1000;if(slug&&!available().includes(slug)){slug=null;releaseSprites();status.textContent='ทากตัวนี้ไม่ว่างแล้ว กรุณาเลือกตัวอื่น';}if(slug)bakeSprites();}
+  if(now>=nextCheck){nextCheck=now+1000;syncPicker();if(slug)bakeSprites();}
   if(slug){if(!sprites)bakeSprites();const d=dimensions(),bite=PlayTableLogic.step(session,dt,{...foodPoint(),held:mode==='feed'&&input.held&&input.x>=0&&input.x<=1&&input.y>=0&&input.y<=1},slug.satiety,Math.abs(headOffset.x)*d.width/w,headOffset.y*d.height/h,d.width/w*.5+.01,d.height/h*.5+.01);
    if(bite){const before=slug.satiety;applyFood(slug,{type:'sponge',level:1,spec:{...FOOD_TYPES.sponge.levels[0],sat:3,cap:1},eaten:[]});if(slug.satiety>before){input.held=false;G.stats.fed=(G.stats.fed||0)+1;saveGame();status.textContent=slug.satiety>=100?'อิ่มเต็ม 100 แล้ว':'ง่ำ… อร่อยจัง';}}
   }
@@ -261,11 +282,9 @@ const PlayTable=(()=>{
  window.addEventListener('blur',()=>{input.held=false;pointer=null;updateTool();});window.addEventListener('pagehide',()=>{if(dialog.open)saveGame();});
  // The borrowed slug stays in its source collection; only its own movement pauses.
  const oldStep=stepTankSlugs;stepTankSlugs=function(slugs,...args){return oldStep(dialog.open&&slug?slugs.filter(s=>s!==slug):slugs,...args);};
- function open(o){if(!o?.def.playTable||!G.objs.includes(o)||dialog.open)return;table=o;options=available();picker.replaceChildren();
-  if(!options.length){const op=document.createElement('option');op.textContent='ยังไม่มีทากว่าง';picker.append(op);}
-  options.forEach((s,i)=>{const op=document.createElement('option');op.value=i;op.textContent=s.id+' · อิ่ม '+Math.round(s.satiety??50);picker.append(op);});
-  picker.disabled=!options.length;dialog.showModal();document.body.classList.add('playing-slug');pickSlug();resizeScene();last=0;lastSave=performance.now();raf=requestAnimationFrame(frame);
+ function open(o){if(!o?.def.playTable||!G.objs.includes(o)||dialog.open)return;table=o;slug=displaySlug(o);
+  dialog.showModal();document.body.classList.add('playing-slug');syncPicker(true);resizeScene();last=0;nextCheck=0;lastSave=performance.now();raf=requestAnimationFrame(frame);
  }
- return {open,close,isOpen:()=>dialog.open,get slug(){return slug;},metrics};
+ return {open,close,displaySlug,isOpen:()=>dialog.open,get slug(){return slug;},metrics};
 })();
 function openPlayTable(o){PlayTable.open(o);}
