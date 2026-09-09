@@ -12,7 +12,10 @@ function init(){
   G.objs.push(o);
   syncHUD();
   fitCamera();
-  loop();
+  // Later scripts install furniture renderers and the boot gate.
+  // Starting here while HTML is still parsing can stop the loop on missing APIs.
+  if(document.readyState==='complete')loop();
+  else window.addEventListener('load',loop,{once:true});
 }
 window.addEventListener('resize', resize);
 window.addEventListener('load', ()=>{ resize(); fitCamera(); });
