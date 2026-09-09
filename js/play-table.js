@@ -42,6 +42,7 @@ function playTableModel(o){
  for(const [x,y] of [[.6,.6],[8.6,.6],[.6,8.6],[8.6,8.6]])box(x,y,.8,.8,0,12,'#bd9365','#64452c','#896040');
  box(.2,.2,9.6,9.6,10.5,1,'#bb9060','#775037','#986d46');
  box(0,0,10,10,12,.65,'#ead4ae','#9d7049','#c2996a');
+ for(const b of boxes)b.wood=true;
  box(.25,.25,6,6,12.65,.25,'#dbbd85','#a99370','#b6a37e'); // 30×30 cm main tank
  box(.25,.25,6,6,12.9,4.4,'rgba(169,224,230,.22)','rgba(120,193,204,.33)','rgba(185,235,235,.32)');
  box(.25,.25,6,.12,17.3,.15,'#d9efea','#a7c7c4','#c1dfd8');
@@ -87,11 +88,42 @@ function drawPlayTableFood(o,nursery){
  if(nursery){const p=local(8.15,2.3,12.95),size=2.65*ZUNIT*cam.zoom;ctx.drawImage(art.whole,p.x-size*.5,p.y-size*.91,size,size);}
  else for(let i=0;i<3;i++){const p=local(7.2+(i%2)*1.15,5.95+Math.floor(i/2)*1.1,12.91),size=1.1*ZUNIT*cam.zoom;ctx.drawImage(art.pieces[i],p.x-size*.5,p.y-size*.7,size,size*.72);}
 }
+// Downsample once and reuse a bounded texture for all wooden table surfaces.
+const playTableWood={canvas:null,pattern:null};
+(function(){const image=new Image();image.onload=()=>{const c=document.createElement('canvas');c.width=c.height=1024;c.getContext('2d').drawImage(image,0,0,1024,1024);playTableWood.canvas=c;document.dispatchEvent(new Event('play-table-art-ready'));};image.src='assets/textures/wood_table_worn_diff_4k.jpg';})();
+function drawPlayTableWood(o,b){
+ const material=playTableWood;if(!material.canvas||typeof DOMMatrix==='undefined')return;
+ if(!material.pattern)material.pattern=ctx.createPattern(material.canvas,'repeat');
+ const pat=material.pattern,top=b.z+b.height,T=1024/10;
+ const fill=(points,matrix,shade)=>{pat.setTransform(new DOMMatrix(matrix));ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fillStyle=pat;ctx.fill();if(shade){ctx.fillStyle=shade;ctx.fill();}};
+ for(const face of [{a:[b.x+b.w,b.y],v:[b.x+b.w,b.y+b.h],shade:'rgba(0,0,0,.28)'},{a:[b.x+b.w,b.y+b.h],v:[b.x,b.y+b.h],shade:'rgba(0,0,0,.12)'}]){
+  const a=P(...face.a,top),v=P(...face.v,top),len=Math.hypot(face.v[0]-face.a[0],face.v[1]-face.a[1]);
+  fill([a,v,P(...face.v,b.z),P(...face.a,b.z)],[(v.x-a.x)/(len*T),(v.y-a.y)/(len*T),0,ZUNIT*cam.zoom/T,a.x,a.y],face.shade);
+ }
+ const local=(u,v)=>{const q=counterLocal(o.def,o.rot,u,v);return P(o.cx+q[0],o.cy+q[1],top);},a=local(0,0),u=local(1,0),v=local(0,1);
+ fill([P(b.x,b.y,top),P(b.x+b.w,b.y,top),P(b.x+b.w,b.y+b.h,top),P(b.x,b.y+b.h,top)],[(u.x-a.x)/T,(u.y-a.y)/T,(v.x-a.x)/T,(v.y-a.y)/T,a.x,a.y],null);
+}
+const playTableWoodSprites=new Map();
+function drawPlayTableWoodBase(o){
+ if(!playTableWood.canvas)return false;
+ let cached=playTableWoodSprites.get(o.rot&3);
+ if(!cached){const image=document.createElement('canvas');image.width=image.height=768;
+  const saved={ctx,CW,CH,x:cam.x,y:cam.y,zoom:cam.zoom};
+  try{ctx=image.getContext('2d');CW=CH=768;cam.zoom=Math.min(740/(20*TW),740/(20*TH+13*ZUNIT));cam.x=(o.cx-o.cy)*TW;cam.y=(o.cx+o.cy)*TH+(20*TH-13*ZUNIT)/2;
+   const anchor=P(o.cx,o.cy,0);for(const b of playTableModel(o)){if(!b.wood)continue;isoBox(b.x,b.y,b.w,b.h,b.z,b.height,b.top,b.right,b.front);drawPlayTableWood(o,b);}
+   cached={image,anchor,zoom:cam.zoom};playTableWoodSprites.set(o.rot&3,cached);
+  }finally{ctx=saved.ctx;CW=saved.CW;CH=saved.CH;cam.x=saved.x;cam.y=saved.y;cam.zoom=saved.zoom;}
+ }
+ const p=P(o.cx,o.cy,0),scale=cam.zoom/cached.zoom;ctx.drawImage(cached.image,p.x-cached.anchor.x*scale,p.y-cached.anchor.y*scale,768*scale,768*scale);return true;
+}
 function drawPlayTable(o){
  if(document.hidden||!onScreen(o))return;
+ const woodReady=drawPlayTableWoodBase(o);
  for(const b of playTableModel(o)){
+  if(b.wood&&woodReady)continue;
   if(b.foodNursery)drawPlayTableFood(o,true);
   isoBox(b.x,b.y,b.w,b.h,b.z,b.height,b.top,b.right,b.front);
+  if(b.wood)drawPlayTableWood(o,b);
   if(b.foodTray)drawPlayTableFood(o,false);
  }
 }
