@@ -1,17 +1,30 @@
 /* Play table: 50×50 cm footprint, 30×30 cm aquarium; one real slug per visit. */
 const PlayTableLogic=(()=>{
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
- function create(){return {x:.5,y:.58,flip:false,pet:0,happy:0,poke:0,bite:0,walking:false,age:0};}
+ function create(){return {x:.5,y:.58,flip:false,pet:0,happy:0,poke:0,bite:0,walking:false,age:0,rest:.5,target:null,vx:0,vy:0,petTouch:0,creep:0,facing:1};}
  function step(s,dt,input,satiety,head=.12,headY=0,halfWidth=.22,halfHeight=.22){
   dt=clamp(dt,0,.1);s.age+=dt;s.happy=Math.max(0,s.happy-dt);s.poke=Math.max(0,s.poke-dt);s.bite=Math.max(0,s.bite-dt);s.walking=false;
-  if(!input.held||satiety>=100||s.happy>0)return false;
+  s.petTouch=Math.max(0,s.petTouch-dt);
+  const feeding=input.held&&satiety<100;
+  if(!feeding){
+   s.rest=Math.max(0,s.rest-dt);
+   if(!s.target&&s.rest===0)s.target={x:halfWidth+Math.random()*(1-2*halfWidth),y:halfHeight+Math.random()*(1-2*halfHeight)};
+   const dx=s.target?s.target.x-s.x:0,dy=s.target?s.target.y-s.y:0,dist=Math.hypot(dx,dy),speed=s.petTouch>0||s.happy>0||s.poke>0?0:.045;
+   if(s.target&&dist<.015){s.target=null;s.rest=1+Math.random()*2.5;}
+   const blend=1-Math.exp(-dt*7),moving=!!s.target&&dist>.015;
+   s.vx+=((moving?dx/dist*speed:0)-s.vx)*blend;s.vy+=((moving?dy/dist*speed:0)-s.vy)*blend;
+   s.x=clamp(s.x+s.vx*dt,halfWidth,1-halfWidth);s.y=clamp(s.y+s.vy*dt,halfHeight,1-halfHeight);
+   s.walking=Math.hypot(s.vx,s.vy)>.002;if(Math.abs(s.vx)>.006)s.flip=s.vx>0;
+   s.creep+=Math.hypot(s.vx,s.vy)*dt*100;return false;
+  }
+  s.vx=s.vy=0;s.target=null;s.rest=.8;
   const tx=clamp(input.x,.12,.88),ty=clamp(input.y,.3,.78);
   if(Math.abs(tx-s.x)>head+.025)s.flip=tx>s.x;
   const targetX=clamp(tx+(s.flip?-head:head),halfWidth,1-halfWidth),targetY=clamp(ty-headY,halfHeight,1-halfHeight),dx=targetX-s.x,dy=targetY-s.y,dist=Math.hypot(dx,dy);
-  if(dist>.015){const amount=Math.min(dist,.18*dt);s.x+=dx/dist*amount;s.y+=dy/dist*amount;s.walking=true;return false;}
+  if(dist>.015){const amount=Math.min(dist,.18*dt);s.x+=dx/dist*amount;s.y+=dy/dist*amount;s.creep+=amount*100;s.walking=true;return false;}
   if(s.bite===0){s.bite=1;return true;}return false;
  }
- function stroke(s,distance){if(s.happy>0)return false;s.pet=clamp(s.pet+Math.min(distance,35)/400,0,1);if(s.pet<1)return false;s.pet=0;s.happy=2.5;return true;}
+ function stroke(s,distance){s.petTouch=.4;s.pet=clamp(s.pet+Math.min(distance,70)/1600,0,1);if(s.pet<1||s.happy>0)return false;s.pet=0;s.happy=2.5;return true;}
  function poke(s){if(s.happy===0)s.poke=.45;}
  return {create,step,stroke,poke,clamp};
 })();
@@ -78,14 +91,14 @@ const PlayTable=(()=>{
  @media(max-width:700px){#playTableView{height:94dvh}#playTableView .playLayout{flex-direction:column}#playTableView header{padding:10px 14px}#playTableView h2{font-size:18px}#playTableView .playControls{width:100%;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}#playTableView .playScene{min-height:200px}#playTableView .playHelp,#playTableView .playStatus{font-size:11px}#playTableView .playGreeting{top:12px;font-size:12px}}
  `;document.head.append(style);
  const canvas=dialog.querySelector('canvas'),x=canvas.getContext('2d'),picker=dialog.querySelector('select'),output=dialog.querySelector('output'),satBar=dialog.querySelector('.playSat progress'),petBar=dialog.querySelector('.playAffection progress'),status=dialog.querySelector('.playStatus'),greeting=dialog.querySelector('.playGreeting');
- let table=null,slug=null,session=PlayTableLogic.create(),mode='feed',input={held:false,x:.5,y:.5},pointer=null,lastPoint=null,moved=0,options=[],raf=0,last=0,w=0,h=0,bg=null,sprites=null,spriteKey='',headOffset={x:-.3,y:.25},lastUI='',lastSave=0,nextCheck=0;
+ let table=null,slug=null,session=PlayTableLogic.create(),mode='feed',input={held:false,x:.5,y:.5},pointer=null,lastPoint=null,moved=0,options=[],raf=0,last=0,w=0,h=0,bg=null,sprites=null,animatedParts=null,spriteKey='',headOffset={x:-.3,y:.25},lastUI='',lastSave=0,nextCheck=0;
  const metrics={frames:0,spriteBuilds:0,backgroundBuilds:0};
  function available(){
   const all=[...(G.inv||[]),...[...G.objs,...G.shelter].flatMap(o=>o.slugs||[])];
   return [...new Set(all)].filter(s=>!s.breedZone&&!G.objs.concat(G.shelter).some(o=>o.breeding?.parents?.includes(s))&&!TRADE_OFFERS.some(o=>o.slug===s));
  }
  function pickSlug(){slug=options[Number(picker.value)]||null;session=PlayTableLogic.create();input.held=false;pointer=null;spriteKey='';releaseSprites();lastUI='';status.textContent='';refresh();}
- function releaseSprites(){if(sprites)for(const c of Object.values(sprites)){c.width=0;c.height=0;}sprites=null;}
+ function releaseSprites(){if(sprites)for(const c of Object.values(sprites)){c.width=0;c.height=0;}sprites=null;animatedParts=null;}
  function refresh(){
   const sat=Math.min(100,Math.max(0,slug?.satiety??0)),key=[slug?.id,Math.ceil(sat),Math.floor(session.pet*100),mode,session.happy>0].join('|');if(key===lastUI)return;lastUI=key;
   output.textContent=Math.round(sat)+' / 100';satBar.value=sat;petBar.value=session.pet;
@@ -97,6 +110,7 @@ const PlayTable=(()=>{
  function bakeSprites(){
   if(!slug)return;const genes=foodGenes(slug),resolution=Math.min(640,Math.max(360,Math.round(Math.min(w*.46,h*.56)*Math.min(2,devicePixelRatio||1)))),key=JSON.stringify(genes)+'|'+resolution;if(key===spriteKey&&sprites)return;
   releaseSprites();const parts=SlugEngine.slugParts(genes,resolution),bw=Math.ceil(parts.w+24),bh=Math.ceil(parts.h+24),old=SlugEngine.ANIM;
+  animatedParts=parts;
   const eyes=SlugEngine.FACE.eyes,ex=eyes.reduce((v,e)=>v+e.u,0)/eyes.length,ey=eyes.reduce((v,e)=>v+e.v,0)/eyes.length;
   headOffset={x:(ex*parts.bw-(parts.L+parts.R)/2)*parts.s/bw,y:(ey*parts.bh-(parts.T+parts.B)/2)*parts.s/bh};
   try{SlugEngine.ANIM=false;sprites={};for(const happy of [false,true]){
@@ -128,15 +142,20 @@ const PlayTable=(()=>{
  function draw(){
   x.clearRect(0,0,w,h);x.drawImage(background(),0,0,w,h);
   if(slug&&sprites){const d=dimensions(),happy=session.happy>0||(mode==='feed'&&input.held&&slug.satiety<100),c=happy?sprites.happy:sprites.normal;
-   const wiggle=session.happy>0?Math.sin(session.age*34)*.045:session.poke>0?Math.sin(session.age*28)*.02:0;
-   const stretch=session.walking?1+Math.sin(session.age*7)*.025:1;
-   x.save();x.translate(session.x*w,session.y*h);x.rotate(wiggle);x.scale(session.flip?-stretch:stretch,session.poke>0?.96:1);x.drawImage(c,-d.width/2,-d.height/2,d.width,d.height);x.restore();
+   const envelope=session.happy>0?Math.sin(Math.PI*session.happy/2.5):0;
+   const wiggle=Math.sin(session.age*18)*.045*envelope;
+   x.save();x.translate(session.x*w,session.y*h);x.rotate(wiggle);
+   // Reuse engine parts and their textures; animate only the selected visible slug.
+   const oldAnim=SlugEngine.ANIM;SlugEngine.ANIM=true;
+   try{SlugEngine.drawSlug(x,animatedParts,0,0,session.flip,0,d.width/sprites.normal.width,true,session.walking,{noBob:true,noEyes:happy,creepT:session.creep,startle:Math.sin(Math.PI*session.poke/.45)*.3,look:session.petTouch>0?.7:.15});}finally{SlugEngine.ANIM=oldAnim;}
+   if(happy){const parts=animatedParts,scale=d.width/sprites.normal.width;x.save();x.scale((session.flip?-1:1)*parts.s*scale,parts.s*scale);x.translate(-(parts.L+parts.R)/2,-(parts.T+parts.B)/2);x.strokeStyle='#172326';x.lineWidth=Math.max(2,parts.bh*.018);x.lineCap='round';x.lineJoin='round';SlugEngine.FACE.eyes.forEach((e,i)=>{const ex=e.u*parts.bw,ey=e.v*parts.bh,r=e.hR*parts.bh*.42,side=i===0?-1:1;x.beginPath();x.moveTo(ex-side*r*.65,ey-r);x.lineTo(ex+side*r*.65,ey);x.lineTo(ex-side*r*.65,ey+r);x.stroke();});x.restore();}
+   x.restore();
    if(session.happy>0){x.fillStyle='#f19eb3';x.font='28px sans-serif';x.textAlign='center';x.fillText('♥',session.x*w,session.y*h-d.height*.48-(2.5-session.happy)*15);x.fillText('♥',session.x*w+d.width*.15,session.y*h-d.height*.45-(2.5-session.happy)*20);}
   }
   if(mode==='feed'&&input.held&&slug&&slug.satiety<100){const p=foodPoint(),px=p.x*w,py=p.y*h;x.lineCap='round';x.strokeStyle='#dcece3';x.lineWidth=4;x.beginPath();x.moveTo(px+38,py-68);x.lineTo(px-3,py-6);x.moveTo(px+43,py-65);x.lineTo(px+7,py-5);x.stroke();sponge(x,px,py,9);}
   metrics.frames++;
  }
- function frame(now){raf=0;if(!dialog.open||document.hidden)return;if(now-last<1000/30){raf=requestAnimationFrame(frame);return;}const dt=Math.min(.1,(now-(last||now))/1000);last=now;
+ function frame(now){raf=0;if(!dialog.open||document.hidden)return;const dt=Math.min(.1,(now-(last||now))/1000);last=now;
   if(now>=nextCheck){nextCheck=now+1000;if(slug&&!available().includes(slug)){slug=null;releaseSprites();status.textContent='ทากตัวนี้ไม่ว่างแล้ว กรุณาเลือกตัวอื่น';}if(slug)bakeSprites();}
   if(slug){if(!sprites)bakeSprites();const d=dimensions(),bite=PlayTableLogic.step(session,dt,{...foodPoint(),held:mode==='feed'&&input.held},slug.satiety,Math.abs(headOffset.x)*d.width/w,headOffset.y*d.height/h,d.width/w*.5+.01,d.height/h*.5+.01);
    if(bite){const before=slug.satiety;applyFood(slug,{type:'sponge',level:1,spec:FOOD_TYPES.sponge.levels[0],eaten:[]});if(slug.satiety>before){G.stats.fed=(G.stats.fed||0)+1;saveGame();status.textContent=slug.satiety>=100?'อิ่มเต็ม 100 แล้ว':'ง่ำ… อร่อยจัง';}}
@@ -151,7 +170,7 @@ const PlayTable=(()=>{
  });
  function release(e){if(e&&pointer!==e.pointerId)return;if(mode==='pet'&&input.held&&moved<8&&lastPoint&&hit(lastPoint)){PlayTableLogic.poke(session);status.textContent='จิ้มเบา ๆ… น้องขยับหนวดทักทาย';}input.held=false;pointer=null;lastPoint=null;}
  canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',()=>{input.held=false;pointer=null;lastPoint=null;});canvas.addEventListener('lostpointercapture',()=>{input.held=false;pointer=null;lastPoint=null;});
- for(const b of dialog.querySelectorAll('[data-mode]'))b.onclick=()=>{mode=b.dataset.mode;input.held=false;pointer=null;status.textContent='';dialog.querySelector('.playHelp').textContent=mode==='feed'?'กดค้างเพื่อคีบฟองน้ำ แล้วเลื่อนให้น้องเดินตาม':'กดแล้วลูบไปมาบนตัว หรือแตะเบา ๆ เพื่อจิ้ม';canvas.style.cursor=mode==='pet'?'pointer':'crosshair';refresh();};
+ for(const b of dialog.querySelectorAll('[data-mode]'))b.onclick=()=>{mode=b.dataset.mode;input.held=false;pointer=null;status.textContent='';dialog.querySelector('.playHelp').textContent=mode==='feed'?'กดค้างเพื่อคีบฟองน้ำ แล้วเลื่อนให้น้องเดินตาม':'ลูบไปมาบนตัวได้เรื่อย ๆ หรือแตะเบา ๆ เพื่อจิ้ม';canvas.style.cursor=mode==='pet'?'pointer':'crosshair';refresh();};
  picker.onchange=pickSlug;
  function close(){if(!dialog.open)return;input.held=false;pointer=null;cancelAnimationFrame(raf);raf=0;saveGame();dialog.close();table=null;slug=null;releaseSprites();bg=null;document.body.classList.remove('playing-slug');last=0;cv.focus();}
  dialog.querySelector('[data-close]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
