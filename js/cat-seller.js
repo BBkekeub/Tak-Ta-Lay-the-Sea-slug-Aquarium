@@ -47,7 +47,8 @@ personFurnitureFaces=function(props=true){
   out.push([A,B,C,D],[a,b,B,A],[b,c,C,B],[c,d,D,C],[d,a,A,D]);
  };
  for(const o of G.objs){
-  if(o===moving)continue;
+  if(o===moving||(props&&!onScreen(o)))continue;
+  if(o.def.playTable){out.push(...playTableDepthFaces(o).opaque);continue;}
   if(o._key==='counter'){
    const top=decoH(o)/ZUNIT; // ผิวเคาน์เตอร์ (ราว 14)
    for(const q of [counterBlock(o,0,10,20,10),counterBlock(o,10,0,10,10)]) boxTo(q.x,q.y,q.w,q.h,top);
