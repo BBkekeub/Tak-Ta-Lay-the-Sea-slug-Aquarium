@@ -729,10 +729,11 @@ function personDepth(p){return p.x+p.y;}
 // A depth buffer resolves intersecting clothing, straps, hair and limbs per pixel.
 let _personGL=null;
 // Opaque furniture writes depth only, allowing a person to be partially hidden.
-function personFurnitureFaces(){
+function personFurnitureFaces(cull=false){
   const out=[];
   for(const o of G.objs){
-    if(o===moving)continue;
+    if(o===moving||(cull&&!onScreen(o)))continue;
+    if(o.def.playTable){out.push(...playTableDepthFaces(o).opaque);continue;}
     const x=o.cx,y=o.cy,w=oW(o),h=oH(o);
     const top=(o.type==='tank'?tankStandH(o.def):decoH(o))/ZUNIT;
     if(!Number.isFinite(top)||top<=0)continue;
@@ -788,7 +789,9 @@ function paintPersonMesh(faces,p,H,snapshot=false){
   const scale=snapshot?1:Math.min(2,window.devicePixelRatio||1),width=Math.ceil(w*scale),height=Math.ceil(h*scale);
   if(canvas.width<width)canvas.width=Math.ceil(width/128)*128;if(canvas.height<height)canvas.height=Math.ceil(height/128)*128;
   const blockers=personFurnitureFaces(!snapshot),glass=[];
-  for(const o of G.objs){if(o.type!=='tank'||o===moving||(!snapshot&&!onScreen(o)))continue;
+  for(const o of G.objs){if(o===moving||(!snapshot&&!onScreen(o)))continue;
+    if(o.def.playTable){glass.push(...playTableDepthFaces(o).glass);continue;}
+    if(o.type!=='tank')continue;
     const x=o.cx,y=o.cy,w=oW(o),h=oH(o),lo=tankStandH(o.def)/ZUNIT,hi=lo+tankGlassH(o.def)/ZUNIT;
     glass.push([[x,y,hi],[x+w,y,hi],[x+w,y+h,hi],[x,y+h,hi]],[[x+w,y,lo],[x+w,y+h,lo],[x+w,y+h,hi],[x+w,y,hi]],[[x,y+h,lo],[x+w,y+h,lo],[x+w,y+h,hi],[x,y+h,hi]]);
   }

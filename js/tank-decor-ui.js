@@ -94,6 +94,7 @@
  }
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)for(const canvas of visiblePreviews)updatePreview(canvas);});
 
+ document.addEventListener('play-table-art-ready',()=>{previewRevision++;for(const canvas of visiblePreviews)updatePreview(canvas);});
  const cards=new Map();
  buildShop=function(){
   for(const [k,d] of Object.entries(CATALOG)){
