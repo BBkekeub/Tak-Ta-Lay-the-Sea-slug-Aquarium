@@ -24,7 +24,7 @@ const PlayTableLogic=(()=>{
   if(dist>.015){const amount=Math.min(dist,.18*dt);s.x+=dx/dist*amount;s.y+=dy/dist*amount;s.creep+=amount*100;s.walking=true;return false;}
   if(s.bite===0){s.bite=1;return true;}return false;
  }
- function stroke(s,distance){s.petTouch=.4;s.pet=clamp(s.pet+Math.min(distance,70)/1600,0,1);if(s.pet<1||s.happy>0)return false;s.pet=0;s.happy=2.5;return true;}
+ function stroke(s,distance){s.petTouch=.4;if(s.happy>0)return false;s.pet=clamp(s.pet+Math.min(distance,70)/1600,0,1);if(s.pet<1||s.happy>0)return false;s.pet=0;s.happy=2.5;return true;}
  function poke(s){if(s.happy===0)s.poke=.45;}
  return {create,step,stroke,poke,clamp};
 })();
@@ -75,7 +75,7 @@ function playTableHit(x,y){
 
 const PlayTable=(()=>{
  const dialog=document.createElement('dialog');dialog.id='playTableView';dialog.setAttribute('aria-label','เล่นกับทาก');
- dialog.innerHTML='<header><div><small>เวลาอยู่ด้วยกัน</small><h2>โต๊ะเล่นกับทาก</h2></div><button class="tbtn" data-close>กลับหน้าร้าน</button></header><div class="playLayout"><div class="playScene"><canvas aria-label="พื้นที่เล่นกับทาก ใช้ที่คีบอาหารหรือลูบตัว" tabindex="0"></canvas><div class="playGreeting">เลือกทากมาเล่นด้วยกัน</div></div><aside class="playControls"><label>เพื่อนตัวน้อย<select aria-label="เลือกทาก"></select></label><div class="playSat"><span>ความอิ่ม</span><output>0 / 100</output><progress max="100" value="0"></progress></div><div class="playToolRow"><button class="tbtn on" data-mode="feed">คีบอาหาร</button><button class="tbtn" data-mode="pet">ลูบ / จิ้ม</button></div><p class="playHelp">กดค้างเพื่อคีบฟองน้ำ แล้วเลื่อนให้น้องเดินตาม</p><div class="playAffection"><span>ความพอใจ</span><progress max="1" value="0"></progress></div><p class="playStatus" role="status"></p></aside></div>';
+ dialog.innerHTML='<header><div><small>เวลาอยู่ด้วยกัน</small><h2>โต๊ะเล่นกับทาก</h2></div><button class="tbtn" data-close>กลับหน้าร้าน</button></header><div class="playLayout"><div class="playScene"><canvas aria-label="พื้นที่เล่นกับทาก ใช้ที่คีบอาหารหรือลูบตัว" tabindex="0"></canvas><div class="playGreeting">เลือกทากมาเล่นด้วยกัน</div></div><aside class="playControls"><label>เพื่อนตัวน้อย<select aria-label="เลือกทาก"></select></label><div class="playSat"><span>ความอิ่ม</span><output>0 / 100</output><progress max="100" value="0"></progress></div><p class="playHelp">ลูบตัวน้องได้เลย หรือหยิบเศษฟองน้ำด้านขวามาป้อน</p><div class="playFoodShelf"><span>เศษฟองน้ำ · อิ่ม +3</span><canvas class="playFoodTray" aria-label="ลากเศษฟองน้ำไปให้น้อง"></canvas></div><div class="playAffection"><span>ความพอใจ</span><progress max="1" value="0"></progress></div><p class="playStatus" role="status"></p></aside></div>';
  document.body.append(dialog);
  const style=document.createElement('style');style.textContent=`
  #playTableView{width:min(1140px,96vw);height:min(780px,94dvh);max-width:96vw;max-height:94dvh;padding:0;border:1px solid #b29a69;border-radius:20px;background:#152c30;color:#f0e8d7;overflow:hidden;box-shadow:0 24px 80px #0008}
@@ -90,9 +90,16 @@ const PlayTable=(()=>{
  #playTableView .playGreeting{position:absolute;top:24px;left:24px;right:24px;text-align:center;color:#e0f0df;font-size:15px;pointer-events:none}
  @media(max-width:700px){#playTableView{height:94dvh}#playTableView .playLayout{flex-direction:column}#playTableView header{padding:10px 14px}#playTableView h2{font-size:18px}#playTableView .playControls{width:100%;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}#playTableView .playScene{min-height:200px}#playTableView .playHelp,#playTableView .playStatus{font-size:11px}#playTableView .playGreeting{top:12px;font-size:12px}}
  `;document.head.append(style);
- const canvas=dialog.querySelector('canvas'),x=canvas.getContext('2d'),picker=dialog.querySelector('select'),output=dialog.querySelector('output'),satBar=dialog.querySelector('.playSat progress'),petBar=dialog.querySelector('.playAffection progress'),status=dialog.querySelector('.playStatus'),greeting=dialog.querySelector('.playGreeting');
+ const canvas=dialog.querySelector('.playScene canvas'),x=canvas.getContext('2d'),picker=dialog.querySelector('select'),output=dialog.querySelector('output'),satBar=dialog.querySelector('.playSat progress'),petBar=dialog.querySelector('.playAffection progress'),status=dialog.querySelector('.playStatus'),greeting=dialog.querySelector('.playGreeting');
  let table=null,slug=null,session=PlayTableLogic.create(),mode='feed',input={held:false,x:.5,y:.5},pointer=null,lastPoint=null,moved=0,options=[],raf=0,last=0,w=0,h=0,bg=null,sprites=null,animatedParts=null,spriteKey='',headOffset={x:-.3,y:.25},lastUI='',lastSave=0,nextCheck=0;
  const metrics={frames:0,spriteBuilds:0,backgroundBuilds:0};
+ const sand=new Image(),foodImage=new Image(),crumbs=[];
+ const tray=dialog.querySelector('.playFoodTray');
+ style.textContent+='#playTableView .playFoodTray{height:130px;width:100%;cursor:grab;touch-action:none;background:#e2d4b7;border-radius:14px;margin-top:12px}#playTableView .playFoodShelf{font-size:12px;color:#e9c77d}#playTableView .playGreeting{color:#3f493e;text-shadow:0 1px 3px #fff}';
+ sand.onload=()=>{bg=null;};sand.src='assets/sand.jpg';
+ foodImage.onload=()=>{for(let i=0;i<3;i++){const c=document.createElement('canvas');c.width=c.height=96;const q=c.getContext('2d');q.beginPath();for(let j=0;j<24;j++){const a=j*Math.PI/12,r=34+(j%2?7:-5)+Math.sin(j*3+i)*5;const px=48+Math.cos(a)*r,py=48+Math.sin(a)*r;j?q.lineTo(px,py):q.moveTo(px,py);}q.closePath();q.clip();q.drawImage(foodImage,330+i*80,360+i*65,230,230,0,0,96,96);crumbs.push(c);}drawTray();};foodImage.src='assets/food/sponge.png';
+ function drawTray(){tray.width=420;tray.height=260;const q=tray.getContext('2d');for(let i=0;i<crumbs.length;i++){q.save();q.translate(80+i*125,130+(i%2?-25:15));q.rotate(i*.65-.3);q.drawImage(crumbs[i],-48,-48,96,96);q.restore();}}
+
  function available(){
   const all=[...(G.inv||[]),...[...G.objs,...G.shelter].flatMap(o=>o.slugs||[])];
   return [...new Set(all)].filter(s=>!s.breedZone&&!G.objs.concat(G.shelter).some(o=>o.breeding?.parents?.includes(s))&&!TRADE_OFFERS.some(o=>o.slug===s));
@@ -103,8 +110,8 @@ const PlayTable=(()=>{
   const sat=Math.min(100,Math.max(0,slug?.satiety??0)),key=[slug?.id,Math.ceil(sat),Math.floor(session.pet*100),mode,session.happy>0].join('|');if(key===lastUI)return;lastUI=key;
   output.textContent=Math.round(sat)+' / 100';satBar.value=sat;petBar.value=session.pet;
   if(slug&&picker.selectedOptions[0])picker.selectedOptions[0].textContent=slug.id+' · อิ่ม '+Math.round(sat);
-  greeting.textContent=slug?(session.happy>0?'ชอบที่สุดเลย!':sat>=100&&mode==='feed'?'อิ่มแล้ว มาเล่นด้วยกันต่อสิ':slug.id):'เลือกทากมาเล่นด้วยกัน';
-  dialog.querySelector('.playAffection').hidden=mode!=='pet';
+  greeting.textContent=slug?(session.happy>0?'ชอบที่สุดเลย!':sat>=100?'อิ่มแล้ว มาเล่นด้วยกันต่อสิ':slug.id):'เลือกทากมาเล่นด้วยกัน';
+  dialog.querySelector('.playAffection').hidden=false;
   for(const b of dialog.querySelectorAll('[data-mode]'))b.classList.toggle('on',b.dataset.mode===mode);
  }
  function bakeSprites(){
@@ -125,14 +132,8 @@ const PlayTable=(()=>{
  function resizeScene(){if(!dialog.open||document.hidden)return;const r=canvas.getBoundingClientRect();if(r.width<1||r.height<1)return;w=r.width;h=r.height;const ratio=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(w*ratio);canvas.height=Math.round(h*ratio);x.setTransform(ratio,0,0,ratio,0,0);bg=null;}
  function background(){
   if(bg)return bg;bg=document.createElement('canvas');bg.width=canvas.width;bg.height=canvas.height;const b=bg.getContext('2d'),r=bg.width/w;b.scale(r,r);
-  const g=b.createLinearGradient(0,0,0,h);g.addColorStop(0,'#163f49');g.addColorStop(.65,'#4e8889');g.addColorStop(1,'#c9bb91');b.fillStyle=g;b.fillRect(0,0,w,h);
-  const glow=b.createRadialGradient(w*.45,h*.28,0,w*.45,h*.28,w*.7);glow.addColorStop(0,'#e3f7d82b');glow.addColorStop(1,'#e3f7d800');b.fillStyle=glow;b.fillRect(0,0,w,h);
-  b.fillStyle='#d6c397';b.beginPath();b.ellipse(w*.5,h*.92,w*.75,h*.22,0,0,Math.PI*2);b.fill();
-  // Static tray, sponge pieces and glass nursery at the edges of the close-up tank.
-  b.fillStyle='#e2dcc8';b.beginPath();b.roundRect(w*.72,h*.84,w*.23,h*.105,10);b.fill();
-  for(let i=0;i<3;i++)sponge(b,w*(.755+i*.06),h*.885,Math.min(w*.027,15));
-  b.fillStyle='#aedbd34a';b.strokeStyle='#d2ece28c';b.lineWidth=2;b.beginPath();b.roundRect(w*.035,h*.64,w*.13,h*.25,8);b.fill();b.stroke();
-  sponge(b,w*.08,h*.81,Math.min(w*.026,18));sponge(b,w*.12,h*.78,Math.min(w*.021,15));
+  b.fillStyle='#e2d8c4';b.fillRect(0,0,w,h);
+  if(sand.complete&&sand.naturalWidth){const pattern=b.createPattern(sand,'repeat');b.fillStyle=pattern;b.fillRect(0,0,w,h);}
   metrics.backgroundBuilds++;return bg;
  }
  function sponge(c,px,py,r){c.fillStyle='#d8a15b';c.beginPath();c.roundRect(px-r,py-r,r*2,r*1.65,r*.35);c.fill();c.fillStyle='#96613e';for(const [dx,dy]of [[-.4,-.3],[.35,-.45],[.05,.2]]){c.beginPath();c.arc(px+dx*r,py+dy*r,r*.15,0,7);c.fill();}}
@@ -152,25 +153,24 @@ const PlayTable=(()=>{
    x.restore();
    if(session.happy>0){x.fillStyle='#f19eb3';x.font='28px sans-serif';x.textAlign='center';x.fillText('♥',session.x*w,session.y*h-d.height*.48-(2.5-session.happy)*15);x.fillText('♥',session.x*w+d.width*.15,session.y*h-d.height*.45-(2.5-session.happy)*20);}
   }
-  if(mode==='feed'&&input.held&&slug&&slug.satiety<100){const p=foodPoint(),px=p.x*w,py=p.y*h;x.lineCap='round';x.strokeStyle='#dcece3';x.lineWidth=4;x.beginPath();x.moveTo(px+38,py-68);x.lineTo(px-3,py-6);x.moveTo(px+43,py-65);x.lineTo(px+7,py-5);x.stroke();sponge(x,px,py,9);}
+  if(mode==='feed'&&input.held&&slug&&slug.satiety<100){const p=foodPoint(),px=p.x*w,py=p.y*h;x.lineCap='round';x.strokeStyle='#dcece3';x.lineWidth=4;x.beginPath();x.moveTo(px+38,py-68);x.lineTo(px-3,py-6);x.moveTo(px+43,py-65);x.lineTo(px+7,py-5);x.stroke();if(crumbs.length)x.drawImage(crumbs[0],px-18,py-18,36,36);}
   metrics.frames++;
  }
  function frame(now){raf=0;if(!dialog.open||document.hidden)return;const dt=Math.min(.1,(now-(last||now))/1000);last=now;
   if(now>=nextCheck){nextCheck=now+1000;if(slug&&!available().includes(slug)){slug=null;releaseSprites();status.textContent='ทากตัวนี้ไม่ว่างแล้ว กรุณาเลือกตัวอื่น';}if(slug)bakeSprites();}
-  if(slug){if(!sprites)bakeSprites();const d=dimensions(),bite=PlayTableLogic.step(session,dt,{...foodPoint(),held:mode==='feed'&&input.held},slug.satiety,Math.abs(headOffset.x)*d.width/w,headOffset.y*d.height/h,d.width/w*.5+.01,d.height/h*.5+.01);
-   if(bite){const before=slug.satiety;applyFood(slug,{type:'sponge',level:1,spec:FOOD_TYPES.sponge.levels[0],eaten:[]});if(slug.satiety>before){G.stats.fed=(G.stats.fed||0)+1;saveGame();status.textContent=slug.satiety>=100?'อิ่มเต็ม 100 แล้ว':'ง่ำ… อร่อยจัง';}}
+  if(slug){if(!sprites)bakeSprites();const d=dimensions(),bite=PlayTableLogic.step(session,dt,{...foodPoint(),held:mode==='feed'&&input.held&&input.x>=0&&input.x<=1&&input.y>=0&&input.y<=1},slug.satiety,Math.abs(headOffset.x)*d.width/w,headOffset.y*d.height/h,d.width/w*.5+.01,d.height/h*.5+.01);
+   if(bite){const before=slug.satiety;applyFood(slug,{type:'sponge',level:1,spec:{...FOOD_TYPES.sponge.levels[0],sat:3,cap:1},eaten:[]});if(slug.satiety>before){input.held=false;G.stats.fed=(G.stats.fed||0)+1;saveGame();status.textContent=slug.satiety>=100?'อิ่มเต็ม 100 แล้ว':'ง่ำ… อร่อยจัง';}}
   }
   refresh();draw();if(now-lastSave>5000){lastSave=now;if(slug)saveGame();}raf=requestAnimationFrame(frame);
  }
  function point(e){const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height};}
- canvas.addEventListener('pointerdown',e=>{if(pointer!==null||!slug)return;e.preventDefault();pointer=e.pointerId;canvas.setPointerCapture(pointer);input={...point(e),held:true};lastPoint=point(e);moved=0;if(mode==='pet'&&!hit(lastPoint))input.held=false;});
- canvas.addEventListener('pointermove',e=>{const p=point(e);input.x=p.x;input.y=p.y;if(pointer!==e.pointerId||!lastPoint)return;
-  const distance=Math.hypot((p.x-lastPoint.x)*w,(p.y-lastPoint.y)*h);moved+=distance;
-  if(mode==='pet'&&input.held&&hit(p)&&hit(lastPoint)){if(PlayTableLogic.stroke(session,distance)){status.textContent='น้องพอใจแล้ว!';if(typeof playNotificationSound==='function')playNotificationSound('success');}}lastPoint=p;
- });
- function release(e){if(e&&pointer!==e.pointerId)return;if(mode==='pet'&&input.held&&moved<8&&lastPoint&&hit(lastPoint)){PlayTableLogic.poke(session);status.textContent='จิ้มเบา ๆ… น้องขยับหนวดทักทาย';}input.held=false;pointer=null;lastPoint=null;}
- canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',()=>{input.held=false;pointer=null;lastPoint=null;});canvas.addEventListener('lostpointercapture',()=>{input.held=false;pointer=null;lastPoint=null;});
- for(const b of dialog.querySelectorAll('[data-mode]'))b.onclick=()=>{mode=b.dataset.mode;input.held=false;pointer=null;status.textContent='';dialog.querySelector('.playHelp').textContent=mode==='feed'?'กดค้างเพื่อคีบฟองน้ำ แล้วเลื่อนให้น้องเดินตาม':'ลูบไปมาบนตัวได้เรื่อย ๆ หรือแตะเบา ๆ เพื่อจิ้ม';canvas.style.cursor=mode==='pet'?'pointer':'crosshair';refresh();};
+ function begin(e,kind){if(pointer!==null||!slug)return;e.preventDefault();mode=kind;pointer=e.pointerId;e.currentTarget.setPointerCapture(pointer);lastPoint=point(e);input={...lastPoint,held:true};moved=0;}
+ canvas.addEventListener('pointerdown',e=>{if(hit(point(e)))begin(e,'pet');});
+ tray.addEventListener('pointerdown',e=>{if(slug&&slug.satiety<100&&crumbs.length)begin(e,'feed');});
+ function move(e){if(pointer!==e.pointerId||!lastPoint)return;const p=point(e);input.x=p.x;input.y=p.y;const distance=Math.hypot((p.x-lastPoint.x)*w,(p.y-lastPoint.y)*h);moved+=distance;
+ if(mode==='pet'&&input.held&&hit(p)&&hit(lastPoint)&&PlayTableLogic.stroke(session,distance)){status.textContent='น้องพอใจแล้ว!';if(typeof playNotificationSound==='function')playNotificationSound('success');}lastPoint=p;}
+ function release(e){if(e&&pointer!==e.pointerId)return;if(mode==='pet'&&input.held&&moved<8&&lastPoint&&hit(lastPoint)){PlayTableLogic.poke(session);status.textContent='จิ้มเบา ๆ…';}input.held=false;pointer=null;lastPoint=null;}
+ for(const surface of [canvas,tray]){surface.addEventListener('pointermove',move);surface.addEventListener('pointerup',release);for(const event of ['pointercancel','lostpointercapture'])surface.addEventListener(event,()=>{input.held=false;pointer=null;lastPoint=null;});}
  picker.onchange=pickSlug;
  function close(){if(!dialog.open)return;input.held=false;pointer=null;cancelAnimationFrame(raf);raf=0;saveGame();dialog.close();table=null;slug=null;releaseSprites();bg=null;document.body.classList.remove('playing-slug');last=0;cv.focus();}
  dialog.querySelector('[data-close]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
