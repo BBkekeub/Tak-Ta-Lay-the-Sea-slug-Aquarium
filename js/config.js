@@ -130,6 +130,7 @@ const SLUG_WID_CELLS = 20 / CM_PER_CELL;            // 4 ช่อง
    foodMax = วางอาหารพร้อมกันได้กี่ชิ้นในตู้นั้น (ตู้ใหญ่วางได้เยอะกว่า — ดู feeding.js)   */
 const TANK_GLASS_COLOR='#9fd0f0';                  // ทุกขนาดใช้น้ำ/กระจกสีเดียวกัน
 const CATALOG = {
+  play_table:{kind:'deco',name:'โต๊ะเล่นกับทาก',icon:'',price:500,w:SUB,h:SUB,col:'#98744b',playTable:true},
   tank_breed:{kind:'tank',name:'ตู้เพาะพันธุ์ 3 ส่วน',icon:'🥚',price:2000,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,breeder:true,foodMax:10},
   counter: {kind:'deco',name:'เคาน์เตอร์แมวขายทาก',icon:'🐱',price:0,w:2*SUB,h:2*SUB,col:'#826448'},
   tank_s:  {kind:'tank', name:'ตู้เล็ก',  icon:'🐚', price:500,  w:1*SUB, h:1*SUB, glass:TANK_GLASS_COLOR, foodMax:8},

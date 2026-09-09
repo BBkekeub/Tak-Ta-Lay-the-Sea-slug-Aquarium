@@ -60,10 +60,10 @@
  dock.innerHTML='<div class="floorBuildHead"><div class="decorTabs" role="tablist" aria-label="หมวดของในร้าน"></div><button class="tbtn floorBuildTools">เครื่องมือ</button><button class="tbtn floorBuildDone">✓ เสร็จสิ้น</button></div><div class="floorBuildSelection"><span aria-live="polite">เลือกของเพื่อวาง</span><button class="tbtn floorBuildCancel" hidden>ยกเลิกเลือก</button></div>';
  dock.append(shop);stage.append(dock);oldSection.remove();
  const tabs=dock.querySelector('.decorTabs'),selection=dock.querySelector('.floorBuildSelection span'),cancel=dock.querySelector('.floorBuildCancel');
- const categories=['ตู้เลี้ยง','เพาะพันธุ์','ของตกแต่ง','เคาน์เตอร์'];let active='ตู้เลี้ยง';
- const category=(k,d)=>d.breeder?'เพาะพันธุ์':d.kind==='tank'?'ตู้เลี้ยง':k==='counter'?'เคาน์เตอร์':'ของตกแต่ง';
+ const categories=['ตู้เลี้ยง','เพาะพันธุ์','ของตกแต่ง','เคาน์เตอร์','เล่นกับทาก'];let active='ตู้เลี้ยง';
+ const category=(k,d)=>d.playTable?'เล่นกับทาก':d.breeder?'เพาะพันธุ์':d.kind==='tank'?'ตู้เลี้ยง':k==='counter'?'เคาน์เตอร์':'ของตกแต่ง';
  function selectCategory(name){active=name;for(const b of tabs.children){const on=b.textContent===name;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;}for(const b of shop.children)b.hidden=category(b.dataset.k,CATALOG[b.dataset.k])!==name;}
- for(const name of categories){const b=document.createElement('button');b.type='button';b.textContent=name;b.setAttribute('role','tab');b.setAttribute('aria-controls','shop');b.onclick=()=>{selectCategory(name);shop.scrollLeft=0;};b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const next=tabs.children[(categories.indexOf(name)+(e.key==='ArrowRight'?1:3))%4];next.click();next.focus();};tabs.append(b);}
+ for(const name of categories){const b=document.createElement('button');b.type='button';b.textContent=name;b.setAttribute('role','tab');b.setAttribute('aria-controls','shop');b.onclick=()=>{selectCategory(name);shop.scrollLeft=0;};b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const next=tabs.children[(categories.indexOf(name)+(e.key==='ArrowRight'?1:categories.length-1))%categories.length];next.click();next.focus();};tabs.append(b);}
  shop.setAttribute('role','tabpanel');shop.setAttribute('aria-label','ของสำหรับหน้าร้าน');
  function paintProduct(canvas,key,rotation=0){
   const d=CATALOG[key],o={id:'preview-'+key,type:d.kind,_key:key,def:d,cx:0,cy:0,rot:rotation,slugs:[],decor:[]};

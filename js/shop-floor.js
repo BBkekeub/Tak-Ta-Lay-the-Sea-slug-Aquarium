@@ -290,7 +290,7 @@ const ANIM_MIN_PX = 30;    // ทากบนจอสูง ≥ เท่าน
 let   animBudget  = 0;     // งบตัวที่อนิเมชันได้ต่อเฟรม (กันกระตุกถ้าซูมใกล้แล้วเห็นเยอะ)
 
 /* กรอบวัตถุบนจอ (ก้น z=0 ถึงยอด) → คัดเฉพาะที่เห็นในจอมาวาด/ขยับ (กันกระตุกตอนของเยอะ) */
-function objTopZ(o){ if(o._key==='counter')return 30*ZUNIT;return o.type==='tank' ? tankStandH(o.def)+tankGlassH(o.def) : (o.type==='deco'? decoH(o) : 0); }
+function objTopZ(o){ if(o.def.playTable)return 20*ZUNIT; if(o._key==='counter')return 30*ZUNIT;return o.type==='tank' ? tankStandH(o.def)+tankGlassH(o.def) : (o.type==='deco'? decoH(o) : 0); }
 function onScreen(o){
   const d=o.def, cx=o.cx, cy=o.cy, tz=objTopZ(o), M=80;
   let minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;
@@ -332,8 +332,6 @@ function drawRoomFloorLayer(){
 
 function drawFloor(){
   if(document.hidden)return;
-  ctx.setTransform(DPR,0,0,DPR,0,0);
-  ctx.clearRect(0,0,CW,CH);
   // อนิเมชันหน้าร้าน (เปิด/ปิดได้) — เปิด = ทากเดินในตู้
   if(engineReady){
     SlugEngine.ANIM = shopAnim;
@@ -343,6 +341,8 @@ function drawFloor(){
     } else floorLastT=0;
   }
   if(typeof stepPeople==='function') stepPeople();     // ลูกค้าเดินดูตู้ (มีตัวจับเวลาของตัวเอง)
+  if(typeof PlayTable!=='undefined'&&PlayTable.isOpen())return;
+  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,CW,CH);
   /* ---- ชั้นห้อง+พื้น: เปลี่ยนเฉพาะตอนกล้องขยับ/ร้านโต จึงแคชเป็นภาพไว้ แล้วแปะทีเดียว ----
      ก่อนหน้านี้เททั้งเท็กซ์เจอร์ผนัง+พื้นแกรนิตใหม่ทุกเฟรม 60 ครั้ง/วิ = ต้นเหตุที่กระตุก
      (การเท pattern ที่มี setTransform บนพื้นที่ใหญ่ ๆ แพงกว่าเทสีล้วนหลายสิบเท่า) */
@@ -492,6 +492,7 @@ function isoBox(cx,cy,w,h, baseZ, boxH, topCol, rightCol, frontCol, alpha){
 }
 
 function drawObject(o){
+  if(o.def.playTable){drawPlayTable(o);return;}
   const d=o.def, cx=o.cx, cy=o.cy;
   if(o.type==='deco'){
     if(o._key==='counter'){drawTradeCounter(o);return;}
@@ -849,7 +850,7 @@ cv.addEventListener('pointerup', e=>{
   // คลิก (ไม่ลาก) — ใช้ tankHit ก่อน (คลิกกระจกตู้ที่ยกสูงก็เข้าได้ + รู้จุดโฟกัส)
   const th=tankHit(sx,sy);
   const o=objAt(cell);
-  if(appMode==='view'){ if(th) enterTank(th.o,{fx:th.fx,fy:th.fy}); return; } // โหมดดู: คลิกตู้=เข้า
+  if(appMode==='view'){ const play=typeof playTableHit==='function'?playTableHit(sx,sy):null;if(play&&(!th||play.cx+play.cy>=th.o.cx+th.o.cy)){openPlayTable(play);return;} if(th) enterTank(th.o,{fx:th.fx,fy:th.fy}); return; } // โหมดดู: คลิกตู้=เข้า
   // โหมดก่อสร้าง
   if(tool==='remove'){ if(o) removeObj(o); else if(th) removeObj(th.o); return; }
   if(tool==='sell'){ if(o) sellObj(o); else if(th) sellObj(th.o); return; }
