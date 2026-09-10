@@ -1437,6 +1437,7 @@ function drawTank(){
   // จัดกล้องใหม่เมื่อเลย์เอาต์นิ่งแล้ว (ขนาด canvas ตอนคลิกเปิดตู้อาจยังไม่พร้อม → ซูมเพี้ยน)
   resizeTank();
   if(tankNeedFit){ applyEnterView(tankFocus); tankNeedFit=false; }
+  if(window.SlugRace?.isRacing(curTank))SlugRace.updateTankFrame(performance.now());
 
   const fw=curTank.def.w, fh=curTank.def.h;
   const wallH=wallCells(), standH=STAND_CELLS, sandT=SAND_CELLS;   // ความสูง (หน่วยช่อง)
@@ -1547,10 +1548,12 @@ function drawTank(){
 
   // --- delta time + พฤติกรรม ---
   const now=performance.now(); let dt=(now-(tankLastT||now))/1000; tankLastT=now; if(dt>0.05) dt=0.05;
-  const slugs=curTank.slugs;
+  const racing=window.SlugRace?.isRacing(curTank);
+  const slugs=racing?SlugRace.normalSlugs(curTank):curTank.slugs;
   tuneSpriteBudget(dt*1000);
   _tsprBudget = TSPR_MAX;                 // งบเรนเดอร์สไปรต์ต่อเฟรม ปรับตามความเร็วเครื่อง
-  stepTankSlugs(heldSlug? slugs.filter(s=>s!==heldSlug) : slugs, fw, fh, dt, true, curTank.decor, curTank.def);
+  if(racing)SlugRace.stepNormal(slugs,dt);
+  else stepTankSlugs(heldSlug? slugs.filter(s=>s!==heldSlug) : slugs, fw, fh, dt, true, curTank.decor, curTank.def);
 
   // --- วาดทาก + ของตกแต่ง รวมกัน เรียงลึก (fy มาก=ไกล วาดก่อน) · clip กล่องแก้วแบบเปิดฝา ---
   tctx.save(); clipOpen();
@@ -1565,11 +1568,13 @@ function drawTank(){
     for(const m of masks){ if(m.behind.has(k)){ sy=m.d.fy+0.05; break; } if(m.front.has(k)){ sy=m.d.fy-0.05; break; } }
     if(s===heldSlug) sy=-1e9;                                 // ตัวที่ยกอยู่ = หน้าสุดเสมอ
     items.push({sortY:sy, kind:'slug', s}); });
+  if(racing)items.push(...SlugRace.racingItems());
   items.sort((a,b)=> b.sortY - a.sortY);
   const ghKey = dragDecor ? dragDecor.key : (tankBuildMode ? selDecorKey : null);
   const ghPos = dragDecor ? dragGhost : decorHover;
   const ghFlip= dragDecor ? dragDecor.flip : placeFlip;
   items.forEach(it=>{
+    if(it.kind==='race'){SlugRace.drawRunner(it.r,it.i);return;}
     if(it.kind==='food'){drawFood(it.f);return;}
     if(it.kind==='decor'){ drawDecor(it.d); return; }
     const s=it.s;

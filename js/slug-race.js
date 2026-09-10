@@ -1,6 +1,6 @@
 /* One saved appointment per shop, independent of furniture ownership.
  * Race positions are head coordinates in centimetres; all entrants use stride().
- * The modal owns input, while the existing simulation continues separately.
+ * Racing uses the existing tank camera/renderer; only prompts and results are modal.
  */
 (()=>{
  'use strict';
@@ -20,8 +20,8 @@
  let state=G.racing;
  if(!state||!Number.isFinite(state.nextAt)||state.nextAt<0)state={purchased:false,nextAt:0,offer:null,active:null};
  G.racing=state;
- let visitors=[],modal=null,canvas=null,backdrop=null,raf=0,lastFrame=0,lastDraw=0,lastSave=0;
- let sprites=[],lastKey=null,countNode=null,resultNode=null,buttons=[];
+ let visitors=[],modal=null,raceUI=null,lastFrame=0,lastSave=0,cameraKey='',raceProgress=null,burstAnimations=[],raceBottom=92,raceResize=null;
+ let sprites=[],lastKey=null,countNode=null,buttons=[];
  let resumeReady=false,offerDeadline=0;
  const names=['คลื่น','ฟอง','ปะการัง','น้ำวน','มุก','หาดทราย','ใบเรือ','เค็ม'];
  function purchased(){
@@ -65,7 +65,7 @@
  function tick(){
    if(owned())purchased();
    if(state.active){
-     if(resumeReady&&!modal&&!window.BOOTING)openRace();
+     if(resumeReady&&!modal&&!raceUI&&!window.BOOTING)openRace();
      return;
    }
    if(!tank()){
@@ -83,8 +83,11 @@
    element('h2',title,modal);document.body.append(modal);modal.showModal();return modal;
  }
  function close(){
-   cancelAnimationFrame(raf);raf=0;modal?.close();modal?.remove();modal=null;canvas=null;backdrop=null;
-   sprites=[];buttons=[];lastFrame=0;lastDraw=0;lastKey=null;
+   for(const animation of burstAnimations)animation.cancel();burstAnimations=[];
+   modal?.close();modal?.remove();modal=null;
+   raceResize?.disconnect();raceResize=null;
+   raceUI?.remove();raceUI=null;document.body.classList.remove('race-in-tank');
+   sprites=[];buttons=[];lastFrame=0;lastKey=null;cameraKey='';
  }
  function ask(){
    if(modal||!state.offer||!tank()||state.active)return;
@@ -115,9 +118,13 @@
    const later=element('button','กลับไปเตรียมทาก',d);later.className='tbtn';later.onclick=close;
  }
  function drawTrack(c,project){
-   c.save();c.lineWidth=1.5;c.strokeStyle='#faf1d7';
-   for(const y of [2,4,6,8]){const a=project(0,y),b=project(40,y);c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();}
-   for(const x of [4,36]){const a=project(x,2),b=project(x,8);c.strokeStyle=x===4?'#45a879':'#272f39';c.lineWidth=3;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();}
+   const quad=(x0,y0,x1,y1,color)=>{const pts=[project(x0,y0),project(x1,y0),project(x1,y1),project(x0,y1)];c.fillStyle=color;c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y));c.closePath();c.fill();};
+   c.save();
+   for(let i=0;i<3;i++)quad(0,2+i*2,40,4+i*2,['#c2d5bc','#e4cea1','#c4d6db'][i]);
+   // Physical strips remain visible under water and retain width at every zoom.
+   for(const y of [2,4,6,8])quad(0,y-.045,40,y+.045,'#244f56');
+   quad(3.94,2,4.06,8,'#18684c');
+   for(let row=0;row<12;row++)for(let col=0;col<2;col++)quad(35.8+col*.2,2+row*.5,36+col*.2,2+(row+1)*.5,(row+col)%2?'#f4ebd1':'#233b40');
    c.restore();
  }
  function drawChallengers(){
@@ -166,85 +173,106 @@
    a.delta=a.rank===1?a.wager*2:a.rank===3?-a.wager:0;
    G.coin+=a.delta;a.settled=true;saveGame();syncHUD();showResult();
  }
+ function complete(){
+   state.active=null;state.offer=null;leave();close();exitTank();saveGame();
+ }
+ function resultFireworks(host){
+   if(document.hidden||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+   const layer=element('div',null,host);layer.className='race-result-fireworks';layer.setAttribute('aria-hidden','true');
+   for(let burst=0;burst<3;burst++)for(let i=0;i<10;i++){
+     const spark=element('i',null,layer),angle=i*Math.PI/5,reach=35+Math.random()*50;
+     spark.style.left=(20+burst*30)+'%';spark.style.top=(burst===1?20:36)+'%';spark.style.background=['#efcd72','#85d5c5','#eaa3aa'][i%3];
+     const animation=spark.animate([{transform:'translate(0,0) scale(.1)',opacity:0},{offset:.12,opacity:1},{transform:'translate('+Math.cos(angle)*reach+'px,'+(Math.sin(angle)*reach+25)+'px) scale(.2)',opacity:0}],{duration:950,delay:burst*110,fill:'both',easing:'ease-out'});
+     burstAnimations.push(animation);
+   }
+   Promise.all(burstAnimations.map(a=>a.finished.catch(()=>{}))).then(()=>layer.remove());
+ }
  function showResult(){
-   const a=state.active;if(!a?.settled||!resultNode)return;
-   countNode.textContent='จบการแข่งขัน';buttons.forEach(b=>b.disabled=true);
-   resultNode.replaceChildren();
-   element('h3','คุณเข้าอันดับที่ '+a.rank+' · '+(a.delta>0?'+':'')+a.delta.toLocaleString()+' ทอง',resultNode);
-   const list=element('ul',null,resultNode);
-   [a.entrants[1],a.entrants[2],a.entrants[0]].sort((x,y)=>(x.finished??Infinity)-(y.finished??Infinity)).forEach(r=>element('li',r.name+' — '+(Number.isFinite(r.finished)?r.finished.toFixed(2)+' วินาที':'ยังไม่เข้าเส้นชัย'),list));
-   element('p',a.rank===1?'ผู้ท้า: ฝากไว้ก่อนเถอะ! คราวหน้าจะเอาคืนให้ได้!':a.rank===2?'ผู้ท้า: ไว้เจอกันใหม่อีกครั้ง!':'ผู้ท้า: ฮ่า ๆ! ฝึกมาอีกหน่อย ยังตามพวกเราไม่ทันหรอก!',resultNode);
-   const done=element('button','กลับร้าน',resultNode);done.className='tbtn';done.onclick=()=>{state.active=null;state.offer=null;leave();close();saveGame();};
+   const a=state.active;if(!a?.settled||modal)return;
+   buttons.forEach(b=>b.disabled=true);
+   const d=dialog('คุณได้อันดับที่ '+a.rank);d.id='raceResult';d.classList.add('race-result');
+   d.addEventListener('cancel',e=>{e.preventDefault();complete();});
+   element('p',a.rank===1?'ชนะการแข่งขัน!':a.rank===2?'เข้าเส้นชัยเป็นอันดับสอง':'เข้าเป็นอันดับสุดท้าย',d).className='race-result-caption';
+   const podium=element('div',null,d);podium.className='race-podium';
+   // Final order at the moment the player's placing is decided.
+   const ordered=a.entrants.map((r,i)=>({r,i})).sort((x,y)=>((x.r.finished??Infinity)-(y.r.finished??Infinity))||(y.r.head-x.r.head)||(y.i-x.i));
+   for(const place of [2,1,3]){
+     const {r,i}=ordered[place-1],step=element('div',null,podium);step.className='race-podium-step place-'+place+(i===0?' is-player':'');
+     element('span',i===0?'คุณ':r.name,step).className='race-podium-name';
+     const c=element('canvas',null,step);c.width=180;c.height=110;c.setAttribute('aria-label',r.name);c.setAttribute('role','img');
+     const sprite=slugSprite(sprites[i]||{genes:r.genes});if(sprite){const scale=Math.min(160/sprite.c.width,100/sprite.c.height),w=sprite.c.width*scale,h=sprite.c.height*scale;c.getContext('2d').drawImage(sprite.c,(180-w)/2,(110-h)/2,w,h);}
+     const block=element('div',null,step);block.className='race-podium-block';element('span',['','🥇','🥈','🥉'][place],block).className='race-medal';element('b',String(place),block);
+   }
+   const receipt=element('div',null,d);receipt.className='race-receipt';
+   element('span','เดิมพัน '+a.wager.toLocaleString()+' ทอง',receipt);
+   element('strong',(a.delta>0?'ได้รับ +':a.delta<0?'เสีย ':'ไม่เสีย ไม่ได้เพิ่ม · ')+a.delta.toLocaleString()+' ทอง',receipt);
+   element('small','ทองคงเหลือ '+G.coin.toLocaleString(),receipt);
+   element('p',a.rank===1?'ผู้ท้า: ฝากไว้ก่อน! คราวหน้าจะเอาคืน!':a.rank===2?'ผู้ท้า: ไว้เจอกันใหม่อีกครั้ง!':'ผู้ท้า: ฮ่า ๆ! ฝึกมาอีกหน่อยนะ!',d).className='race-taunt';
+   const done=element('button','รับทราบ · กลับร้าน',d);done.className='tbtn';done.onclick=complete;done.focus();resultFireworks(d);
  }
- function buildBackdrop(t){
-   backdrop=document.createElement('canvas');backdrop.width=1000;backdrop.height=500;const c=backdrop.getContext('2d');
-   c.fillStyle='#183f47';c.fillRect(0,0,1000,500);c.fillStyle='#c6b787';c.fillRect(0,300,1000,200);
-   c.fillStyle='#99c1b4';c.font='16px sans-serif';c.fillText('พื้นที่เลี้ยงทั่วไป 200 × 60 ซม.',20,30);
-   drawTrack(c,(x,y)=>({x:x*25,y:500-y*25}));
-   c.fillStyle='#1c4546';c.font='bold 14px sans-serif';c.fillText('เริ่ม 20 ซม.',65,482);c.fillText('เส้นชัย 180 ซม.',845,482);
-   for(const f of t?.foods||[]){const im=FOOD_IMAGES[f.type],w=Math.max(14,f.spec.cap*1.65)*5;if(im?.complete&&im.naturalWidth)c.drawImage(im,f.fx*25-w/2,500-f.fy*25-w*.5,w,w);}
-   for(const d of t?.decor||[]){const info=TANK_DECOR[d.key],im=decorImg(d.key);if(!im.ok)continue;const w=info.wCm*5,h=w*im.img.naturalHeight/im.img.naturalWidth;c.save();c.translate(d.fx*25,500-d.fy*25);if(d.flip&1)c.scale(-1,1);c.drawImage(im.img,-w/2,-h/2,w,h);c.restore();}
+ function isRacing(t){return !!raceUI&&!!state.active&&(!t||t.id===state.active.tankId);}
+ function normalSlugs(t){return t.slugs.filter(s=>s.id!==state.active.entrants[0].id);}
+ function stepNormal(slugs,dt){
+   const t=G.objs.find(o=>o.id===state.active.tankId);if(!t)return;
+   stepTankSlugs(slugs,t.def.w,t.def.h,dt,true,t.decor,t.def);
+   for(const s of slugs){const min=8+slugCm(s.genes)/CM_PER_CELL*.55;if(s.fy<min){s.fy=min;s.state='rest';s.stt=1;}s.wall=null;s.climbZ=0;}
  }
- function drawSprite(c,s,x,y,length,pulse=0,head=false){
-   const sp=slugSprite(s),parts=slugPartsOf(s);if(!sp||!parts)return;
-   const scale=length*5/(parts.bw*parts.s),w=sp.w*scale,h=sp.h*scale;
-   c.save();c.translate(x,y);c.scale(1+Math.sin(pulse)*.035,1-Math.sin(pulse)*.035);
-   if(head){
-     // Native art faces left. Mirror around the body head, not the sprite box;
-     // gills/aura change its bounds, and must not move the measured start point.
-     const headPixel=sp.w/2-(parts.L+parts.R)*parts.s/2;
-     c.scale(-1,1);c.drawImage(sp.c,-headPixel*scale,-h/2,w,h);
-   }else c.drawImage(sp.c,-w/2,-h/2,w,h);
-   c.restore();
- }
- function render(){
-   if(!canvas||document.hidden)return;
-   const a=state.active,c=canvas.getContext('2d');c.drawImage(backdrop,0,0);
-   const t=G.objs.find(o=>o.id===a.tankId);
-   c.save();c.beginPath();c.rect(0,0,1000,300);c.clip();
-   for(const s of t?.slugs||[]){if(s.id===a.entrants[0].id)continue;drawSprite(c,s,s.fx*25,500-s.fy*25,slugCm(s.genes));}
-   c.restore();
+ function updateTankFrame(now){
+   if(!isRacing(curTank)||document.hidden||!countNode||!raceUI.querySelector('.race-controls'))return;
+   const dt=Math.min(.05,(now-(lastFrame||now))/1000);lastFrame=now;advance(dt);
+   const a=state.active,r=a.entrants[0];
    a.entrants.forEach((r,i)=>{
-     const y=425-i*50;drawSprite(c,sprites[i],r.head*5,y,r.length,r.finished===null?a.elapsed*12:0,true);
-     c.fillStyle=i===0?'#114f60':'#52482f';c.font='bold 12px sans-serif';c.fillText((i===0?'คุณ · ':'')+r.name,6,y-14);
+     const s=sprites[i],old=s.viewHead??r.head;
+     s.viewHead=r.finished!==null?r.head:old+(r.head-old)*(1-Math.exp(-dt*18));
+     if(Math.abs(r.head-s.viewHead)<.002)s.viewHead=r.head;
+     s.creepT=((s.viewHead-START)/(CREEP_BODY_PER_CYCLE*r.length))*Math.PI*2;
+     s.state=a.countdown===0&&!a.settled&&Math.abs(s.viewHead-old)>.001?'walk':'rest';
    });
-   if(!a.settled)countNode.textContent=a.countdown>0?String(Math.ceil(a.countdown)):a.elapsed<.7?'ไป!':'กดสลับ '+(lastKey==='a'?'D / ขวา':lastKey==='d'?'A / ซ้าย':'A / D');
- }
- function simulateRear(dt){
-   const a=state.active,t=G.objs.find(o=>o.id===a.tankId);if(!t)return;
-   const rest=t.slugs.filter(s=>s.id!==a.entrants[0].id);
-   stepTankSlugs(rest,t.def.w,t.def.h,dt,true,t.decor,t.def);
-   for(const s of rest){const min=8+slugCm(s.genes)/CM_PER_CELL*.55;if(s.fy<min){s.fy=min;s.dir=Math.abs(s.dir);s.state='rest';s.stt=1;}s.wall=null;s.climbZ=0;}
- }
- function frame(now){
-   if(!modal||!state.active)return;
-   const dt=Math.min(.05,(now-(lastFrame||now))/1000);lastFrame=now;
-   if(!document.hidden){advance(dt);if(now-lastDraw>=1000/30){render();lastDraw=now;}}
+   const top=60,bottom=raceBottom,usable=Math.max(90,TCH-top-bottom);
+   const key=TCW+'|'+TCH+'|'+bottom;
+   if(cameraKey!==key){cameraKey=key;tankCam.zoom=Math.max(.25,Math.min(1.6,(TCW-32)/(CELLW*(TCW<600?12:18)+DEPX*6),usable/(DEPY*8+80)));}
+   const desiredX=TCW*.46,desiredY=top+usable*.74,z=tankCam.zoom;
+   tankCam.ox=desiredX-((sprites[0].viewHead/CM_PER_CELL-curTank.def.w/2)*CELLW+(3-curTank.def.h/2)*DEPX)*z;
+   tankCam.oy=desiredY+(3-curTank.def.h/2)*DEPY*z+SAND_CELLS*ZH*z;tankNeedFit=false;
+   const message=a.countdown>0?String(Math.ceil(a.countdown)):a.settled?'จบการแข่งขัน':lastKey?'กด '+(lastKey==='a'?'D / ขวา':'A / ซ้าย'):'เริ่ม! กด A / D สลับกัน';
+   if(countNode.textContent!==message)countNode.textContent=message;
+   const distance=Math.min(160,Math.max(0,r.head-START)).toFixed(0)+' / 160 ซม.';
+   if(raceProgress.textContent!==distance)raceProgress.textContent=distance;
    if(now-lastSave>1000){saveGame();lastSave=now;}
-   raf=requestAnimationFrame(frame);
+ }
+ function racingItems(){return state.active.entrants.map((r,i)=>({sortY:3+i*2,kind:'race',r,i}));}
+ function drawRunner(r,i){
+   const s=sprites[i],parts=slugPartsOf(s);if(!parts)return;
+   const p=S((s.viewHead??r.head)/CM_PER_CELL,3+i*2,SAND_CELLS),scale=r.length*depthPxPerCm()/(parts.bw*parts.s),w=parts.w*scale,h=parts.h*scale;
+   if(p.x+w<0||p.x-w>TCW||p.y<0||p.y-h>TCH)return;
+   const stretch=s.state==='walk'?1+Math.sin(s.creepT)*.035:1;
+   const centerX=p.x-((parts.L+parts.R)/2-parts.bw/2*(1-stretch))*parts.s*scale,cy=p.y-h*.44;
+   drawTankSlug(s,parts,scale,centerX,cy,false);
+   drawDefaultEyes(parts,centerX,cy,true,parts.s*scale);
+   if(i===0){tctx.save();tctx.font='bold 12px sans-serif';tctx.textAlign='center';tctx.fillStyle='#153c42';tctx.fillRect(p.x-r.length*depthPxPerCm()/2-20,p.y+8,40,19);tctx.fillStyle='#ffe3a0';tctx.fillText('คุณ',p.x-r.length*depthPxPerCm()/2,p.y+22);tctx.restore();}
  }
  function openRace(){
-   const a=state.active;if(!a||modal)return;
-   spawn();
-   const d=dialog('🏁 สนามแข่งทากทะเล');d.classList.add('racing');
-   countNode=element('div','3',d);countNode.className='race-count';countNode.setAttribute('role','status');
-   canvas=element('canvas',null,d);canvas.width=1000;canvas.height=500;canvas.setAttribute('aria-label','สนามสามเลน ทากทั่วไปอยู่ด้านหลังแยกจากผู้แข่ง');
-   const controls=element('div',null,d);controls.className='race-controls';
+   const a=state.active,t=G.objs.find(o=>o.id===a?.tankId);if(!a||modal||raceUI||!t)return;
+   spawn();sprites=a.entrants.map(r=>({genes:r.genes,viewHead:r.head,flip:true,state:'rest',ph:0,noBob:true,creepT:0}));lastKey=a.lastKey;
+   // Reuse the existing aquarium canvas, furniture, water, lighting and camera.
+   raceUI=element('div');raceUI.id='raceTankHUD';document.body.classList.add('race-in-tank');
+   enterTank(t);ov.querySelector('.ov-body').append(raceUI);document.getElementById('ovTitle').textContent='🏁 ตู้แข่งทากทะเล';
+   const banner=element('div',null,raceUI);banner.className='race-tank-banner';countNode=element('div','3',banner);countNode.className='race-count';countNode.setAttribute('role','status');raceProgress=element('small','0 / 160 ซม.',banner);
+   const controls=element('div',null,raceUI);controls.className='race-controls';
    for(const [key,label] of [['a','A · ซ้าย'],['d','D · ขวา']]){
      const b=element('button',label,controls);b.type='button';b.setAttribute('aria-label','กระดึ๊บฝั่ง'+(key==='a'?'ซ้าย':'ขวา'));
      b.onpointerdown=e=>{e.preventDefault();press(key);};b.onclick=e=>{if(e.detail===0)press(key);};buttons.push(b);
    }
-   element('p','กดสลับสองฝั่ง กดค้างหรือกดซ้ำฝั่งเดิมไม่ขยับ • เดิมพัน '+a.wager+' ทอง',d);
-   resultNode=element('section',null,d);resultNode.setAttribute('aria-live','polite');
-   sprites=a.entrants.map(r=>({genes:r.genes}));lastKey=a.lastKey;
-   buildBackdrop(G.objs.find(o=>o.id===a.tankId));render();if(a.settled)showResult();raf=requestAnimationFrame(frame);
+   raceBottom=Math.max(88,controls.offsetHeight+22);
+   raceResize=new ResizeObserver(entries=>{raceBottom=Math.max(88,entries[0].contentRect.height+22);cameraKey='';});raceResize.observe(controls);
+   resizeTank();lastFrame=0;cameraKey='';if(a.settled)showResult();
  }
  window.addEventListener('keydown',e=>{
-   if(!modal?.open)return;
+   if(!raceUI||modal?.open)return;
    if(state.active){e.stopImmediatePropagation();if(['KeyA','KeyD','Space','Escape'].includes(e.code))e.preventDefault();if(!e.repeat&&(e.code==='KeyA'||e.code==='KeyD'))press(e.code==='KeyA'?'a':'d');}
  },true);
- document.addEventListener('visibilitychange',()=>{lastFrame=0;saveGame();});
- window.SlugRace={purchased,goal,drawTrack,drawChallengers,isOpen:()=>!!modal?.open,stride};
+ document.addEventListener('visibilitychange',()=>{lastFrame=0;if(document.hidden)for(const a of burstAnimations)a.cancel();saveGame();});
+ window.SlugRace={purchased,goal,drawTrack,drawChallengers,isOpen:()=>!!modal?.open,isRacing,normalSlugs,stepNormal,updateTankFrame,racingItems,drawRunner,stride};
  // Settled races retain their receipt; unfinished races resume, never reroll.
  if(state.active?.entrants?.length===3){
    state.active.entrants.forEach(r=>{if(r.finished===null&&state.active.settled)r.finished=Infinity;});
@@ -252,11 +280,11 @@
  if(owned())purchased();
  // Keep gameplay independent of the hidden shop renderer, at a bounded 20 Hz.
  setInterval(()=>{
-   if((!modal?.open&&!document.hidden)||window.BOOTING||!engineReady)return;
+   if((!modal?.open&&!raceUI&&!document.hidden)||window.BOOTING||!engineReady)return;
    stepPeople();
    for(const t of G.objs){
      if(t.type!=='tank'||!t.slugs.length)continue;
-     if(state.active&&t.id===state.active.tankId)simulateRear(.05);
+     if(raceUI&&t.id===state.active?.tankId){if(modal?.open||document.hidden)stepNormal(normalSlugs(t),.05);}
      else stepTankSlugs(t.slugs,t.def.w,t.def.h,.05,true,t.decor,t.def);
    }
  },50);
