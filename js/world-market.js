@@ -41,6 +41,10 @@
   const HAGGLE_AT  = 0.50;               // ผ่านครึ่งเวลาแล้วเริ่มโดนต่อราคา
   const HAGGLE_MAX = 0.25;               // ต่อราคาลงได้สูงสุด 25%
   const SIM_STEP   = 30 * 1000;          // ความละเอียดการจำลองเวลา
+
+  // กันสแปมลงขาย: ทุกครั้งที่ "วางขาย" สำเร็จ ราคากลางของตัวถัดไป (ในเทรนเดียวกัน) เหลือ 90% ของเดิม
+  // ทบไปเรื่อย ๆ จนกว่าเทรนจะเปลี่ยน (ทุก REFRESH_MS) แล้วรีเซ็ตกลับเป็น 100% ใหม่
+  const LIST_PENALTY_STEP = 0.9;
   /* ===================== */
 
   const GENE_KEYS  = Object.keys(GENE_BASE);
@@ -190,8 +194,12 @@
   function refreshTrend(m) {
     if (m.trend && m.trend.refreshAt > now()) return false;
     const target = trendTarget();
-    m.trend = { target, refreshAt: now() + REFRESH_MS };
+    m.trend = { target, refreshAt: now() + REFRESH_MS, listPenalty: 1 };  // เทรนใหม่ = เพนัลตี้จากการลงขายถี่ ๆ กลับมาเต็ม
     return true;
+  }
+  // ราคากลางที่ "ใช้จริง" ตอนนี้ = ราคากลางดิบ × เพนัลตี้สแปมของเทรนปัจจุบัน
+  function effectiveValue(m, genes) {
+    return Math.max(MIN_VALUE, Math.round(valueOf(genes, m.trend.target) * (m.trend.listPenalty || 1)));
   }
 
   /* ---------- ทากที่ลงขายได้ ---------- */
@@ -226,13 +234,14 @@
     }
     if (m.listings.length >= MAX_LIST) { say('ชั้นวางเต็มแล้ว (' + MAX_LIST + ' ช่อง)', 'bad'); return false; }
     if (totalShopSlugsSafe() <= 2) { say('ต้องเหลือทากในร้านอย่างน้อย 2 ตัว', 'bad'); return false; }
-    const s = entry.slug, value = valueOf(s.genes, m.trend.target);
+    const s = entry.slug, value = effectiveValue(m, s.genes);
     ask = Math.max(1, Math.round(+ask || value));
     removeSlug(entry);
     m.listings.push({
       key: 'L' + s.id + '-' + now().toString(36), id: s.id, genes: { ...s.genes }, slug: packSlug(s),
       value, ask, listedAt: now(), simAt: now(), prog: 0, jitter: 0.85 + Math.random() * 0.3
     });
+    m.trend.listPenalty = (m.trend.listPenalty || 1) * LIST_PENALTY_STEP;   // ลงขายอีกตัวในเทรนนี้ = ราคากลางถัดไปลดอีก 10%
     persist(); renderMarket(true);
     return true;
   }
@@ -458,7 +467,7 @@
     const m = market(), t = m.trend, showcase = getShowcase(m);
     if (!full && marketDialog.querySelector('[data-mk-listings]')) return refreshLive();
 
-    let _all = availableSlugs().map(e => ({ ...e, target: t.target, value: valueOf(e.slug.genes, t.target) }))
+    let _all = availableSlugs().map(e => ({ ...e, target: t.target, value: effectiveValue(m, e.slug.genes) }))
                              .sort((a, b) => b.value - a.value);
     const _q = _availFilter.trim().toLowerCase();
     if (_q) _all = _all.filter(e => (String(e.slug.id)+' '+SlugBrowser.name(e.slug)).toLowerCase().includes(_q));
@@ -471,6 +480,7 @@
       <p style="font-size:12px;opacity:.85;margin:8px 0">คุณตั้งราคาเอง — <b>ถูกกว่าราคากลาง = ขายไว</b> · <b>แพงกว่า = ช้า</b> · เกิน ${R_DEAD}× ของราคากลาง = ไม่มีใครซื้อ<br>
       ผ่านครึ่งเวลาแล้วผู้ซื้อจะเริ่มต่อราคา (ลดได้ถึง ${Math.round(HAGGLE_MAX * 100)}%) · ครบ 3 ชม. ยังไม่ขาย ทากจะกลับเข้าคลัง<br>
       เทรนเปลี่ยนใน <b data-mk-refresh>${fmtLeft(t.refreshAt - now())}</b></p>
+      ${(t.listPenalty || 1) < 0.999 ? `<p style="font-size:12px;color:#e0b07a;margin:0 0 10px">⚠️ ลงขายถี่ไปหน่อย — ราคากลางตอนนี้เหลือ <b>${Math.round((t.listPenalty || 1) * 100)}%</b> ของปกติ (กันสแปม) จะกลับมาเต็มเมื่อเทรนเปลี่ยน</p>` : ''}
 
       <h3 style="margin:14px 0 6px">ทากตัวอย่างที่ตลาดต้องการตอนนี้</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap">${showcase.map((c, i) =>

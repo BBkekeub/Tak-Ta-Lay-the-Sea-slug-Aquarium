@@ -841,6 +841,7 @@ function canPlaceDecor(key, fx, fy, flip, ignore){
   if(!curTank||!decorFitsTankWalls(key,fx,fy,flip,curTank)) return false;
   const NX=Math.round(curTank.def.w/DCELL), NY=Math.round(curTank.def.h/DCELL);
   const mine=decorFootprint(key,fx,fy,flip);
+  if(curTank.def.race&&(fy<8||[...mine].some(k=>(Number(k.split(',')[1])*DCELL)<8)))return false;
   if(!mine.size) return true;
   if(isBreeder(curTank)){const zone=fx<20?[0,20]:fx<25?[20,25]:[25,30];for(const k of mine){const [ix,iy]=k.split(',').map(Number),x=ix*DCELL,y=iy*DCELL;if(x<zone[0]||x+DCELL>zone[1])return false;if(zone[0]===20&&!(fy<1?y>=0&&y+DCELL<=1:fy>=curTank.def.h-1&&y>=curTank.def.h-1&&y+DCELL<=curTank.def.h))return false;}}
   for(const k of mine){ const c=k.split(','), ix=+c[0], iy=+c[1];
@@ -888,7 +889,7 @@ function clampTankPan(){
 const ENTER_ZOOM = 3.0;                       // ซูมเข้าหนักๆ จากระดับพอดี (โฟกัสจุดที่กด)
 const TANK_MAX_ZOOM = 5.0;
 function applyEnterView(focus){
-  if(isBreeder(curTank)){fitTankZoom();centerTankCam();return;}
+  if(isBreeder(curTank)||curTank.def.race){fitTankZoom();centerTankCam();return;}
   fitTankZoom();
   const R=tankZoomRange();
   tankCam.zoom = Math.max(R.min, Math.min(Math.min(TANK_MAX_ZOOM, R.max), tankCam.zoom*ENTER_ZOOM));
@@ -1421,6 +1422,7 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
 
 /* ---------- ฉากในตู้ (มองจากด้านหน้า — ขอบหน้าตรง ไม่มีมุมแหลม) ---------- */
 function drawTank(){
+  if(document.hidden||window.SlugRace?.isOpen()){requestAnimationFrame(()=>{if(tankMode)drawTank();else tankLoopOn=false;});return;}
   _tankFrame++;
   tctx.setTransform(DPR,0,0,DPR,0,0);
   tctx.clearRect(0,0,TCW,TCH);
@@ -1480,6 +1482,7 @@ function drawTank(){
       sandStyle=sg;
     } else if(spat){ fillQuad(a0,a1,a2,a3, spat, null); }
     fillQuad(a0,a1,a2,a3, sandStyle, null);
+    if(curTank.def.race&&window.SlugRace)SlugRace.drawTrack(tctx,(x,y)=>S(x,y,sandT));
   };
   /* ---------- ชั้นนิ่งที่อยู่ "หน้า" ตัวทาก: น้ำ + ผิวน้ำ + กระจกใกล้ ---------- */
   const drawGlass=(x)=>{
@@ -1496,7 +1499,7 @@ function drawTank(){
     SIDES.map(s=>face(s.a,s.b,sandT,wallH)).sort(byFar).slice(2)
          .forEach(f=> qfill(f.p,'rgba(150,205,215,0.05)','rgba(200,235,240,0.24)',1.3));
   };
-  const layKey=[TCW,TCH,DPR,tankCam.zoom.toFixed(4),fw,fh,wallH,
+  const layKey=[TCW,TCH,DPR,tankCam.zoom.toFixed(4),fw,fh,wallH,!!curTank.def.race,
                 (_sandImg&&_sandImg.naturalWidth)?1:0, texOK(woodSrc())?1:0].join('|');
   if(performance.now() >= _zoomBusyT && (_lay.key!==layKey || !layCovers())){
     const box=layBox();
@@ -1706,7 +1709,7 @@ tankCv.addEventListener('pointermove', e=>{
   if(dragFood){                                        // อาหารตามนิ้ว/เมาส์
     const {mx,my}=tankXY(e), f=tankFloorAt(mx,my);
     dragFood.fx=Math.max(1,Math.min(curTank.def.w-1, f.fx));
-    dragFood.fy=Math.max(1,Math.min(curTank.def.h-1, f.fy));
+    dragFood.fy=Math.max(curTank.def.race?8+Math.max(14,dragFood.spec.cap*1.65)/CM_PER_CELL/2:1,Math.min(curTank.def.h-1, f.fy));
     dragFoodMoved=true; tankCv.style.cursor='grabbing'; return;
   }
   if(heldSlug){                                        // ทากตามนิ้ว/เมาส์ไปเลย

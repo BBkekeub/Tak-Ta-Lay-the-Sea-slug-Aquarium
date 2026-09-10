@@ -56,7 +56,8 @@ function openSlugDelivery(id){
  const list=slugDeliveries(),idx=list.findIndex(d=>d.id===id);if(idx<0)return false;
  const d=list[idx];
  if(!slugDeliveryReady(d)){toast('พัสดุยังมาไม่ถึง · '+slugDeliveryWaitText(d),'bad');return false;}
- list.splice(idx,1);G.inv.push(makeSlug(d.genes));
+ list.splice(idx,1);const slug=makeSlug(d.genes);G.inv.push(slug);
+ if(window.NewSlugNotices)NewSlugNotices.add(slug,'box');
  if(typeof saveGame==='function')saveGame();if(typeof syncHUD==='function')syncHUD();
  toast('เปิดกล่อง'+d.name+' · ทากอยู่ในคลังแล้ว','good');
  refreshSlugShop();return true;

@@ -194,6 +194,7 @@ function foodCanPlace(type,level,fx,fy){
  const spec=FOOD_TYPES[type].levels[level-1],solid=decorSolidSet(tank.decor);
  if(fx<1||fy<1||fx>tank.def.w-1||fy>tank.def.h-1||solid.has(ptKey(fx,fy))) return {ok:false,why:'วางอาหารบนพื้นที่ว่างในตู้ครับ'};
  /* จำนวนอาหารสูงสุดต่อตู้ ไม่เท่ากันตามขนาด (foodMax ใน CATALOG) — ตู้เก่าที่ไม่มีค่านี้ใช้ 8 เหมือนเดิม */
+ if(tank.def.race&&fy-Math.max(14,spec.cap*1.65)/CM_PER_CELL/2<8)return {ok:false,why:'แถบสนามด้านหน้า 40 ซม. ห้ามวางอาหารและของตกแต่ง'};
  const foodMax=Number.isFinite(tank.def.foodMax)?tank.def.foodMax:8;
  if((tank.foods||[]).length>=foodMax) return {ok:false,why:'ตู้นี้วางอาหารพร้อมกันได้ไม่เกิน '+foodMax+' ชิ้น'};
  if(G.coin<spec.cost) return {ok:false,why:'เหรียญไม่พอ ('+spec.cost+')'};

@@ -404,6 +404,7 @@ function drawFloor(){
   syncRotateBtn();
   if(ghost) drawGhost(ghost);
   drawAreaBadges();
+  if(window.SlugRace)SlugRace.drawChallengers();
 }
 
 function drawBigDiamond(bx0,by0,bw,bh, fill, stroke, dashed){
@@ -533,6 +534,7 @@ function drawObject(o){
     sg.addColorStop(0,'rgba(150,112,52,0.42)'); sg.addColorStop(1,'rgba(228,190,126,0.20)');
     ctx.fillStyle=sg; ctx.fill();
   } else { ctx.fillStyle='#d8bd8c'; ctx.fill(); }
+  if(d.race&&window.SlugRace)SlugRace.drawTrack(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);});
   // ทากอยู่ก้นตู้ (ในน้ำ) — clip ให้อยู่ในกรอบตู้ (หัวไม่ทะลุกระจก) · ขนาด = ความยาวลำตัวจริง
   const displaySlugs=[...o.slugs,...breederVisualSlugs(o)];
   const pxPerCm=TW/CM_PER_CELL, shown=Math.min(displaySlugs.length,isBreeder(o)?70:20);   // ระยะแนวนอนต่อ 1 ช่อง (ตรงกับในตู้)
@@ -704,8 +706,10 @@ function placeBuy(cell){
   if(G.coin<def.price){ toast('เหรียญไม่พอ ('+def.price+')','bad'); return; }
   const o=snapFootprint(cell,def,buyRot);
   if(!canPlace(o.cx,o.cy,def,null,buyRot)){ toast('วางไม่ได้: ของทับกัน บังประตู หรือเหลือทางเข้าตู้ไม่พอ','bad'); return; }
+  if(def.race&&[...G.objs,...G.shelter].some(t=>t.def.race)){toast('มีตู้แข่งได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   G.coin-=def.price;
   G.objs.push({ id:'o'+(G.seq++), type:def.kind, _key:buyKey, cx:o.cx, cy:o.cy, def, rot:buyRot, slugs:[] });
+  if(def.race&&window.SlugRace)SlugRace.purchased();
   toast('วาง'+def.name+' −'+def.price,'good'); syncHUD();finishConstruction();
 }
 function objAt(cell){
@@ -977,7 +981,7 @@ document.getElementById('expH').onclick=()=>expand('h');
 /* ระหว่างหน้าโหลด (boot.js) ห้ามวาด — ไม่งั้นลูปจะไปแตะทากก่อน แล้วอบสไปรต์รวดเดียวทั้งฉาก
    = จอค้างยาว ซึ่งคือสิ่งที่หน้าโหลดตั้งใจจะเลี่ยง */
 function loop(){
-  if(!window.BOOTING && !(typeof tankMode!=='undefined' && tankMode)) drawFloor();
+  if(!window.BOOTING && !document.hidden && !(typeof tankMode!=='undefined' && tankMode) && !window.SlugRace?.isOpen()) drawFloor();
   requestAnimationFrame(loop);
 }
 
@@ -1037,5 +1041,4 @@ function ensureRotateBtn(){
   return b;
 }
 ensureRotateBtn();
-
 

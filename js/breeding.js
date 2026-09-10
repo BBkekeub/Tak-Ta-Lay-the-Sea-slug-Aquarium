@@ -59,8 +59,9 @@ function tickBreeder(o,dt,rnd=Math.random){
   if(larva.left>0)continue;
   if(!larva.ready&&larva.growthRoll!==undefined)larva.survives=larva.growthRoll<.7*breedingSatietyFactor(larva.slug.satiety)*breedingCleanFactor(o);
   if(!larva.survives){if(typeof onBreedLarvaDeath==='function')onBreedLarvaDeath(o,larva);b.larvae.splice(i,1);continue;}
-  larva.ready=true;
+  const newlyReady=!larva.ready;larva.ready=true;
   if(breederAdultSpace(o)){placeOnFloor(larva.slug,o);o.slugs.push(larva.slug);b.larvae.splice(i,1);}
+  if(newlyReady&&window.NewSlugNotices)NewSlugNotices.add(larva.slug,'grown');
  }
 }
 function breederVisualSlugs(o){

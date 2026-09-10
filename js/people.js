@@ -238,7 +238,7 @@ function startPersonAction(p,action,duration,partner=null){
   p.action=action;p.actionT=0;p.actionDuration=duration;p.socialPartner=partner;
 }
 function beginPersonBrowse(p){
-  p.state='look';p.t=0;p.lookT=5;p._browseActed=false;
+  p.state='look';p.t=0;p.lookT=p.raceChallenger?Infinity:5;p._browseActed=false;
   p.action='watch';p.actionT=0;p.actionDuration=0;p.socialPartner=null;
   p.socialCooldown=.5+Math.random()*.5;
 }
@@ -574,6 +574,7 @@ function crowdRoute(p,target){
 }
 
 function nextGoal(p){
+  if(p.raceChallenger&&window.SlugRace&&SlugRace.goal(p))return;
   if(p._columnFollower)return;
   if(p._yieldResume)return;
   if(p.tradeOffer)return;
@@ -1169,8 +1170,8 @@ function drawPerson(p){
     q([x0,y0,z0],[x0,y1,z0],[x1,y1,z0],[x1,y0,z0],frame,0);           // ก้นตู้
     q([x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],frame,6);           // ขอบบน
     q([x0+.006,y0+.004,z0+.010],[x1-.006,y0+.004,z0+.010],[x1-.006,y1-.006,z0+.010],[x0+.006,y1-.006,z0+.010],sand,0); // ทราย
-    // ตัวทากในตู้ — สีจากยีนสีลำตัว/หงอนของตัวที่เอามาขาย
-    rings([[0,lean+CARRY_Y,z0+.016,.030,.018],[0,lean+CARRY_Y,z0+.030,.038,.024],[0,lean+CARRY_Y,z0+.046,.026,.016]],p.carryAccent||'#d8b0d0',8);
+    // ตัวทากในตู้ — สีจากยีนสีลำตัว/หงอนของตัวที่เอามาขาย · ไม่มี carryAccent (เช่น พ่อค้ารับเหมาที่ถือกล่องเปล่ามารับซื้อ) = ไม่วาดทาก
+    if(p.carryAccent)rings([[0,lean+CARRY_Y,z0+.016,.030,.018],[0,lean+CARRY_Y,z0+.030,.038,.024],[0,lean+CARRY_Y,z0+.046,.026,.016]],p.carryAccent,8);
     // โครงกรอบหน้า 4 ด้าน (เปิดโล่งตรงกลาง)
     for(const [a,b] of [[[x0,y1,z0],[x1,y1,z0]],[[x0,y1,z1],[x1,y1,z1]],[[x0,y1,z0],[x0,y1,z1]],[[x1,y1,z0],[x1,y1,z1]]])
       limb(a,b,.006,.006,frame);

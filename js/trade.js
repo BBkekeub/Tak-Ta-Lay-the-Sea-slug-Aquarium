@@ -55,6 +55,10 @@ function finishTrade(id,accept=false){
   if(accept&&o.sell){
     if(!o.arrived||!PEOPLE.includes(o.p)||!G.objs.includes(o.counter)||o.counter===moving||o.cx!==o.counter.cx||o.cy!==o.counter.cy||o.rot!==o.counter.rot){finishTrade(id);return;}
     if(typeof buyFromPeddler!=='function'||!buyFromPeddler(o))return;
+  }else if(accept&&o.wholesale){
+    /* ข้อเสนอ 'พ่อค้ารับเหมาซื้อทาก' (slug-wholesaler.js) — ซื้อได้หลายตัวพร้อมกันในราคาคงที่ ไม่มี o.tank/o.slug เดี่ยว */
+    if(!o.arrived||!PEOPLE.includes(o.p)||!G.objs.includes(o.counter)||o.counter===moving||o.cx!==o.counter.cx||o.cy!==o.counter.cy||o.rot!==o.counter.rot){finishTrade(id);return;}
+    if(typeof sellToWholesaler!=='function'||!sellToWholesaler(o))return;
   }else if(accept){
     if(!o.arrived||!PEOPLE.includes(o.p)||!G.objs.includes(o.counter)||o.counter===moving||o.cx!==o.counter.cx||o.cy!==o.counter.cy||o.rot!==o.counter.rot||!G.objs.includes(o.tank)||!o.tank.slugs.includes(o.slug)){finishTrade(id);return;}
     if(typeof heldSlug!=='undefined'&&heldSlug===o.slug){toast('วางทากกลับตู้ก่อน');return;}
@@ -75,7 +79,7 @@ function finishTrade(id,accept=false){
 function stepTradeOffers(dt){
   for(const o of [...TRADE_OFFERS]){
     o.age+=dt;
-    const gone=o.sell?false:(!G.objs.includes(o.tank)||!o.tank.slugs.includes(o.slug));
+    const gone=(o.sell||o.wholesale)?false:(!G.objs.includes(o.tank)||!o.tank.slugs.includes(o.slug));
     if(!PEOPLE.includes(o.p)||gone||!G.objs.includes(o.counter)||o.counter===moving||o.cx!==o.counter.cx||o.cy!==o.counter.cy||o.rot!==o.counter.rot||o.age>(o.timeout||90))finishTrade(o.id);
   }
   tradeHudTime+=dt;if(tradeHudTime>1){tradeHudTime=0;renderTradeOffers();}
@@ -110,12 +114,13 @@ function renderTradeOffers(force=false){
   if(!force&&el.contains(document.activeElement)&&document.activeElement.tagName==='SELECT')return;
   const html=TRADE_OFFERS.map(o=>{
     if(o.sell)return typeof sellOfferCard==='function'?sellOfferCard(o):'';
+    if(o.wholesale)return typeof wholesaleOfferCard==='function'?wholesaleOfferCard(o):'';
     o.requestedId ||= o.slug.id;
     o.choices=SlugBrowser.apply(tradeAlternatives(o),'trade',c=>c.slug);
     const name=tradeEscape(SlugBrowser.name(o.slug)),tank=tradeEscape(o.tank.def.name+' '+o.tank.id);
     return `<div class="trade-offer-card">
       <div class="trade-offer-heading"><b>${o.price.toLocaleString()} <span>เหรียญ</span></b><span class="trade-status">${o.arrived?'รอคำตอบ':'กำลังเดินมา'}</span></div>
-      <div style="display:flex;align-items:center;gap:8px;margin:8px 0"><canvas data-trade-slug="${o.id}" width="120" height="80" style="width:100px;height:66px;background:#17262b;border-radius:6px"></canvas><div><b>ขายทาก ${name}</b><br><small>${tank}<br>ลูกค้าขอเดิม: ${tradeEscape(o.requestedId)}</small></div></div>
+      <div class="trade-slug-summary"><canvas data-trade-slug="${o.id}" width="120" height="80"></canvas><div class="trade-slug-details"><b>ขายทาก ${name}</b><br><small>${tank}<br>ลูกค้าขอเดิม: ${tradeEscape(o.requestedId)}</small></div></div>
       <button class="tbtn" onclick="inspectTradeSlug(${o.id})">ดูทาก ${name} ในตู้</button>
       <label style="display:block;margin:8px 0;font-size:12px">เลือกตัวที่จะขายแทน (ทากในตู้หน้าร้าน)
       <select style="display:block;width:100%;margin-top:5px;background:#202025;color:#eadcc4;padding:6px" onchange="chooseTradeSlug(${o.id},Number(this.value))">
@@ -127,7 +132,9 @@ function renderTradeOffers(force=false){
   el.innerHTML=html;SlugBrowser.mount(el.parentElement,'trade',()=>renderTradeOffers(true));
   for(const canvas of el.querySelectorAll('canvas[data-trade-slug]')){
     const o=TRADE_OFFERS.find(o=>o.id===Number(canvas.dataset.tradeSlug));if(!o)continue;
-    SlugBrowser.heart(canvas.parentElement,o.slug,()=>renderTradeOffers(true));
+    const controls=document.createElement('div');controls.className='trade-slug-controls';
+    canvas.parentElement.after(controls);
+    SlugBrowser.heart(controls,o.slug,()=>renderTradeOffers(true));
     const sprite=slugSprite(o.slug);if(!sprite)continue;
     const ratio=Math.min(112/sprite.c.width,72/sprite.c.height),w=sprite.c.width*ratio,h=sprite.c.height*ratio;
     canvas.getContext('2d').drawImage(sprite.c,(120-w)/2,(80-h)/2,w,h);
@@ -202,5 +209,5 @@ function notificationKind(msg,kind){
 }
 function notifyTradeArrival(offer){
  if(!offer.arrived||offer.soundNotified)return;
- if(playNotificationSound(offer.sell?'seller':'buyer'))offer.soundNotified=true;
+ if(playNotificationSound(offer.sell||offer.wholesale?'seller':'buyer'))offer.soundNotified=true;
 }
