@@ -6,6 +6,11 @@
  help.innerHTML='<form method="dialog"><button class="tbtn" aria-label="ปิดวิธีเล่น">✕</button></form><h2>วิธีเล่น</h2>';
  const instructions=[['กล้อง','ลากพื้นเพื่อเลื่อนกล้อง · ล้อเมาส์เพื่อซูม'],['ก่อสร้าง','เลือกของแล้วคลิกวาง · R หมุน · Esc ยกเลิก · ประตูวางบนกำแพง'],['ทางเดิน','หน้าตู้ต้องมีช่วงว่างต่อเนื่อง 50 ซม. และทางเดินลึก 100 ซม.'],['ดูตู้','คลิกตู้เพื่อเข้าไปดู · คลิกทากเพื่อเลือกและดูยีน'],['จัดของในตู้','เปิดจัดของ แล้วเลือกของเพื่อวาง · R พลิก · Esc วางมือ'],['ข้อเสนอ','เลือกดูตัวทากหรือเปลี่ยนตัวที่จะขายได้ ขายเมื่อกดยอมรับเท่านั้น']];
  for(const [title,body] of instructions){const d=document.createElement('details');const summary=document.createElement('summary');summary.textContent=title;const p=document.createElement('p');p.textContent=body;d.append(summary,p);help.append(d);}
+ 
+ const supportDetails = document.createElement('details');
+ supportDetails.innerHTML = '<summary>💖 สนับสนุนผู้พัฒนา</summary><div style="background:#141617;border:1px solid #3b4d4b;border-radius:12px;padding:16px;text-align:center;margin-top:12px"><p style="font-size:13px;line-height:1.6;color:#c7c0b1;margin:0 0 16px">ถ้าชื่นชอบเกมร้านทากทะเล และอยากสนับสนุนค่ากาแฟหรือเติมเสบียงอาหารทากให้ผม<br>สามารถสนับสนุนได้ตามช่องทางด้านล่างนี้เลยครับ ขอบคุณที่แวะมาเล่นนะ! 🐌✨</p><img src="assets/QR PP.jpg" alt="QR Code PromptPay" style="width:100%;max-width:220px;border-radius:8px;margin-bottom:16px"><div style="background:#1e2425;border:1px solid #2a3535;border-radius:8px;padding:12px;font-size:13px;color:#c7c0b1"><p style="margin:4px 0">ธนาคารไทยพาณิชย์ (SCB)</p><p style="margin:4px 0">เลขบัญชี: <b style="color:#ffe1a0;font-size:15px;letter-spacing:1px">322-250-7470</b></p><p style="margin:4px 0">ชื่อบัญชี: นาย อัษฎา สารารัตน์</p></div></div>';
+ help.append(supportDetails);
+
  document.body.append(help);
  window.addEventListener('keydown',e=>{if(help.open&&e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();help.close();}},true);
  const helpButton=document.createElement('button');helpButton.className='tbtn';helpButton.textContent='?';helpButton.setAttribute('aria-label','วิธีเล่น');helpButton.onclick=()=>help.showModal();top.append(helpButton);
