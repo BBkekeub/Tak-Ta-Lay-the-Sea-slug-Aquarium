@@ -6,20 +6,16 @@
 .new-slug-icon.unread:after{content:'';position:absolute;right:3px;top:3px;width:8px;height:8px;border-radius:50%;background:#ffcf64;box-shadow:0 0 6px #ffcf64}
 body.mode-build:not(.inside-tank)>#newSlugTray{bottom:calc(var(--mobile-build,220px) + var(--mobile-nav,0px) + 12px)}
 
-/* การ์ด: ใช้ flex column + scroll เฉพาะเนื้อหา แทน "sticky header ข้างในดาลอกที่ scroll เอง"
-   เดิมสองชั้นนี้ชนกัน (มุมโค้งของการ์ดโดนเนื้อหาที่เลื่อนทับตอนสโครล + มีโอกาสได้สองแถบสโครลซ้อน)
-   ย้ายมาให้ header คงที่ ส่วน .new-slug-content เป็นตัวเดียวที่ overflow:auto จึงพอดีจอเสมอ
-   ไม่ว่าจอจะเตี้ยแค่ไหน (มือถือแนวนอน) เพราะ dialog เองจำกัดความสูงด้วย dvh แล้วส่งต่อให้ลูก */
-/* สำคัญ: "display:flex" ต้องผูกกับ [open] เท่านั้น — ถ้าใส่ไว้ที่ #newSlugCard เฉย ๆ
-   ตัวเลือกแบบ id (specificity สูง) จะไปทับกฎซ่อนของ dialog เอง (dialog:not([open]){display:none})
-   ผลคือการ์ดโชว์ค้างตั้งแต่โหลดหน้า ทั้งที่ยังไม่มีใครเรียก .showModal() เลย (กล่องว่างโผล่ทันที ✕ อย่างเดียว) */
+/* การ์ด: flex column + scroll เฉพาะ .new-slug-content เท่านั้น (กันสโครลซ้อน/มุมโค้งโดนทับ) */
+/* สำคัญ: "display:flex" ต้องผูกกับ [open] เท่านั้น ไม่งั้น id-selector จะไปทับกฎซ่อนของ dialog เอง
+   (dialog:not([open]){display:none}) แล้วการ์ดจะค้างโชว์ตั้งแต่โหลดหน้าทั้งที่ยังไม่ได้เปิด */
 #newSlugCard{
   box-sizing:border-box;
-  width:min(460px,calc(100vw - 24px));
-  max-height:min(720px,calc(100dvh - 24px));
+  width:min(560px,calc(100vw - 24px));
+  max-height:min(680px,calc(100dvh - 24px));
   padding:0;
   overflow:hidden;
-  border:1px solid #ddbd75;border-radius:22px;
+  border:1px solid #ddbd75;border-radius:20px;
   background:#152f34;color:#f4edda;
   box-shadow:0 24px 90px #000a,inset 0 1px #ffffff12;
   color-scheme:dark;font-family:inherit;
@@ -33,25 +29,25 @@ body.mode-build:not(.inside-tank)>#newSlugTray{bottom:calc(var(--mobile-build,22
 #newSlugCard::backdrop{background:radial-gradient(ellipse at 50% 20%,#0d3038cc,#020f13e8)}
 
 #newSlugCard>header{
-  flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;
-  padding:16px 18px;border-bottom:1px solid #ffffff1a;
+  flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:12px 16px;border-bottom:1px solid #ffffff1a;
   background:linear-gradient(180deg,#1c3f45,#16353b)
 }
-#newSlugCard h2{margin:0;font-size:20px;line-height:1.3;letter-spacing:.2px}
+#newSlugCard h2{margin:0;font-size:18px;line-height:1.3;letter-spacing:.2px}
 #newSlugCard>header button{
-  flex-shrink:0;min-width:40px;min-height:40px;border-radius:12px;
-  background:#ffffff10;border:1px solid #ffffff22;color:#f4edda;font-size:16px;
+  flex-shrink:0;min-width:36px;min-height:36px;border-radius:11px;
+  background:#ffffff10;border:1px solid #ffffff22;color:#f4edda;font-size:15px;
   display:flex;align-items:center;justify-content:center;transition:background .15s
 }
 #newSlugCard>header button:hover{background:#ffffff1c}
 
-.new-slug-content{flex:1 1 auto;min-height:0;overflow:auto;padding:16px 18px calc(20px + env(safe-area-inset-bottom))}
+.new-slug-content{flex:1 1 auto;min-height:0;overflow:auto;padding:14px 16px calc(14px + env(safe-area-inset-bottom))}
 
-/* aspect-ratio แทนการปล่อยให้ canvas กำหนดสัดส่วนเอง — กันภาพยืด/ล้นบนจอแคบหรือเตี้ย
-   and object-fit:contain กันภาพถูกครอปตอนอัตราส่วนกล่องไม่ตรงกับภาพวาด (560×260) */
+/* aspect-ratio สั้นลงกว่ารอบก่อน (5/2 แทน 560/260) — ประหยัดพื้นที่แนวตั้งให้ 11 ค่ายีน
+   อยู่ในหน้าเดียวโดยไม่ต้องเลื่อน ยังคง object-fit:contain กันภาพยืด/ล้น */
 .new-slug-hero{
-  position:relative;border-radius:16px;overflow:hidden;
-  aspect-ratio:560/260;
+  position:relative;border-radius:14px;overflow:hidden;
+  aspect-ratio:5/2;
   display:flex;align-items:center;justify-content:center
 }
 .new-slug-hero.is-box{background:radial-gradient(ellipse at 50% 30%,#4a7a72,#1d3d3e 75%)}
@@ -61,43 +57,43 @@ body.mode-build:not(.inside-tank)>#newSlugTray{bottom:calc(var(--mobile-build,22
   radial-gradient(circle at 82% 85%,#00000030,transparent 55%)}
 .new-slug-hero canvas{position:relative;display:block;width:100%;height:100%;object-fit:contain}
 .new-slug-badge{
-  position:absolute;top:10px;left:10px;z-index:1;
-  font-size:11.5px;font-weight:600;padding:6px 10px;border-radius:999px;
+  position:absolute;top:8px;left:8px;z-index:1;
+  font-size:11px;font-weight:600;padding:5px 9px;border-radius:999px;
   background:#0009;color:#ffe9b3;border:1px solid #ffffff2a;backdrop-filter:blur(3px)
 }
 
-.new-slug-name{margin:14px 0 2px;font-size:22px;line-height:1.3;overflow-wrap:anywhere}
-.new-slug-id{font-size:11.5px;font-family:'IBM Plex Mono',monospace;color:#8fa9a4;margin:0 0 14px;overflow-wrap:anywhere;letter-spacing:.3px}
+/* ชื่อ + ปุ่มถูกใจ + ปุ่มเปลี่ยนชื่อ แถวเดียวกัน — ชื่อยืดเต็มที่เหลือ ปุ่มไม่หด */
+.new-slug-title-row{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:10px 0 8px}
+.new-slug-name{margin:0;font-size:19px;line-height:1.3;overflow-wrap:anywhere;flex:1 1 auto;min-width:0}
+.new-slug-title-row .slugFavorite{flex:0 0 auto;min-height:36px;box-sizing:border-box;padding:7px 11px;white-space:nowrap;font-size:12.5px;border-radius:9px}
+.new-slug-gone{font-size:12px;color:#9fb3ae}
+.new-slug-id{font-size:11px;font-family:'IBM Plex Mono',monospace;color:#8fa9a4;margin:-4px 0 8px;overflow-wrap:anywhere;letter-spacing:.3px}
 
-.new-slug-controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
-.new-slug-controls .slugFavorite{min-height:42px;box-sizing:border-box;padding:9px 13px;white-space:nowrap;font-size:13.5px;border-radius:10px}
-.new-slug-controls p{font-size:12.5px;color:#9fb3ae;margin:4px 0}
+.new-slug-gene-heading{color:#f3d58c;margin:12px 0 8px;font-weight:600;font-size:12px;letter-spacing:.3px;text-transform:uppercase;opacity:.9}
 
-.new-slug-gene-heading{color:#f3d58c;margin:20px 0 10px;font-weight:600;font-size:13px;letter-spacing:.3px;text-transform:uppercase;opacity:.9}
-
-/* auto-fit แทน 2 คอลัมน์ตายตัว — 11 ยีนไม่ลงตัวกับ 2 คอลัมน์พอดี (เหลือ 1 ช่องเดี่ยวแถวสุดท้าย)
-   auto-fit ปรับจำนวนคอลัมน์ตามความกว้างจริง แถวสุดท้ายจึงไม่ค้างช่องว่างเก้อ ๆ อีกต่อไป */
-.new-slug-genes{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px}
-.new-slug-genes>div{min-width:0;padding:10px 11px;background:#ffffff08;border:1px solid #ffffff14;border-radius:11px}
-.new-slug-genes dt{font-size:11.5px;line-height:1.3;overflow-wrap:anywhere;color:#a9c0ba;margin-bottom:5px}
-.new-slug-genes dd.new-slug-gene-value{margin:0;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:2px}
-.new-slug-gene-value b{font-size:19px;color:#f4edda}
-.new-slug-gene-value small{font-size:11px;color:#7fa39c}
+/* แถวเดียวต่อค่ายีน (ป้ายชื่อ + ตัวเลขชิดขวา) แทนป้าย/ตัวเลขซ้อนกันคนละบรรทัด
+   ประหยัดความสูงลงพอสมควร ให้ 11 ค่าลงจบในจอเดียวได้จริง แทนที่จะต้องเลื่อนดู */
+.new-slug-genes{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:6px}
+.new-slug-genes>div{min-width:0;display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:6px 10px;background:#ffffff08;border:1px solid #ffffff14;border-radius:9px}
+.new-slug-genes dt{font-size:11px;line-height:1.3;overflow-wrap:anywhere;color:#a9c0ba}
+.new-slug-genes dd.new-slug-gene-value{margin:0;flex-shrink:0;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:2px}
+.new-slug-gene-value b{font-size:14.5px;color:#f4edda}
+.new-slug-gene-value small{font-size:10px;color:#7fa39c}
 
 .new-slug-fireworks{position:absolute;inset:0;pointer-events:none}
 .new-slug-fireworks i{position:absolute;width:5px;height:8px;border-radius:2px}
 .new-slug-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 
-@media(max-width:400px){
-  #newSlugCard{border-radius:18px}
-  #newSlugCard h2{font-size:17px}
-  .new-slug-content{padding:12px 12px calc(16px + env(safe-area-inset-bottom))}
-  .new-slug-name{font-size:19px}
-  .new-slug-genes{grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:6px}
-  .new-slug-genes>div{padding:8px 9px}
+@media(max-width:460px){
+  #newSlugCard{border-radius:16px}
+  #newSlugCard h2{font-size:16px}
+  .new-slug-content{padding:11px 12px calc(12px + env(safe-area-inset-bottom))}
+  .new-slug-name{font-size:17px}
+  .new-slug-genes{grid-template-columns:repeat(auto-fit,minmax(124px,1fr));gap:5px}
+  .new-slug-genes>div{padding:6px 8px}
 }
-/* มือถือแนวนอน/จอเตี้ย: ลดสัดส่วนภาพลงแทนที่จะปล่อยให้การ์ดล้นจอ */
+/* มือถือแนวนอน/จอเตี้ย: ลดสัดส่วนภาพลงอีก แทนที่จะปล่อยให้การ์ดล้นจอ */
 @media(max-height:640px) and (orientation:landscape){
   #newSlugCard{max-height:calc(100dvh - 12px)}
-  .new-slug-hero{aspect-ratio:560/170}
+  .new-slug-hero{aspect-ratio:560/140}
 }

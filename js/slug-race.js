@@ -129,11 +129,32 @@
  }
  function drawChallengers(){
    if(!state.offer)return;
-   ctx.save();ctx.font='bold 13px sans-serif';ctx.textAlign='center';
-   visitors.forEach(p=>{if(!personOnScreen(p))return;const b=personScreenBounds(p);const x=clamp((b.x0+b.x1)/2,64,CW-64),y=clamp(b.y0-8,26,CH-12);
-     ctx.fillStyle='#123e48';ctx.fillRect(x-62,y-20,124,28);ctx.fillStyle='#ffe18a';ctx.fillText('🏁 คลิกเพื่อแข่ง',x,y);
-     p._raceHit={x0:x-62,x1:x+62,y0:y-20,y1:y+8};
-   });ctx.restore();
+   /* ป้ายเดิมใช้ textBaseline ปริยาย ('alphabetic') แต่กล่องกำหนดสูง/ตำแหน่งตายตัวแยกกัน
+      สระบน-ล่างของภาษาไทยเลยหลุดกรอบ/ลอยไม่ตรงกล่อง — ที่นี่จัดกลางทั้งแนวตั้ง-นอนจริง
+      และวัดความกว้างตัวอักษรจริงแทนเลข 124 ตายตัว กล่องจึงพอดีข้อความเสมอ
+      โทนสี/ขอบทองอิงป้าย .race-tank-banner ในตู้แข่ง ให้เข้าธีมเดียวกับเกมทั้งหมด */
+   const font='bold 13px "IBM Plex Sans Thai",sans-serif',label='🏁 คลิกเพื่อแข่ง';
+   ctx.save();ctx.font=font;ctx.textAlign='center';ctx.textBaseline='middle';
+   const padX=16,padY=9,textW=ctx.measureText(label).width,boxW=textW+padX*2,boxH=13+padY*2,radius=boxH/2;
+   const glow=.55+.35*(.5+.5*Math.sin(performance.now()/260));
+   visitors.forEach(p=>{
+     if(!personOnScreen(p))return;
+     const b=personScreenBounds(p);
+     const x=clamp((b.x0+b.x1)/2,boxW/2+4,CW-boxW/2-4),y=clamp(b.y0-boxH/2-10,boxH/2+4,CH-boxH/2-4);
+     const left=x-boxW/2,top=y-boxH/2;
+     ctx.beginPath();
+     ctx.moveTo(left+radius,top);
+     ctx.arcTo(left+boxW,top,left+boxW,top+boxH,radius);
+     ctx.arcTo(left+boxW,top+boxH,left,top+boxH,radius);
+     ctx.arcTo(left,top+boxH,left,top,radius);
+     ctx.arcTo(left,top,left+boxW,top,radius);
+     ctx.closePath();
+     ctx.fillStyle='rgba(15,45,50,.92)';ctx.fill();
+     ctx.lineWidth=1.4;ctx.strokeStyle='rgba(231,198,123,'+glow+')';ctx.stroke();
+     ctx.fillStyle='#ffe1a0';ctx.fillText(label,x,top+boxH/2+1);
+     p._raceHit={x0:left,x1:left+boxW,y0:top,y1:top+boxH};
+   });
+   ctx.restore();
  }
  function hit(e){
    if(tankMode||modal||!state.offer)return false;
