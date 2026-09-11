@@ -79,7 +79,7 @@
  document.body.appendChild(card);
  function placeCard(){ const bar=document.querySelector('.topbar'); const b=bar?Math.ceil(bar.getBoundingClientRect().bottom):48; card.style.top=(Math.max(8,b)+10)+'px'; }
  placeCard(); window.addEventListener('resize',placeCard);
- function updateCardVisibility(){ const ov=document.getElementById('ov'); card.style.display=(ov&&ov.classList.contains('on'))?'none':'block'; }
+ function updateCardVisibility(){ if(G.questDone){ card.style.display='none'; return; } const ov=document.getElementById('ov'); card.style.display=(ov&&ov.classList.contains('on'))?'none':'block'; }
  const _ovEl=document.getElementById('ov'); if(_ovEl&&typeof MutationObserver!=='undefined') new MutationObserver(updateCardVisibility).observe(_ovEl,{attributes:true,attributeFilter:['class']});
  updateCardVisibility();
  let questCollapsed=false; try{ questCollapsed=localStorage.getItem('questCardCollapsed')==='1'; }catch(e){}
@@ -110,7 +110,7 @@
  function updateQuestGlow(){ const cq=G.questDone?null:QUESTS[G.questIndex]; if(cq&&cq.btn&&_glowPressedQuest!==cq.id) applyGlow(cq.btn,cq.id); else clearGlow(); }
  function renderCard(){
   updateQuestGlow();
-  if(G.questDone){ card.innerHTML=questHeader('เควส')+(questCollapsed?'':'<div style="font-weight:600;color:#f1c66d;margin-top:3px">🎉 จบบทเรียนเริ่มต้น</div><div style="opacity:.85;margin-top:3px">เปิดร้านเพาะทากได้เต็มตัวแล้ว ลุยเลย!</div>'); bindToggle(); return; }
+  if(G.questDone){ card.style.display='none'; clearGlow(); return; }
   const i=G.questIndex, q=QUESTS[i]; if(!q){ G.questDone=true; renderCard(); return; }
   if(questCollapsed){ card.innerHTML=questHeader('เควส '+(i+1)+' / '+QUESTS.length+' · '+q.t); bindToggle(); return; }
   const rw=[]; if(q.reward.tank)rw.push('🥚 ตู้เพาะพันธุ์ 1 ตู้'); if(q.reward.coin) rw.push('💰'+q.reward.coin); if(q.reward.rep) rw.push('⭐'+q.reward.rep);

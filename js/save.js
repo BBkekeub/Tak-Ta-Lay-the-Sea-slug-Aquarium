@@ -37,7 +37,7 @@ function saveGame(){
   if(!_saveOK) return;
   try{
     const data={
-      v:1, racing:G.racing||null, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||0, floorTiles:G.floorTiles||null, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, orders:G.orders||[], nextOrderAt:G.nextOrderAt||0, orderSeq:G.orderSeq||0, nextPeddlerAt:G.nextPeddlerAt||0, nextWholesalerAt:G.nextWholesalerAt||0, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
+      v:1, racing:G.racing||null, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||0, floorTiles:G.floorTiles||null, floorPaint:G.floorPaint||{}, wallPaint:G.wallPaint||{}, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, orders:G.orders||[], nextOrderAt:G.nextOrderAt||0, orderSeq:G.orderSeq||0, nextPeddlerAt:G.nextPeddlerAt||0, nextWholesalerAt:G.nextWholesalerAt||0, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
       newSlugNotices:G.newSlugNotices||[],
       objs:(G.objs||[]).map(_saveObj),
       shelter:(G.shelter||[]).map(_saveObj),
@@ -172,6 +172,14 @@ function loadGame(){
     G.boxStock=(d.boxStock&&Number.isFinite(d.boxStock.n)&&Number.isFinite(d.boxStock.at))
       ?{n:Math.max(0,Math.min(SLUG_BOX_MAX,d.boxStock.n|0)),at:d.boxStock.at}:null;
     G.slugDeliveries=Array.isArray(d.slugDeliveries)?d.slugDeliveries.filter(x=>x&&typeof x.id==='string'&&Number.isFinite(+x.readyAt)&&x.genes&&typeof x.genes==='object').map(x=>({id:x.id,boxIndex:_NUM(x.boxIndex,0)|0,name:String(x.name||''),readyAt:+x.readyAt,genes:_cleanGenes(x.genes),alerted:!!x.alerted})):[];
+    /* ทาสีทีละช่อง (เดิมเป็นวัสดุเดียวทั้งร้าน G.floorMat/G.wallMat) — คีย์ต้องเป็นพิกัดจำนวนเต็มจริง ๆ
+       และวัสดุต้องอยู่ในรายการปัจจุบันเท่านั้น กันเซฟที่ถูกแก้มือ/รุ่นเก่าที่ค้างชื่อวัสดุที่เลิกใช้แล้ว */
+    G.floorPaint={};
+    if(d.floorPaint&&typeof d.floorPaint==='object'&&typeof FLOOR_MATERIALS!=='undefined')
+      for(const k in d.floorPaint) if(/^\d+,\d+$/.test(k)&&FLOOR_MATERIALS.some(m=>m.id===d.floorPaint[k])) G.floorPaint[k]=d.floorPaint[k];
+    G.wallPaint={};
+    if(d.wallPaint&&typeof d.wallPaint==='object'&&typeof WALL_MATERIALS!=='undefined')
+      for(const k in d.wallPaint) if(/^\d+,\d+,[01]$/.test(k)&&WALL_MATERIALS.some(m=>m.id===d.wallPaint[k])) G.wallPaint[k]=d.wallPaint[k];
     G.bw=Math.max(1, _NUM(d.bw, G.bw)|0);
     G.bh=Math.max(1, _NUM(d.bh, G.bh)|0);
     G.floorTiles=Array.isArray(d.floorTiles)&&d.floorTiles.length?d.floorTiles.filter(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isInteger)&&p[0]>=0&&p[1]>=0&&p[0]<G.bw&&p[1]<G.bh):null;floorRevision++;

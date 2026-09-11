@@ -43,25 +43,32 @@ function commitFloorTiles(tiles){
  G.coin-=cost;G.floorTiles=[...set].map(k=>k.split(',').map(Number));G.bw=Math.max(...G.floorTiles.map(p=>p[0]))+1;G.bh=Math.max(...G.floorTiles.map(p=>p[1]))+1;floorRevision++;
  return {ok:true,count:added.length,cost};
 }
+/* กุญแจของ "ช่องกำแพง" หนึ่งช่อง — side 0 = ผนังเหนือของช่อง (x,y), 1 = ผนังตะวันตกของช่อง (x,y)
+   ใช้ทั้งตอนวาด (ด้านล่าง) และตอนหาว่าคลิกโดนช่องไหน (tile-paint.js) — ต้องตรงกันเป๊ะทั้งสองที่ */
+function wallKey(x,y,side){ return x+','+y+','+side; }
+/* เดิมใช้ได้เฉพาะร้านที่ผ่านระบบขยายแบบ "ทีละช่อง" (G.floorTiles ตั้งค่าแล้ว)
+   ตอนนี้ใช้ allFloorTiles() แทน (คืนกริดสี่เหลี่ยมเต็มเมื่อยังไม่เคยขยาย) จึงวาด "ผนังทีละช่อง"
+   ได้เสมอไม่ว่าร้านจะยังเป็นสี่เหลี่ยมเดิมหรือขยายมาแล้ว — จำเป็นเพื่อให้ทาสีกำแพงทีละช่องได้ทุกกรณี */
 function drawTileWalls(){
  const ends=[];const north=(x,y)=>ownsTile(x,y)&&!ownsTile(x,y-1),west=(x,y)=>ownsTile(x,y)&&!ownsTile(x-1,y);
- for(const [x,y] of G.floorTiles){
+ for(const [x,y] of allFloorTiles()){
   for(const side of [0,1]){
    if(ownsTile(x-(side===1),y-(side===0)))continue;
    const a=side===0?[x*SUB,y*SUB]:[x*SUB,(y+1)*SUB],b=side===0?[(x+1)*SUB,y*SUB]:[x*SUB,y*SUB];
-   drawWall(a,b,side===0?'rgba(255,242,220,0.05)':'rgba(0,0,0,0.20)');
+   const key=wallKey(x,y,side);
+   drawWall(a,b,side===0?'rgba(255,242,220,0.05)':'rgba(0,0,0,0.20)',key);
    const thickness=15/CM_PER_CELL;
    const dx=side===1?-thickness:0,dy=side===0?-thickness:0;
    if(side===0){
-    if(!north(x+1,y))ends.push([b,[b[0]+dx,b[1]+dy],'rgba(0,0,0,0.36)']);
-    if(!north(x-1,y)&&!west(x,y))ends.push([[a[0]+dx,a[1]+dy],a,'rgba(0,0,0,0.28)']);
+    if(!north(x+1,y))ends.push([b,[b[0]+dx,b[1]+dy],'rgba(0,0,0,0.36)',key]);
+    if(!north(x-1,y)&&!west(x,y))ends.push([[a[0]+dx,a[1]+dy],a,'rgba(0,0,0,0.28)',key]);
    }else{
-    if(!west(x,y+1))ends.push([[a[0]+dx,a[1]+dy],a,'rgba(0,0,0,0.28)']);
-    if(!west(x,y-1)&&!north(x,y))ends.push([b,[b[0]+dx,b[1]+dy],'rgba(0,0,0,0.36)']);
+    if(!west(x,y+1))ends.push([[a[0]+dx,a[1]+dy],a,'rgba(0,0,0,0.28)',key]);
+    if(!west(x,y-1)&&!north(x,y))ends.push([b,[b[0]+dx,b[1]+dy],'rgba(0,0,0,0.36)',key]);
    }
    const points=[a,b,[b[0]+dx,b[1]+dy],[a[0]+dx,a[1]+dy]].map(v=>P(v[0],v[1],ROOM_H));
    ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fillStyle='#696354';ctx.fill();
   }
  }
- for(const [a,b,tint] of ends)drawWall(a,b,tint);
+ for(const [a,b,tint,key] of ends)drawWall(a,b,tint,key);
 }

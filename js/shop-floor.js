@@ -136,8 +136,7 @@ function bigFill(bx,by){ return (bx+by)%2===0 ? '#123037' : '#0F2A30'; }
    ขอบไกลในไอโซเมตริกคือแนว cy=0 (ขวา-หลัง) กับ cx=0 (ซ้าย-หลัง)
    ============================================================ */
 const ROOM_H      = 48*ZUNIT;   // ความสูงผนัง (หน่วย world-z px)
-const MARBLE_CM   = 120;        // 1 ผืนหินอ่อน = กี่ ซม.
-const GRANITE_CM  = 90;         // 1 แผ่นแกรนิตพื้น = กี่ ซม.
+// ขนาดผืนพื้น/กำแพง (cm) ย้ายไปอยู่ในแต่ละรายการของ FLOOR_MATERIALS/WALL_MATERIALS (materials.js) แล้ว
 const SHOP_SAND_CM = 40, SHOP_WOOD_CM = 180;      // ต้องตรงกับในโหมดดูตู้ วัสดุจะได้เป็นชิ้นเดียวกัน
 const _texs={};
 function tex(name){                              // โหลดครั้งเดียว ใช้ซ้ำ
@@ -204,48 +203,49 @@ function facePatShop(name, texCm, a, b, zt){
   e.pat.setTransform(new DOMMatrix([(q.x-o.x)/(L*T), (q.y-o.y)/(L*T), 0, s, o.x, o.y]));
   return e.pat;
 }
-let _graImg=null, _graPat=null;
-function granitePat(){
-  if(!_graImg){ _graImg=new Image(); _graImg.src='assets/granite.jpg'; }
-  if(!_graImg.complete || !_graImg.naturalWidth) return null;
-  if(!_graPat) _graPat=ctx.createPattern(_graImg,'repeat');
-  return _graPat;
+/* ---------- วัสดุพื้น/กำแพงที่เลือกได้ (materials.js) ----------
+   pattern แคชแยกต่อไฟล์ภาพ (ใช้ชุดเดียวกับ matImage() ใน materials.js
+   จึงไม่โหลดภาพซ้ำกับตอนมองผ่านกระจกตู้ใน tank-view.js) */
+const _floorPatCache={}, _wallPatCache={};
+function floorMatPatFor(m){
+  const img=matImage(m.file); if(!img) return null;
+  let pat=_floorPatCache[m.file]; if(!pat) pat=_floorPatCache[m.file]=ctx.createPattern(img,'repeat');
+  return {pat, img, m};
 }
-/* ปูแกรนิตทั้งผืนพื้นทีเดียว (ไม่ใช่ทีละช่อง) วางตามระนาบพื้นไอโซเมตริก
-   เวกเตอร์ฐาน: ไป cx = (TW,TH)·zoom · ไป cy = (−TW,TH)·zoom */
-function drawGraniteFloor(W,H){
-  const pat=granitePat();
-  if(!pat || !pat.setTransform || typeof DOMMatrix==='undefined') return false;
-  const T=_graImg.naturalWidth/(GRANITE_CM/CM_PER_CELL), z=cam.zoom, o=P(0,0,0);
-  pat.setTransform(new DOMMatrix([TW*z/T, TH*z/T, -TW*z/T, TH*z/T, o.x, o.y]));
-  const q=[P(0,0),P(W,0),P(W,H),P(0,H)];
-  ctx.beginPath(); q.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.closePath();
-  ctx.fillStyle=pat; ctx.fill();
-  /* แกรนิตตัวนี้เกือบดำสนิท (เฉลี่ย 13,8,10) ถ้าไม่ยกขึ้นมาจะกลายเป็นหลุมดำ
-     ยกด้วยแสงนวล ๆ จากกลางร้าน ให้มีจุดสว่างและขอบจมมืด */
-  const c=P(W/2,H/2), r=Math.hypot(P(W,H).x-P(0,0).x, P(W,H).y-P(0,0).y)*0.5;
-  const g=ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,Math.max(40,r));
-  g.addColorStop(0,'rgba(190,205,210,0.17)'); g.addColorStop(0.55,'rgba(150,170,180,0.09)');
-  g.addColorStop(1,'rgba(0,0,0,0.18)');
-  ctx.fillStyle=g; ctx.fill();
-  return true;
+function wallMatPatFor(m){
+  const img=matImage(m.file); if(!img) return null;
+  let pat=_wallPatCache[m.file]; if(!pat) pat=_wallPatCache[m.file]=ctx.createPattern(img,'repeat');
+  return {pat, img, m};
 }
-let _marbleImg=null, _marblePat=null;
+function floorMatPat(){ return floorMatPatFor(currentFloorMat()); }
+function wallMatPat(){ return wallMatPatFor(currentWallMat()); }
 let _roomC=null, _roomX=null, _roomKey='';   // แคชชั้นห้อง+พื้น
-function marblePat(){
-  if(!_marbleImg){ _marbleImg=new Image(); _marbleImg.src='assets/marble.jpg'; }
-  if(!_marbleImg.complete || !_marbleImg.naturalWidth) return null;
-  if(!_marblePat) _marblePat=ctx.createPattern(_marbleImg,'repeat');
-  return _marblePat;
+/* ปูวัสดุพื้น "ทีละช่อง" (ไม่ใช่ทั้งผืนแบบเดิม) — แต่ละช่องอาจถูกทาสีต่างกัน (tile-paint.js)
+   เวกเตอร์ฐาน (ไป cx = (TW,TH)·zoom · ไป cy = (−TW,TH)·zoom) ยึดจากจุดกำเนิดร้านเสมอ (ไม่ใช่มุมช่อง)
+   ลายจึงต่อเนื่องเป็นผืนเดียวข้ามช่องที่ใช้วัสดุเดียวกัน แม้จะวาดแยกทีละช่อง */
+function drawFloorTile(bx,by,m){
+  const r=floorMatPatFor(m), W=bx*SUB,H=by*SUB;
+  const q=[P(W,H),P(W+SUB,H),P(W+SUB,H+SUB),P(W,H+SUB)];
+  ctx.beginPath(); q.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.closePath();
+  if(r && r.pat.setTransform && typeof DOMMatrix!=='undefined'){
+    const {pat, img}=r;
+    const T=img.naturalWidth/(m.cm/CM_PER_CELL), z=cam.zoom, o=P(0,0,0);
+    pat.setTransform(new DOMMatrix([TW*z/T, TH*z/T, -TW*z/T, TH*z/T, o.x, o.y]));
+    ctx.fillStyle=pat;
+  } else ctx.fillStyle='#123037';
+  ctx.fill();
+
+  return q;
 }
 /* ผนังหนึ่งบาน: จากขอบ a→b บนพื้น ตั้งขึ้นสูง ROOM_H
-   ปูหินอ่อนโดยวางแนวตามขอบผนัง แล้วไล่ลงตามแกนตั้ง สเกลเท่ากันทั้งสองแกนจะได้ไม่ยืด */
-function drawWall(a, b, tint){
+   ปูวัสดุกำแพงโดยวางแนวตามขอบผนัง แล้วไล่ลงตามแกนตั้ง สเกลเท่ากันทั้งสองแกนจะได้ไม่ยืด */
+function drawWall(a, b, tint, wallKeyId){
   const q=[P(a[0],a[1],ROOM_H), P(b[0],b[1],ROOM_H), P(b[0],b[1],0), P(a[0],a[1],0)];
   ctx.beginPath(); q.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.closePath();
-  const pat=marblePat();
-  if(pat && pat.setTransform && typeof DOMMatrix!=='undefined'){
-    const T=_marbleImg.naturalWidth/(MARBLE_CM/CM_PER_CELL);   // px เท็กซ์เจอร์ ต่อ 1 ช่องเล็ก
+  const r=wallMatPatFor(wallKeyId!=null ? wallMatAt(wallKeyId) : currentWallMat());
+  if(r && r.pat.setTransform && typeof DOMMatrix!=='undefined'){
+    const {pat, img, m}=r;
+    const T=img.naturalWidth/(m.cm/CM_PER_CELL);   // px เท็กซ์เจอร์ ต่อ 1 ช่องเล็ก
     const o=q[0], e=q[1], L=Math.hypot(b[0]-a[0], b[1]-a[1])||1;
     const s=Math.hypot(e.x-o.x, e.y-o.y)/(L*T);                // px จอ ต่อ 1 px เท็กซ์เจอร์
     pat.setTransform(new DOMMatrix([(e.x-o.x)/(L*T), (e.y-o.y)/(L*T), 0, s, o.x, o.y]));
@@ -279,11 +279,7 @@ function drawWallThickness(W,H){
   ctx.beginPath();rim.forEach((v,i)=>{const p=P(v[0],v[1],ROOM_H);i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y);});ctx.stroke();ctx.restore();
 }
 function drawRoom(){
-  if(G.floorTiles){drawTileWalls();return;}
-  const W=G.bw*SUB, H=G.bh*SUB;
-  drawWall([0,0],[W,0], 'rgba(255,242,220,0.05)');   // ผนังขวา-หลัง โดนแสงมากกว่า
-  drawWall([0,H],[0,0], 'rgba(0,0,0,0.20)');
-  drawWallThickness(W,H);         // ผนังซ้าย-หลัง อยู่ในเงา
+  drawTileWalls();   // ทีละช่อง (allFloorTiles() คืนกริดสี่เหลี่ยมเต็มเมื่อยังไม่เคยขยาย) — ทาสีกำแพงได้เสมอ
 }
 
 const ANIM_MIN_PX = 30;    // ทากบนจอสูง ≥ เท่านี้ (px) = ซูมใกล้พอ → อนิเมชันเต็ม (ไม่งั้นสไปรต์นิ่ง)
@@ -302,27 +298,25 @@ function onScreen(o){
   return maxx>=-M && minx<=CW+M && maxy>=-M && miny<=CH+M;
 }
 
-/* พื้นร้านทั้งชั้น (อยู่ในแคช) */
+/* พื้นร้านทั้งชั้น (อยู่ในแคช) — วาดทีละช่อง เพราะแต่ละช่องอาจถูกทาวัสดุต่างกัน (tile-paint.js) */
 function drawRoomFloorLayer(){
   if(G.floorTiles){ctx.save();ctx.beginPath();for(const [x,y] of G.floorTiles){const pts=[[x,y],[x+1,y],[x+1,y+1],[x,y+1]].map(v=>P(v[0]*SUB,v[1]*SUB));pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();}ctx.clip();}
   // พื้นที่ที่ยังขยายได้ (ghost)
   drawBigDiamond(0,0, MAX_B, MAX_B, 'rgba(95,168,174,0.05)', 'rgba(95,168,174,0.10)', true);
 
-  // พื้นแกรนิตทั้งผืน แล้วค่อยทับด้วยหมากรุกจาง ๆ
-  const _floorTex = drawGraniteFloor(G.bw*SUB, G.bh*SUB);
-
-  // ช่องใหญ่แบบหมากรุก (พื้นที่ปัจจุบัน)
+  // ช่องใหญ่แบบหมากรุก (พื้นที่ปัจจุบัน) — แต่ละช่องปูวัสดุของตัวเอง แล้วทับด้วยลายหมากรุกจาง ๆ
   for(let by=0; by<G.bh; by++){
     for(let bx=0; bx<G.bw; bx++){
+      if(!ownsTile(bx,by)) continue;
       const c0=P(bx*SUB,by*SUB), c1=P((bx+1)*SUB,by*SUB), c2=P((bx+1)*SUB,(by+1)*SUB), c3=P(bx*SUB,(by+1)*SUB);
       if(Math.max(c0.y,c1.y,c2.y,c3.y)<-40 || Math.min(c0.y,c1.y,c2.y,c3.y)>CH+40 ||
          Math.max(c0.x,c1.x,c2.x,c3.x)<-40 || Math.min(c0.x,c1.x,c2.x,c3.x)>CW+40) continue;
+      drawFloorTile(bx,by, floorMatAt(bx,by));
       ctx.beginPath(); ctx.moveTo(c0.x,c0.y);ctx.lineTo(c1.x,c1.y);ctx.lineTo(c2.x,c2.y);ctx.lineTo(c3.x,c3.y);ctx.closePath();
-      /* มีแกรนิตปูอยู่แล้ว ช่องหมากรุกเหลือเป็นแค่คลื่นสว่าง-มืดบาง ๆ ให้ยังนับช่องได้ */
-      ctx.fillStyle = _floorTex ? ((bx+by)%2===0 ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.10)')
-                                : bigFill(bx,by);
+      /* มีลายวัสดุปูอยู่แล้ว ช่องหมากรุกเหลือเป็นแค่คลื่นสว่าง-มืดบาง ๆ ให้ยังนับช่องได้ */
+      ctx.fillStyle = (bx+by)%2===0 ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.10)';
       ctx.fill();
-      ctx.strokeStyle = _floorTex ? 'rgba(150,180,190,0.16)' : 'rgba(39,69,78,0.9)';
+      ctx.strokeStyle = 'rgba(150,180,190,0.16)';
       ctx.lineWidth=1; ctx.stroke();
     }
   }
@@ -347,7 +341,7 @@ function drawFloor(){
      ก่อนหน้านี้เททั้งเท็กซ์เจอร์ผนัง+พื้นแกรนิตใหม่ทุกเฟรม 60 ครั้ง/วิ = ต้นเหตุที่กระตุก
      (การเท pattern ที่มี setTransform บนพื้นที่ใหญ่ ๆ แพงกว่าเทสีล้วนหลายสิบเท่า) */
   const rkey=[CW,CH,cam.x.toFixed(1),cam.y.toFixed(1),cam.zoom.toFixed(4),G.bw,G.bh,floorRevision,
-              !!(_graImg&&_graImg.complete), !!(_marbleImg&&_marbleImg.complete)].join('|');
+              paintRevision, matGen()].join('|');
   if(rkey!==_roomKey){
     _roomKey=rkey;
     if(!_roomC){ _roomC=document.createElement('canvas'); _roomX=_roomC.getContext('2d'); }

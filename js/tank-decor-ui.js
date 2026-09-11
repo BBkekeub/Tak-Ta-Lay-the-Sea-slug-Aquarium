@@ -60,11 +60,37 @@
  dock.innerHTML='<div class="floorBuildHead"><div class="decorTabs" role="tablist" aria-label="หมวดของในร้าน"></div><div class="floorBuildActions" role="group" aria-label="เครื่องมือก่อสร้าง"></div><button class="tbtn floorBuildDone">✓ เสร็จสิ้น</button></div><div class="floorBuildSelection"><span aria-live="polite">เลือกของเพื่อวาง</span><button class="tbtn floorBuildCancel" hidden>ยกเลิกเลือก</button></div>';
  dock.append(shop);stage.append(dock);oldSection.remove();
  const tabs=dock.querySelector('.decorTabs'),selection=dock.querySelector('.floorBuildSelection span'),cancel=dock.querySelector('.floorBuildCancel');
- const categories=['ตู้เลี้ยง','ของตกแต่ง','อุปกรณ์สำคัญ'];let active='ตู้เลี้ยง';
+ // 'วัสดุ' ต่อจาก 'อุปกรณ์สำคัญ' — แท็บเลือกวัสดุพื้น/กำแพงร้าน ไม่ผูกกับ CATALOG จึงไม่มีของใน #shop ขึ้นตรงนี้ (ดูพาแนล matPanel ด้านล่าง)
+ const categories=['ตู้เลี้ยง','ของตกแต่ง','อุปกรณ์สำคัญ','วัสดุ'];let active='ตู้เลี้ยง';
  const category=(k,d)=>(!d||d.playTable||k==='counter')?'อุปกรณ์สำคัญ':d.kind==='tank'?'ตู้เลี้ยง':'ของตกแต่ง';
- function selectCategory(name){active=name;for(const b of tabs.children){const on=b.textContent===name;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;}for(const b of shop.children)b.hidden=category(b.dataset.k,CATALOG[b.dataset.k])!==name;}
- for(const name of categories){const b=document.createElement('button');b.type='button';b.textContent=name;b.setAttribute('role','tab');b.setAttribute('aria-controls','shop');b.onclick=()=>{selectCategory(name);shop.scrollLeft=0;};b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const next=tabs.children[(categories.indexOf(name)+(e.key==='ArrowRight'?1:categories.length-1))%categories.length];next.click();next.focus();};tabs.append(b);}
+ const navButtons=[];
+ function selectCategory(name){active=name;for(const b of tabs.children){const on=b.textContent===name;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;}for(const b of shop.children)b.hidden=category(b.dataset.k,CATALOG[b.dataset.k])!==name;const onMat=name==='วัสดุ';shop.hidden=onMat;matPanel.hidden=!onMat;for(const b of navButtons)b.hidden=onMat;}
+ for(const name of categories){const b=document.createElement('button');b.type='button';b.textContent=name;b.setAttribute('role','tab');b.setAttribute('aria-controls',name==='วัสดุ'?'floorMatPanel':'shop');b.onclick=()=>{selectCategory(name);shop.scrollLeft=0;};b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const next=tabs.children[(categories.indexOf(name)+(e.key==='ArrowRight'?1:categories.length-1))%categories.length];next.click();next.focus();};tabs.append(b);}
  shop.setAttribute('role','tabpanel');shop.setAttribute('aria-label','ของสำหรับหน้าร้าน');
+
+ // ---- แท็บ "วัสดุ": สวอตช์เลือกพื้น/กำแพงร้าน (แทน dropdown เดิม) ----
+ const matPanel=document.createElement('div');matPanel.id='floorMatPanel';matPanel.className='floorMatPanel';matPanel.hidden=true;
+ matPanel.setAttribute('role','tabpanel');matPanel.setAttribute('aria-label','วัสดุพื้นและกำแพงร้าน');
+ const matRow=(labelText,options,getCurrent,onPick)=>{
+  const group=document.createElement('div');group.className='floorMatGroup';
+  const label=document.createElement('span');label.className='floorMatGroupLabel';label.textContent=labelText;group.append(label);
+  const row=document.createElement('div');row.className='floorMatRow';group.append(row);
+  const swatches=[];
+  for(const opt of options){
+   const b=document.createElement('button');b.type='button';b.className='matSwatch';b.title=opt.label;
+   b.setAttribute('aria-pressed',String(opt.id===getCurrent()));
+   const thumb=document.createElement('span');thumb.className='thumb';thumb.style.backgroundImage='url("'+opt.file+'")';
+   const name=document.createElement('b');name.textContent=opt.label;
+   b.append(thumb,name);
+   b.onclick=()=>{onPick(opt.id);for(const [o,el] of swatches)el.setAttribute('aria-pressed',String(o.id===getCurrent()));if(typeof saveGame==='function')saveGame();};
+   swatches.push([opt,b]);row.append(b);
+  }
+  matPanel.append(group);
+ };
+ // เลือกลาย = "หยิบพู่กัน" ไว้ก่อน ยังไม่เปลี่ยนอะไรจนกว่าจะคลิกช่องพื้น/กำแพงบนพื้นร้าน (ดู tile-paint.js)
+ if(typeof FLOOR_MATERIALS!=='undefined')matRow('พื้น',FLOOR_MATERIALS,()=>TilePaint.current('floor'),id=>TilePaint.pick('floor',id));
+ if(typeof WALL_MATERIALS!=='undefined')matRow('กำแพง',WALL_MATERIALS,()=>TilePaint.current('wall'),id=>TilePaint.pick('wall',id));
+ shop.after(matPanel);
  function paintProduct(canvas,key,rotation=0){
   if(key==='wall-door'||key==='wall-shelf'){paintWallProduct(canvas,key);return;}
   const d=CATALOG[key],o={id:'preview-'+key,type:d.kind,_key:key,def:d,cx:0,cy:0,rot:rotation,slugs:[],decor:[]};
@@ -181,7 +207,7 @@
  cv.addEventListener('pointercancel',()=>{wallPress=null;});
 
  cancel.onclick=()=>{buyKey=null;buildShop();};dock.querySelector('.floorBuildDone').onclick=()=>setMode('view');
- for(const dir of [-1,1]){const b=document.createElement('button');b.className='floorBuildNav '+(dir<0?'prev':'next');b.textContent=dir<0?'‹':'›';b.setAttribute('aria-label',dir<0?'เลื่อนซ้าย':'เลื่อนขวา');b.onclick=()=>shop.scrollBy({left:dir*Math.max(100,shop.clientWidth-100),behavior:'auto'});dock.append(b);}
+ for(const dir of [-1,1]){const b=document.createElement('button');b.className='floorBuildNav '+(dir<0?'prev':'next');b.textContent=dir<0?'‹':'›';b.setAttribute('aria-label',dir<0?'เลื่อนซ้าย':'เลื่อนขวา');b.onclick=()=>shop.scrollBy({left:dir*Math.max(100,shop.clientWidth-100),behavior:'auto'});dock.append(b);navButtons.push(b);}
  const style=document.createElement('style');style.textContent=`
  #floorBuildDock{display:none;position:absolute;left:0;bottom:0;width:100%;height:250px;box-sizing:border-box;padding:6px 10px;background:#142b2e;border-top:1px solid #997f49;z-index:8;color:#e7d8b4}
  body.mode-build:not(.inside-tank) #floorBuildDock{display:block}
@@ -206,6 +232,17 @@
  #floorBuildDock .nm{width:100%;font-size:11px;line-height:16px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  #floorBuildDock .pr{width:100%;text-align:center;font-size:12px;line-height:21px;border-top:1px solid #ffffff14;color:#f5d990;background:#142b2e;border-radius:0 0 4px 4px}
  .floorBuildNav{position:absolute;top:126px;bottom:12px;width:28px;border:0;border-radius:6px;background:#102426;color:#dcc78e;font-size:26px;cursor:pointer}.floorBuildNav.prev{left:7px}.floorBuildNav.next{right:7px}
+ #floorBuildDock .floorMatPanel{width:100%;height:134px;box-sizing:border-box;padding:4px 32px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+ .floorMatGroup{display:flex;align-items:center;gap:8px;flex:1;min-height:0}
+ .floorMatGroupLabel{flex:0 0 40px;font-size:11px;color:#c3c9bd}
+ .floorMatRow{flex:1;min-width:0;height:100%;display:flex;align-items:center;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+ .floorMatRow::-webkit-scrollbar{display:none}
+ .matSwatch{flex:0 0 62px;width:62px;height:100%;max-height:58px;box-sizing:border-box;padding:3px;display:flex;flex-direction:column;gap:3px;background:#20383a;border:1px solid #48605e;border-radius:7px;color:#e7d8b4;cursor:pointer}
+ .matSwatch:hover{background:#39483b;border-color:#e0bb66}
+ .matSwatch .thumb{width:100%;flex:1;min-height:0;border-radius:5px;background-size:cover;background-position:center;border:1px solid #ffffff14}
+ .matSwatch b{font-size:9px;line-height:1.2;font-weight:500;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .matSwatch[aria-pressed="true"]{background:#39483b;border-color:#e6c173}
+ .matSwatch[aria-pressed="true"] .thumb{box-shadow:0 0 0 2px #e6c173}
  `;document.head.append(style);
  buildShop();resize();
 })();
