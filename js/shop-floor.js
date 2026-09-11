@@ -237,30 +237,37 @@ function drawFloorTile(bx,by,m){
 
   return q;
 }
-/* ผนังหนึ่งบาน: จากขอบ a→b บนพื้น ตั้งขึ้นสูง ROOM_H
-   ปูวัสดุกำแพงโดยวางแนวตามขอบผนัง แล้วไล่ลงตามแกนตั้ง สเกลเท่ากันทั้งสองแกนจะได้ไม่ยืด */
-function drawWall(a, b, tint, wallKeyId){
-  const q=[P(a[0],a[1],ROOM_H), P(b[0],b[1],ROOM_H), P(b[0],b[1],0), P(a[0],a[1],0)];
+/* ผนังหนึ่งบาน: จากขอบ a→b บนพื้น ตั้งขึ้นสูง ROOM_H (หรือช่วง z0..z1 ถ้าระบุ — ใช้ตอนวาดทีละช่องความสูง)
+   ปูวัสดุกำแพงโดยวางแนวตามขอบผนัง แล้วไล่ลงตามแกนตั้ง สเกลเท่ากันทั้งสองแกนจะได้ไม่ยืด
+   จุดยึดลาย/แสง: ใช้ "บนสุดของผนังทั้งบาน" (z=ROOM_H) เสมอ ไม่ใช่มุมของช่องที่กำลังวาดตอนนี้
+   ผนังถูกหั่นเป็นช่องความสูงแยกกัน (wallLayerZ) แต่ยังต้องเป็นลายเดียวกันต่อเนื่องกันทั้งบาน
+   ถ้ายึดมุมของแต่ละช่องเอง ลายจะ "เริ่มนับใหม่" ทุกช่อง กลายเป็นเห็นเป็นเส้นแบ่งถี่ ๆ ทุก 20 ซม. */
+function drawWall(a, b, tint, wallKeyId, z0=0, z1=ROOM_H){
+  const q=[P(a[0],a[1],z1), P(b[0],b[1],z1), P(b[0],b[1],z0), P(a[0],a[1],z0)];
   ctx.beginPath(); q.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.closePath();
   const r=wallMatPatFor(wallKeyId!=null ? wallMatAt(wallKeyId) : currentWallMat());
+  const top=P(a[0],a[1],ROOM_H), topE=P(b[0],b[1],ROOM_H), bottom=P(a[0],a[1],0);
   if(r && r.pat.setTransform && typeof DOMMatrix!=='undefined'){
     const {pat, img, m}=r;
     const T=img.naturalWidth/(m.cm/CM_PER_CELL);   // px เท็กซ์เจอร์ ต่อ 1 ช่องเล็ก
-    const o=q[0], e=q[1], L=Math.hypot(b[0]-a[0], b[1]-a[1])||1;
-    const s=Math.hypot(e.x-o.x, e.y-o.y)/(L*T);                // px จอ ต่อ 1 px เท็กซ์เจอร์
-    pat.setTransform(new DOMMatrix([(e.x-o.x)/(L*T), (e.y-o.y)/(L*T), 0, s, o.x, o.y]));
+    const L=Math.hypot(b[0]-a[0], b[1]-a[1])||1;
+    const s=Math.hypot(topE.x-top.x, topE.y-top.y)/(L*T);        // px จอ ต่อ 1 px เท็กซ์เจอร์
+    pat.setTransform(new DOMMatrix([(topE.x-top.x)/(L*T), (topE.y-top.y)/(L*T), 0, s, top.x, top.y]));
     ctx.fillStyle=pat;
   } else ctx.fillStyle='#14100e';
   ctx.fill();
-  /* ไล่แสง: บนสว่างกว่าล่างนิดหน่อย + ย้อมให้ผนังสองด้านต่างกันเหมือนโดนแสงคนละมุม */
-  const gy0=Math.min(q[0].y,q[1].y), gy1=Math.max(q[2].y,q[3].y);
-  const g=ctx.createLinearGradient(0,gy0,0,gy1);
+  /* ไล่แสง: บนสว่างกว่าล่างนิดหน่อย + ย้อมให้ผนังสองด้านต่างกันเหมือนโดนแสงคนละมุม
+     ใช้บน–ล่างของ "ทั้งบาน" เป็นจุดอ้างอิงเดียวกันทุกช่อง ไม่งั้นแสงจะไล่ซ้ำ (สว่าง-มืด-สว่าง-มืด) ทุกช่อง */
+  const g=ctx.createLinearGradient(0,top.y,0,bottom.y);
   g.addColorStop(0,'rgba(255,240,215,0.11)'); g.addColorStop(1,'rgba(0,0,0,0.28)');
   ctx.fillStyle=g; ctx.fill();
   if(tint){ ctx.fillStyle=tint; ctx.fill(); }
-  /* บัวเชิงผนัง — เส้นสว่างบาง ๆ ตรงรอยต่อผนังกับพื้น ช่วยให้อ่านออกว่าเป็นห้อง */
-  ctx.strokeStyle='rgba(212,176,120,0.35)'; ctx.lineWidth=1.4;
-  ctx.beginPath(); ctx.moveTo(q[3].x,q[3].y); ctx.lineTo(q[2].x,q[2].y); ctx.stroke();
+  /* บัวเชิงผนัง — เส้นสว่างบาง ๆ ตรงรอยต่อผนังกับพื้น ช่วยให้อ่านออกว่าเป็นห้อง
+     วาดเฉพาะช่องความสูงชั้นล่างสุด (z0≈0) กันเส้นซ้ำที่รอยต่อของทุกชั้นเมื่อผนังถูกหั่นเป็นช่อง ๆ */
+  if(z0<=0.01){
+    ctx.strokeStyle='rgba(212,176,120,0.35)'; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(q[3].x,q[3].y); ctx.lineTo(q[2].x,q[2].y); ctx.stroke();
+  }
 }
 /* 15 cm masonry extends outside the playable floor. */
 function drawWallThickness(W,H){

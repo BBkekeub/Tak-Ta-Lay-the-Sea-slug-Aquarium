@@ -68,28 +68,28 @@
  for(const name of categories){const b=document.createElement('button');b.type='button';b.textContent=name;b.setAttribute('role','tab');b.setAttribute('aria-controls',name==='วัสดุ'?'floorMatPanel':'shop');b.onclick=()=>{selectCategory(name);shop.scrollLeft=0;};b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const next=tabs.children[(categories.indexOf(name)+(e.key==='ArrowRight'?1:categories.length-1))%categories.length];next.click();next.focus();};tabs.append(b);}
  shop.setAttribute('role','tabpanel');shop.setAttribute('aria-label','ของสำหรับหน้าร้าน');
 
- // ---- แท็บ "วัสดุ": สวอตช์เลือกพื้น/กำแพงร้าน (แทน dropdown เดิม) ----
+ // ---- แท็บ "วัสดุ": สวอตช์เดียวใช้ได้ทั้งพื้น/กำแพง — เลือกลายแล้วไปชี้ตำแหน่งเอา ระบบจะรู้เองว่าคลิกโดนพื้นหรือกำแพง (ดู tile-paint.js) ----
  const matPanel=document.createElement('div');matPanel.id='floorMatPanel';matPanel.className='floorMatPanel';matPanel.hidden=true;
  matPanel.setAttribute('role','tabpanel');matPanel.setAttribute('aria-label','วัสดุพื้นและกำแพงร้าน');
- const matRow=(labelText,options,getCurrent,onPick)=>{
-  const group=document.createElement('div');group.className='floorMatGroup';
-  const label=document.createElement('span');label.className='floorMatGroupLabel';label.textContent=labelText;group.append(label);
-  const row=document.createElement('div');row.className='floorMatRow';group.append(row);
+ const matGroup=document.createElement('div');matGroup.className='floorMatGroup';
+ const matPrev=document.createElement('button');matPrev.type='button';matPrev.className='matRowNav prev';matPrev.textContent='‹';matPrev.setAttribute('aria-label','เลื่อนวัสดุไปทางซ้าย');
+ const matRowEl=document.createElement('div');matRowEl.className='floorMatRow';
+ const matNext=document.createElement('button');matNext.type='button';matNext.className='matRowNav next';matNext.textContent='›';matNext.setAttribute('aria-label','เลื่อนวัสดุไปทางขวา');
+ matPrev.onclick=()=>matRowEl.scrollBy({left:-Math.max(100,matRowEl.clientWidth-40),behavior:'auto'});
+ matNext.onclick=()=>matRowEl.scrollBy({left:Math.max(100,matRowEl.clientWidth-40),behavior:'auto'});
+ matGroup.append(matPrev,matRowEl,matNext);matPanel.append(matGroup);
+ if(typeof FLOOR_MATERIALS!=='undefined'){
   const swatches=[];
-  for(const opt of options){
+  for(const opt of FLOOR_MATERIALS){
    const b=document.createElement('button');b.type='button';b.className='matSwatch';b.title=opt.label;
-   b.setAttribute('aria-pressed',String(opt.id===getCurrent()));
+   b.setAttribute('aria-pressed',String(opt.id===TilePaint.current()));
    const thumb=document.createElement('span');thumb.className='thumb';thumb.style.backgroundImage='url("'+opt.file+'")';
    const name=document.createElement('b');name.textContent=opt.label;
    b.append(thumb,name);
-   b.onclick=()=>{onPick(opt.id);for(const [o,el] of swatches)el.setAttribute('aria-pressed',String(o.id===getCurrent()));if(typeof saveGame==='function')saveGame();};
-   swatches.push([opt,b]);row.append(b);
+   b.onclick=()=>{TilePaint.pick(opt.id);for(const [o,el] of swatches)el.setAttribute('aria-pressed',String(o.id===TilePaint.current()));};
+   swatches.push([opt,b]);matRowEl.append(b);
   }
-  matPanel.append(group);
- };
- // เลือกลาย = "หยิบพู่กัน" ไว้ก่อน ยังไม่เปลี่ยนอะไรจนกว่าจะคลิกช่องพื้น/กำแพงบนพื้นร้าน (ดู tile-paint.js)
- if(typeof FLOOR_MATERIALS!=='undefined')matRow('พื้น',FLOOR_MATERIALS,()=>TilePaint.current('floor'),id=>TilePaint.pick('floor',id));
- if(typeof WALL_MATERIALS!=='undefined')matRow('กำแพง',WALL_MATERIALS,()=>TilePaint.current('wall'),id=>TilePaint.pick('wall',id));
+ }
  shop.after(matPanel);
  function paintProduct(canvas,key,rotation=0){
   if(key==='wall-door'||key==='wall-shelf'){paintWallProduct(canvas,key);return;}
@@ -232,12 +232,13 @@
  #floorBuildDock .nm{width:100%;font-size:11px;line-height:16px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  #floorBuildDock .pr{width:100%;text-align:center;font-size:12px;line-height:21px;border-top:1px solid #ffffff14;color:#f5d990;background:#142b2e;border-radius:0 0 4px 4px}
  .floorBuildNav{position:absolute;top:126px;bottom:12px;width:28px;border:0;border-radius:6px;background:#102426;color:#dcc78e;font-size:26px;cursor:pointer}.floorBuildNav.prev{left:7px}.floorBuildNav.next{right:7px}
- #floorBuildDock .floorMatPanel{width:100%;height:134px;box-sizing:border-box;padding:4px 32px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
- .floorMatGroup{display:flex;align-items:center;gap:8px;flex:1;min-height:0}
- .floorMatGroupLabel{flex:0 0 40px;font-size:11px;color:#c3c9bd}
+ #floorBuildDock .floorMatPanel{width:100%;height:134px;box-sizing:border-box;padding:4px 32px;display:flex;flex-direction:column;justify-content:center;gap:6px;overflow:hidden}
+ .floorMatGroup{display:flex;align-items:center;gap:6px;width:100%;height:100%;min-height:0}
  .floorMatRow{flex:1;min-width:0;height:100%;display:flex;align-items:center;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
  .floorMatRow::-webkit-scrollbar{display:none}
- .matSwatch{flex:0 0 62px;width:62px;height:100%;max-height:58px;box-sizing:border-box;padding:3px;display:flex;flex-direction:column;gap:3px;background:#20383a;border:1px solid #48605e;border-radius:7px;color:#e7d8b4;cursor:pointer}
+ .matRowNav{flex:0 0 24px;width:24px;height:100%;box-sizing:border-box;border:0;border-radius:6px;background:#102426;color:#dcc78e;font-size:18px;line-height:1;cursor:pointer}
+ .matRowNav:hover{background:#193638}
+ .matSwatch{flex:0 0 78px;width:78px;height:100%;box-sizing:border-box;padding:3px;display:flex;flex-direction:column;gap:3px;background:#20383a;border:1px solid #48605e;border-radius:7px;color:#e7d8b4;cursor:pointer}
  .matSwatch:hover{background:#39483b;border-color:#e0bb66}
  .matSwatch .thumb{width:100%;flex:1;min-height:0;border-radius:5px;background-size:cover;background-position:center;border:1px solid #ffffff14}
  .matSwatch b{font-size:9px;line-height:1.2;font-weight:500;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

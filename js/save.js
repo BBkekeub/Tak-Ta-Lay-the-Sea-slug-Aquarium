@@ -179,7 +179,7 @@ function loadGame(){
       for(const k in d.floorPaint) if(/^\d+,\d+$/.test(k)&&FLOOR_MATERIALS.some(m=>m.id===d.floorPaint[k])) G.floorPaint[k]=d.floorPaint[k];
     G.wallPaint={};
     if(d.wallPaint&&typeof d.wallPaint==='object'&&typeof WALL_MATERIALS!=='undefined')
-      for(const k in d.wallPaint) if(/^\d+,\d+,[01]$/.test(k)&&WALL_MATERIALS.some(m=>m.id===d.wallPaint[k])) G.wallPaint[k]=d.wallPaint[k];
+      for(const k in d.wallPaint) if(/^\d+,\d+,[01](:\d+)?$/.test(k)&&WALL_MATERIALS.some(m=>m.id===d.wallPaint[k])) G.wallPaint[k]=d.wallPaint[k];   // ":layer" ต่อท้าย = ทาสีทีละช่องความสูง (ของเดิมไม่มีต่อท้าย ยังใช้ได้)
     G.bw=Math.max(1, _NUM(d.bw, G.bw)|0);
     G.bh=Math.max(1, _NUM(d.bh, G.bh)|0);
     G.floorTiles=Array.isArray(d.floorTiles)&&d.floorTiles.length?d.floorTiles.filter(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isInteger)&&p[0]>=0&&p[1]>=0&&p[0]<G.bw&&p[1]<G.bh):null;floorRevision++;
