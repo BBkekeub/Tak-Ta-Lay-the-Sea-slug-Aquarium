@@ -11,6 +11,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Trirong:wght@500;600&display=swap">
 <link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/context-ui.css">
+<!-- ต้องมาก่อน importmap: สลับ fetch → XHR ตอนเปิดแบบ file:// (ดู js/file-mode.js) -->
+<script src="js/file-mode.js?v=filemode1"></script>
+<!-- three โหลดจาก CDN เหมือนเดิม — ห้ามเปลี่ยนไปชี้ vendor/ ในเครื่อง เพราะถ้า vendor/
+     ไม่ได้ถูก push ขึ้นไปด้วย เบราว์เซอร์จะ resolve "three" ไม่ได้ → slug-3d.js ตายเงียบ
+     → ทากกลายเป็น 2D ทั้งเว็บ (ทดสอบแล้ว: เปิดจากไฟล์ผ่าน PLAY.bat ก็ดึง CDN ได้ปกติ) -->
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
 </head>
 <body>
@@ -39,6 +44,7 @@
     <button class="tbtn" id="bMusic">🎵 เพลง: ปิด</button>
     <button class="tbtn" id="bAnim">🌊 ขยับ: เปิด</button>
     <button class="tbtn" id="bPeople">👥 ลูกค้า: เปิด</button>
+    <button class="tbtn" id="bSlug3D" title="สลับทากระหว่างโมเดล 3D กับสไปรต์ 2D">🐌 ทาก: 3D</button>
     <button class="tbtn" id="bFit">จัดกล้องให้พอดี</button>
   </div>
 
@@ -155,6 +161,7 @@
 <link rel="stylesheet" href="css/new-slug-notices.css">
 <script src="js/new-slug-notices.js"></script>
 <script type="module" src="js/slug-3d.js?v=3d-production1"></script>
+<script src="js/slug-3d-toggle.js?v=toggle1"></script>
 </body>
 </html>
 
