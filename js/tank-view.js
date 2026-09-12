@@ -128,7 +128,7 @@ function tankSlugSprite(s, P, sa, walking, lifted){
   const now = performance.now();
   if(s._tsOff===undefined) s._tsOff = Math.random()*1000/TSPR_FPS;   // กระจายจังหวะ ไม่ให้รีเฟรชพร้อมกันทั้งฝูง
   const zb = now < _zoomBusyT;                                       // ซูมอยู่ → ใช้ของเดิมยืดเอา ไม่เรนเดอร์ใหม่
-  const poseKey=s.state+'|'+Math.round((s.wake||0)*12)+'|'+Math.round((s.startle||0)*10)+'|'+(lifted?1:0);
+  const poseKey=s.state+'|'+Math.round((s.wake||0)*12)+'|'+Math.round((s.startle||0)*10)+'|'+(lifted?1:0)+'|'+(s._bakeEyes?1:0);
   const due = !s._ts || (!zb && ((now - s._tsT) > (1000/TSPR_FPS) || s._tsWalk!==walking || s._tsPose!==poseKey));
   const sized = s._ts && (zb || Math.abs(s._tsSa - sa) < sa*0.06);   // ขนาดเพี้ยนไม่เกิน 6% ใช้ของเดิมยืดเอา
   if(due && _tsprBudget>0 || !s._ts || !sized && _tsprBudget>0){
@@ -140,7 +140,7 @@ function tankSlugSprite(s, P, sa, walking, lifted){
     const x=s._tsX;
     x.setTransform(DPR,0,0,DPR,0,0);
     x.clearRect(0,0,w,h);
-    const pose=lifted ? Object.assign({},s,{noBob:true,noEyes:true}) : Object.assign({},s,{noEyes:true});
+    const pose=lifted ? Object.assign({},s,{noBob:true,noEyes:true}) : Object.assign({},s,{noEyes: !s._bakeEyes});   // ท่าปกติอบตาเข้าสไปรต์ให้ขยับตาม creep
     SlugEngine.drawSlug(x, P, w/2, h/2, false, (s.ph||0)*120, sa, false, walking, pose);
     s._tsT=now; s._tsSa=sa; s._tsWalk=walking; s._tsPose=poseKey; _tsprBudget--;
   }
@@ -687,6 +687,7 @@ function liftPending(){                    // เลื่อนสถานะ�
 function dropHeldSlug(){
   if(!heldSlug) return;
   const s=heldSlug; heldSlug=null;
+  if(!curTank?.def){s.state='rest';s.stt=.8;return;}
   const SOLID=decorSolidSet(curTank&&curTank.decor);
   const mg=slugCm(s.genes)/CM_PER_CELL*0.55+0.2;
   const g=freeSpotNear(s.fx, s.fy, SOLID, isBreeder(curTank)?20:curTank.def.w, curTank.def.h, mg);
@@ -888,6 +889,7 @@ function clampTankPan(){
 /* จัดมุมมองตอนเข้าตู้: fit → ซูมเข้าอีก ~2 สเต็ป → โฟกัสจุดที่กด (ถ้ามี) · idempotent */
 const ENTER_ZOOM = 3.0;                       // ซูมเข้าหนักๆ จากระดับพอดี (โฟกัสจุดที่กด)
 const TANK_MAX_ZOOM = 5.0;
+const TANK_SLUG_VIEW_SCALE = 0.7;             // ลดขนาดทาก "ในโหมดในตู้" ให้เข้าสัดส่วนกับที่เห็นจากนอกตู้ (1 = เท่าเดิม · เล็กลง = ค่าน้อยลง)
 function applyEnterView(focus){
   if(isBreeder(curTank)||curTank.def.race){fitTankZoom();centerTankCam();return;}
   fitTankZoom();
@@ -928,7 +930,7 @@ function enterTank(o, focus){
   syncOv();
   if(!tankLoopOn){ tankLoopOn=true; drawTank(); }
 }
-function exitTank(){ if(typeof exitModes==='function') exitModes('tank');
+function exitTank(){ if(heldSlug)dropHeldSlug();pendSlug=null;cancelHold();if(typeof exitModes==='function') exitModes('tank');
   tankMode=false; curTank=null; ov.classList.remove('on');
   tankBuildMode=false; selDecorKey=null; selDecor=null; decorHover=null; dragGhost=null;
   const b=document.getElementById('ovBuild'); if(b) b.textContent='🔧 จัดของ: ปิด'; }
@@ -1136,6 +1138,12 @@ function drawWallSlug(s,parts,sa){
 function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
   if(tankDef?.breeder){slugs=slugs.filter(s=>{if(s.breedZone){walkBreedingZone(s,dt);return false;}return true;});}
   if(tankDef?.breeder)fw=20;
+  if(tankDef?.noClimb)for(const s of slugs){
+    if(s.wall||['seekClimb','climbUp','climb','climbDown','goDown'].includes(s.state)){
+      s.wall=null;s.climbSide=null;s.climbZ=0;s.state='rest';s.stt=REST_MIN;
+      delete s.intentX;delete s.intentY;delete s.climbDir;
+    }
+  }
   // Heal invalid runtime coordinates before feeding, steering or pair separation.
   for(const s of slugs){
     if(!Number.isFinite(s.fx)||!Number.isFinite(s.fy)){
@@ -1218,7 +1226,7 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
         const pDash   = 0.015 + (t.bold||0.3)*0.09;                        // กล้า → ดีดพุ่งบ่อย
         const pStretch= 0.12;
         const pSneeze = 0.06;
-        const pClimb  = 0.04 + (t.bold||0.3)*0.07 + (t.curious||0.3)*0.05; // กล้า+ช่างสำรวจ → ไต่/เกาะ
+        const pClimb  = tankDef?.noClimb ? 0 : 0.04 + (t.bold||0.3)*0.07 + (t.curious||0.3)*0.05; // กล้า+ช่างสำรวจ → ไต่/เกาะ
         const pFollow = friends.length ? (0.08 + (t.social||0.3)*0.30) : 0;// เข้าสังคม → ตามเพื่อน
         const pDecor  = decor.length   ? (0.12 + (t.curious||0.3)*0.30) : 0;// ช่างสำรวจ → ส่องหิน
         let acc=0;
@@ -1350,6 +1358,7 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
     if(s.wall) return;                       // อยู่บนกำแพง = ใช้บล็อกเดินของกำแพงไปแล้ว
     let dd=((s.turn-s.dir+Math.PI*3)%(Math.PI*2))-Math.PI;
     s.dir+=dd*Math.min(1,dt*SLUG_TURN*(nearEdge?EDGE_TURN_BOOST:1));
+    const headingX=s.fx,headingY=s.fy;
     if(s.state==='walk' || s.state==='seekDecor' || s.state==='seekNap' || s.state==='seekClimb' || s.state==='follow' || s.state==='dash' || s.state==='flee'){
       const speedMul=s.state==='dash'?DASH_SPEED:s.state==='flee'?FLEE_SPEED:1;
       const paceMul=(s.state==='dash'||s.state==='flee')?1:slugPace(s);   // ดีด/หนีคงจังหวะเดิม
@@ -1360,6 +1369,8 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
       else if(!blk(s.fx,ny)){ s.fy=ny; }
       else { s.turn=s.dir+Math.PI*(0.6+Math.random()*0.8); s.stt=Math.min(s.stt,0.5); }
     }
+    const ownDX=s.fx-headingX,ownDY=s.fy-headingY;
+    s._motionHeading=Math.hypot(ownDX,ownDY)>1e-7?Math.atan2(ownDY,ownDX):s.dir;
     s.ph+=dt*(0.8+((s.traits&&s.traits.energy)||0.5)*0.5)*(s.state==='dash'?3.2:s.state==='flee'?2.35:(s.state==='walk'||s.state==='seekDecor'||s.state==='seekNap'||s.state==='seekClimb'||s.state==='follow')?1.45:s.state==='wake'?2.0:0.62);
     if(hit(s.fx,s.fy)){                                   // ค้างในช่อง solid → หาที่ว่างใกล้สุดแล้วย้ายไปเลย
       const g=freeSpotNear(s.fx, s.fy, SOLID, fw, fh, slugCm(s.genes)/CM_PER_CELL*0.55+0.2);
@@ -1394,7 +1405,8 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
   }
   // จำกัดขอบ "วัดที่ขอบตัว" — เผื่อครึ่งความยาวลำตัว (หน่วยช่อง) ไม่ให้หัว-ท้ายล้น
   slugs.forEach(s=>{
-    const mg=slugCm(s.genes)/CM_PER_CELL*0.55 + 0.2;
+    /* เผื่อขอบเขตเดิน "เต็มความยาวลำตัว" (เดิมเผื่อแค่ครึ่งตัว 0.55 → หัว/ท้าย/หงอนล้นกล่องแล้วโดน clip) */
+    const mg=slugCm(s.genes)/CM_PER_CELL*0.9 + 0.7;
     if(!Number.isFinite(s.fx)||!Number.isFinite(s.fy)){
       s.fx=s._lastGoodFx;s.fy=s._lastGoodFy;s.state='rest';s.stt=REST_MIN;s.dir=s.turn=0;
     }
@@ -1423,6 +1435,7 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
 /* ---------- ฉากในตู้ (มองจากด้านหน้า — ขอบหน้าตรง ไม่มีมุมแหลม) ---------- */
 function drawTank(){
   if(document.hidden||window.SlugRace?.isOpen()){requestAnimationFrame(()=>{if(tankMode)drawTank();else tankLoopOn=false;});return;}
+  window.Slug3D?.beginFrame();
   _tankFrame++;
   tctx.setTransform(DPR,0,0,DPR,0,0);
   tctx.clearRect(0,0,TCW,TCH);
@@ -1578,7 +1591,7 @@ function drawTank(){
     if(it.kind==='food'){drawFood(it.f);return;}
     if(it.kind==='decor'){ drawDecor(it.d); return; }
     const s=it.s;
-    const bodyLen=(curTank.def.shopSlugScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*depthPxPerCm(s.fx,s.fy)*(s._breedScale||1);
+    const bodyLen=TANK_SLUG_VIEW_SCALE*(curTank.def.shopSlugScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*depthPxPerCm(s.fx,s.fy)*(s._breedScale||1);
     const p=S(s.fx,s.fy,sandT+(s.climbZ||0));          // เกาะกระจก/หิน = ยกความสูง z ขึ้น
     const lifted = (s===heldSlug);
     if(lifted){                                        // เงาบนพื้นใต้ตัว (ตัวเองลอยอยู่ที่เคอร์เซอร์)
@@ -1588,10 +1601,17 @@ function drawTank(){
       sg.addColorStop(0,'rgba(0,0,0,0.34)'); sg.addColorStop(0.6,'rgba(0,0,0,0.15)'); sg.addColorStop(1,'rgba(0,0,0,0)');
       tctx.fillStyle=sg; tctx.beginPath(); tctx.arc(0,0,rx,0,6.283); tctx.fill(); tctx.restore();
     }
+    if(engineReady&&!slugOnWall(s)&&window.Slug3D?.draw(tctx,s,p.x,lifted?p.y-6*tankCam.zoom:p.y,bodyLen,lifted,{x:CELLW*Math.cos(s._motionHeading??s.dir??0)+DEPX*Math.sin(s._motionHeading??s.dir??0),y:-DEPY*Math.sin(s._motionHeading??s.dir??0)})){
+      if(s.state==='sneeze')drawSneezeBubbles(s,p,bodyLen);
+      if(!lifted)drawSlugMood(s,p,bodyLen,null,p.y,1);
+      if(s===selSlug){tctx.save();tctx.strokeStyle='#9fffdc';tctx.lineWidth=2;tctx.beginPath();tctx.ellipse(p.x,p.y,bodyLen*.5,bodyLen*.12,0,0,Math.PI*2);tctx.stroke();tctx.restore();}
+      return;
+    }
     if(engineReady){
       const P=slugPartsOf(s);
       const sa=bodyLen/(P.bw*P.s), spriteH=P.h*sa;
       const cy = lifted ? (p.y - 6*tankCam.zoom) : (p.y - spriteH*0.44);
+      s._bakeEyes=false;                                   // ค่าเริ่ม: ตัวเกาะกำแพง/ท่าพิเศษ วาดตาทับแบบเดิม
       if(!lifted&&slugOnWall(s)){
         const w=drawWallSlug(s,P,sa);
         /* ฟองออกจากหัว — จุดตั้งต้นถอยหลังนิดหน่อยเพราะบนกำแพงส่งจุด "กลางตัว" มา
@@ -1600,12 +1620,15 @@ function drawTank(){
           drawSneezeBubbles(s,{x:w.x-w.hx*w.len*0.20, y:w.y-w.hy*w.len*0.20},bodyLen,w.hx,w.hy);
         return;
       }
+      const _smiling=(s.state==='rest'||s.state==='greet'||s.state==='wake'||s.state==='stretch') && smileNow(s);
+      /* ท่าปกติ = อบตาเข้าสไปรต์ (ขยับตาม creep ที่ตัวยืด/หด) · ท่าพิเศษ = วาดหน้าทับแบบเดิม */
+      s._bakeEyes = !lifted && !(s.state==='sleep'||s.state==='dashCharge'||s.state==='dash'||_smiling);
       drawTankSlug(s, P, sa, p.x, cy, lifted);
       if(lifted) drawHeldFace(P, p.x, cy, s.flip, P.s*sa, slugBaseHex(s.genes));
       else if(s.state==='sleep') drawSleepFace(P, p.x, cy, s.flip, P.s*sa, slugBaseHex(s.genes));
       else if(s.state==='dashCharge'||s.state==='dash') drawDashFace(P,p.x,cy,s.flip,P.s*sa,slugBaseHex(s.genes),s.charge);
-      else if((s.state==='rest'||s.state==='greet'||s.state==='wake'||s.state==='stretch') && smileNow(s)) drawSmileFace(P,p.x,cy,s.flip,P.s*sa,slugBaseHex(s.genes));
-      else drawDefaultEyes(P,p.x,cy,s.flip,P.s*sa);
+      else if(_smiling) drawSmileFace(P,p.x,cy,s.flip,P.s*sa,slugBaseHex(s.genes));
+      // ท่าปกติ: ตาอยู่ในสไปรต์แล้ว (ขยับตาม creep) ไม่ต้องวาดทับ
       if(s.state==='sneeze') drawSneezeBubbles(s,p,bodyLen);
       if(!lifted) drawSlugMood(s,p,bodyLen,P,cy,sa);
       s._hit={ x:p.x, y:cy, r:Math.max(26,bodyLen*0.62) };

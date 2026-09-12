@@ -333,6 +333,7 @@ function drawRoomFloorLayer(){
 
 function drawFloor(){
   if(document.hidden)return;
+  window.Slug3D?.beginFrame();
   // อนิเมชันหน้าร้าน (เปิด/ปิดได้) — เปิด = ทากเดินในตู้
   if(engineReady){
     SlugEngine.ANIM = shopAnim;
@@ -538,7 +539,7 @@ function drawObject(o){
   if(d.race&&window.SlugRace)SlugRace.drawTrack(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);});
   // ทากอยู่ก้นตู้ (ในน้ำ) — clip ให้อยู่ในกรอบตู้ (หัวไม่ทะลุกระจก) · ขนาด = ความยาวลำตัวจริง
   const displaySlugs=[...o.slugs,...breederVisualSlugs(o)];
-  const pxPerCm=TW/CM_PER_CELL, shown=Math.min(displaySlugs.length,isBreeder(o)?70:20);   // ระยะแนวนอนต่อ 1 ช่อง (ตรงกับในตู้)
+  const pxPerCm=TW/CM_PER_CELL, shown=window.Slug3D?.ready&&Slug3D.enabled&&Slug3D.all?displaySlugs.length:Math.min(displaySlugs.length,isBreeder(o)?70:20);   // ระยะแนวนอนต่อ 1 ช่อง (ตรงกับในตู้)
   ctx.save();
   const topZ=tz+30;                                   // เปิดฝา: หินสูงกว่าขอบตู้ให้โผล่พ้นได้ ไม่โดนเฉือน
   const q0=P(cx,cy,topZ),q1=P(cx+w,cy,topZ),q2=P(cx+w,cy,standH),q3=P(cx+w,cy+h,standH),q4=P(cx,cy+h,standH),q5=P(cx,cy+h,topZ);
@@ -591,6 +592,10 @@ function drawObject(o){
     const a=Math.min(w*.92,Math.max(w*.08,it.sm[0]));
     const b=Math.min(h*.92,Math.max(h*.08,it.sm[1]));
     const p=P(cx+a, cy+b, standH+1);
+    const headingOrigin=MAP(s.fx||0,s.fy||0),headingTarget=MAP((s.fx||0)+Math.cos(s._motionHeading??s.dir??0),(s.fy||0)+Math.sin(s._motionHeading??s.dir??0));
+    const headingPoint=P(cx+a+headingTarget[0]-headingOrigin[0],cy+b+headingTarget[1]-headingOrigin[1],standH+1);
+    const heading3D={x:headingPoint.x-p.x,y:headingPoint.y-p.y};
+    if(engineReady&&!slugOnWall(s)&&window.Slug3D?.draw(ctx,s,p.x,p.y,Math.min(30*pxPerCm*cam.zoom,showcaseScale*(s._breedScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*pxPerCm*cam.zoom),false,heading3D))return;
     if(engineReady){
       const PP=slugPartsOf(s);
       const sa=showcaseScale*(s._breedScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*pxPerCm*cam.zoom/(PP.bw*PP.s), spriteH=PP.h*sa;
@@ -629,6 +634,7 @@ function drawObject(o){
         }
         return;
       }
+      if(window.Slug3D?.draw(ctx,s,p.x,p.y,Math.min(30*pxPerCm*cam.zoom,PP.bw*PP.s*sa),false,heading3D))return;
       const aura=PP.D.aMetal>0.30;
       if(shopAnim && spriteH>=ANIM_MIN_PX && animBudget>0){
         animBudget--;

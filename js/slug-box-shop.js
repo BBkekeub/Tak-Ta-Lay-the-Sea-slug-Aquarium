@@ -57,7 +57,7 @@ function openSlugDelivery(id){
  const d=list[idx];
  if(!slugDeliveryReady(d)){toast('พัสดุยังมาไม่ถึง · '+slugDeliveryWaitText(d),'bad');return false;}
  list.splice(idx,1);const slug=makeSlug(d.genes);G.inv.push(slug);
- if(window.NewSlugNotices)NewSlugNotices.add(slug,'box');
+ if(window.NewSlugNotices){NewSlugNotices.add(slug,'box');if(NewSlugNotices.open)NewSlugNotices.open(slug.id);}   // เด้งการ์ดโชว์ทาก + พลุฉลองทันที
  if(typeof saveGame==='function')saveGame();if(typeof syncHUD==='function')syncHUD();
  toast('เปิดกล่อง'+d.name+' · ทากอยู่ในคลังแล้ว','good');
  refreshSlugShop();return true;

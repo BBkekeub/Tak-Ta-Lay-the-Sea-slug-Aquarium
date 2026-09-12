@@ -40,13 +40,15 @@
 
  const ORIGINAL_QUESTS=[
   /* ===== บทที่ 1 (0–14) — ห้ามแก้ id/ลำดับ เพื่อรักษารางวัลที่ผู้เล่นเคยรับ ===== */
-  {t:'ให้อาหารทากทะเล', h:'คลิกเข้าตู้ → เปิดแผง 🌸 ให้อาหาร (แถบขวาในตู้) → กดเปิดโหมดวางอาหาร → คลิกพื้นที่ว่างในตู้เพื่อวาง', cond:b=>S().fed>b.fed, reward:{coin:300, rep:0, txt:'ปลดล็อกอาหารที่ดีขึ้น'}, btn:['#foodChoose','#ovFeedBtn','canvas:anytank']},
+  {t:'ให้อาหารทากทะเล', h:'คลิกเข้าตู้ → กดปุ่มที่ไฟกะพริบ (เปิดโหมดวางอาหาร) → คลิกพื้นที่ว่างในตู้เพื่อวางอาหาร', cond:b=>S().fed>b.fed, reward:{coin:300, rep:0, txt:'ปลดล็อกอาหารที่ดีขึ้น'}, btn:['#foodChoose','#ovFeedBtn','canvas:anytank'],
+   force:()=>{ try{ if(typeof foodMode!=='undefined'&&foodMode) return; if(typeof tankMode!=='undefined'&&!tankMode) return; const det=document.getElementById('foodBar')&&document.getElementById('foodBar').closest('details'); if(det&&!det.open) det.open=true; }catch(e){} }},
   {t:'ทำความสะอาดตู้', h:'ในตู้มีปุ่มทำความสะอาด ลองขัดคราบสาหร่ายให้เอี่ยม', cond:b=>S().cleaned>b.cleaned, reward:{coin:200, rep:0, txt:'ได้แปรงขัดตู้'}, btn:'#mView'},
   {t:'แต่งร้านสักหน่อย', h:'เข้าโหมดก่อสร้าง (🔧) ซื้อของตกแต่งมาวางในร้าน 1 ชิ้น', cond:b=>decorCount()>b.decor, reward:{coin:250, rep:0, txt:'ปลดล็อกชุดตกแต่งใหม่'}, btn:'#mBuild'},
   {t:'ทำประตูเข้าร้าน', h:'กด 🔧 ก่อสร้าง → แท็บ "อุปกรณ์สำคัญ" → เลือก 🚪 ประตู แล้วแตะบนกำแพงเพื่อวาง', cond:b=>!!G.door, reward:{coin:100, rep:0, txt:'ลูกค้าเดินเข้าร้านได้แล้ว'}, btn:['#shop .item[data-k="wall-door"]','#floorBuildDock .decorTabs [data-cat="อุปกรณ์สำคัญ"]','#mBuild']},
   {t:'เพิ่มความดึงดูดของร้าน', h:'ซื้อของตกแต่งเพิ่ม (และมีทากอยู่ในตู้) ให้ค่าความดึงดูดแตะ 6', cond:b=>attraction()>=6, reward:{coin:500, rep:0, tank:'tank_breed', txt:'รับตู้เพาะพันธุ์ฟรีในที่พักพิง แล้วนำมาวางในร้านได้เลย'}, btn:'#mBuild'},
   {t:'วางตู้เพาะพันธุ์', h:'กดปุ่ม "ของที่เก็บ" (แถบบน) → ลากตู้เพาะพันธุ์ฟรีที่ได้รับมาวางในร้าน', cond:b=>breederExists(), reward:{coin:200, rep:2, txt:'ปลดล็อกการเพาะพันธุ์'}, btn:['#navShelf','#mBuild']},
-  {t:'ผสมพันธุ์ทากคู่แรก', h:'เข้าตู้เพาะ → เปิดแผง 🥚 ผสมพันธุ์ (แถบซ้าย) → กด "เลือกทากมาผสมพันธุ์" เลือก 2 ตัว แล้วเริ่ม (จากนั้นจะเข้าสู่ช่วงรอผสม → รอไข่ → ฟักไข่)', cond:b=>S().bred>b.bred, reward:{coin:150, rep:1, txt:'รอลูกทากตัวแรกได้เลย'}, btn:['#startBreeder','#ovBreedBtn','canvas:breeder']},
+  {t:'ผสมพันธุ์ทากคู่แรก', h:'เข้าตู้เพาะ → กดปุ่มที่ไฟกะพริบ "เลือกทากมาผสมพันธุ์" → เลือก 2 ตัว แล้วเริ่ม (จากนั้นจะเข้าสู่ช่วงรอผสม → รอไข่ → ฟักไข่)', cond:b=>S().bred>b.bred, reward:{coin:150, rep:1, txt:'รอลูกทากตัวแรกได้เลย'}, btn:['#startBreeder','#ovBreedBtn','canvas:breeder'],
+   force:()=>{ try{ if(typeof tankMode!=='undefined'&&!tankMode) return; const bp=document.getElementById('breederPanel'), det=bp&&bp.closest('details'); if(det&&!det.hidden&&!det.open) det.open=true; }catch(e){} }},
   {t:'วางเคาน์เตอร์ขายทาก', h:'กด 🔧 ก่อสร้าง → แท็บ "อุปกรณ์สำคัญ" → เลือกเคาน์เตอร์แมว (ฟรี) แล้ววางในร้านให้ลูกค้ามาเสนอราคา', cond:b=>(G.objs||[]).some(o=>o&&o.type==='deco'&&o._key==='counter'), reward:{coin:100, rep:1, txt:'พร้อมขายทากแล้ว'}, btn:['#shop .item[data-k="counter"]','#floorBuildDock .decorTabs [data-cat="อุปกรณ์สำคัญ"]','#mBuild']},
   {t:'ขายทากให้ลูกค้า', h:'รอลูกค้าเดินมาที่เคาน์เตอร์เสนอราคา แล้วกดขาย — ขายลูกที่เพาะได้ อย่าขายคู่พ่อแม่', cond:b=>S().sold>b.sold, reward:{coin:100, rep:1, txt:'นี่คือรายได้หลักของร้าน'}, btn:'#mView'},
   {t:'ขายทากอีกตัว', h:'ทากที่ผสมจนหมดพลังก็ยังขายได้ ลองปล่อยของอีกตัว', cond:b=>S().sold>b.sold, reward:{coin:800, rep:1, txt:'ทุนก้อนไว้สั่งกล่องทากตัวต่อไป'}, btn:'#mView'},
@@ -72,7 +74,8 @@
 
   /* ===== แทรกในลูปเพาะพันธุ์ (id 25–26) — id ต่อท้ายไว้ ไม่กระทบเซฟเก่า · จัดตำแหน่งจริงในลำดับ QUESTS ===== */
   {t:'ใส่ทากเข้าตู้เพาะพันธุ์', h:'เข้าตู้เพาะ → กดปุ่ม "จัดการทาก" (แถบซ้าย) → ย้ายทากจากคลังเข้าตู้ให้ครบอย่างน้อย 2 ตัว', cond:b=>(G.objs||[]).some(o=>o&&typeof isBreeder==='function'&&isBreeder(o)&&o.slugs&&o.slugs.length>=2), reward:{coin:100, rep:1, txt:'ต้องมี 2 ตัวในตู้ถึงจะผสมได้'}, btn:['#ovAdd','canvas:breeder']},
-  {t:'ฟักไข่ทากตัวแรก', h:'หลังผสมเสร็จจะได้ไข่ → รอสักครู่จนไข่พร้อมฟัก → กดปุ่ม "ฟักทั้งหมด" หรือคลิกไข่ในตู้ (ตัวอ่อนที่ฟักจะค่อย ๆ โตเป็นทากตัวใหม่)', cond:b=>{try{return (G.objs||[]).some(o=>o&&typeof isBreeder==='function'&&isBreeder(o)&&typeof breederState==='function'&&(breederState(o).larvae||[]).length>0);}catch(e){return false;}}, reward:{coin:150, rep:1, txt:'ตัวอ่อนจะโตเป็นทากขายได้'}, btn:['#hatchAllBreeder','#ovBreedBtn','canvas:breeder']},
+  {t:'ฟักไข่ทากตัวแรก', h:'หลังผสมเสร็จจะได้ไข่ → รอสักครู่จนไข่พร้อมฟัก → กดปุ่ม "ฟักทั้งหมด" หรือคลิกไข่ในตู้ (ตัวอ่อนที่ฟักจะค่อย ๆ โตเป็นทากตัวใหม่)', cond:b=>{try{return (G.objs||[]).some(o=>o&&typeof isBreeder==='function'&&isBreeder(o)&&typeof breederState==='function'&&(breederState(o).larvae||[]).length>0);}catch(e){return false;}}, reward:{coin:150, rep:1, txt:'ตัวอ่อนจะโตเป็นทากขายได้'}, btn:['#hatchAllBreeder','#ovBreedBtn','canvas:breeder'],
+   force:()=>{ try{ if(typeof tankMode!=='undefined'&&!tankMode) return; const bp=document.getElementById('breederPanel'), det=bp&&bp.closest('details'); if(det&&!det.hidden&&!det.open) det.open=true; }catch(e){} }},
  ];
 
  // Stable IDs preserve earned rewards when tutorial order changes.
