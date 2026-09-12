@@ -352,8 +352,9 @@ function stepVisitorArrivals(){
   const capacity=visitorCapacity(),score=visitorAttraction();
   if(!capacity){_pendingParty=null;_arrivalScore=null;_spawnAt=Infinity;return;}
   if(stepOpeningVisitors(capacity,score))return;
-  /* พ่อค้าเร่ถือตู้ทากมาขาย (slug-peddler.js) — คิวแยกจากลูกค้าปกติ */
-  if(typeof stepPeddlerArrival==='function'&&stepPeddlerArrival(capacity))return;
+  /* พ่อค้าเร่/คนรับเหมาถือตู้ทากมาขาย (slug-peddler.js) — คิวแยกจากลูกค้าปกติ
+     gate: ยังไม่ถึงเควสพ่อค้าเร่ (บทที่ 2) ยังไม่ให้มา — sellerSystemUnlocked() มาจาก quests.js */
+  if(typeof stepPeddlerArrival==='function' && (typeof sellerSystemUnlocked!=='function'||sellerSystemUnlocked()) && stepPeddlerArrival(capacity))return;
   if(score!==_arrivalScore){
     if(_arrivalScore===null||!isFinite(_spawnAt))_spawnAt=_peopleT+visitorInterval(score);
     else if(!_pendingParty){
@@ -512,7 +513,7 @@ function makePerson(options={}){
     x: d.x, y: d.y,
     hCm: kid ? 98 + Math.random()*30 : (gender==='female'?151:160) + Math.random()*19,
     kid, gender, hairCut, outfit, family:null,
-    wantsBuy: !kid && Math.random()<buyChance(),
+    wantsBuy: !kid && Math.random()<SOLO_BUY_CHANCE,   // เดี่ยว/คู่: 20% คงที่ · ครอบครัว(มีเด็ก) ถูก assignFamilyBuyer() เขียนทับด้วยสูตรเดิม
     spd: (PERSON_SPEED_CM * (kid ? 1.15 : 0.9 + Math.random()*0.35)) / CM_PER_CELL,
     phase: Math.random()*6.283,
     idle: Math.random()*6.283,
