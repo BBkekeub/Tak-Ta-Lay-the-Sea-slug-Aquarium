@@ -131,6 +131,7 @@ const SLUG_WID_CELLS = 20 / CM_PER_CELL;            // 4 ช่อง
    foodMax = วางอาหารพร้อมกันได้กี่ชิ้นในตู้นั้น (ตู้ใหญ่วางได้เยอะกว่า — ดู feeding.js)   */
 const TANK_GLASS_COLOR='#9fd0f0';                  // ทุกขนาดใช้น้ำ/กระจกสีเดียวกัน
 const CATALOG = {
+  tank_showcase:{kind:'tank',name:'ตู้โชว์',icon:'🔎',price:500,w:SUB,h:SUB,glass:TANK_GLASS_COLOR,foodMax:8,maxSlugs:1,shopSlugScale:7.2,decorScale:1.3},
   tank_race:{kind:'tank',name:'ตู้แข่งทากทะเล',icon:'🏁',price:2500,w:4*SUB,h:2*SUB,glass:TANK_GLASS_COLOR,race:true,foodMax:24},
   play_table:{kind:'deco',name:'โต๊ะเล่นกับทาก',icon:'',price:500,w:SUB,h:SUB,col:'#98744b',playTable:true},
   tank_breed:{kind:'tank',name:'ตู้เพาะพันธุ์ 3 ส่วน',icon:'🥚',price:2000,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,breeder:true,foodMax:10},
@@ -145,6 +146,7 @@ const CATALOG = {
 };
 /* ความจุตู้: พื้นที่ตู้ (ตร.ซม.) ÷ พื้นที่ต่อตัว (400) */
 function tankCap(def){
+  if(Number.isInteger(def.maxSlugs)&&def.maxSlugs>0) return def.maxSlugs;
   const areaCm = ((def.breeder?20:def.w)*CM_PER_CELL) * (def.h*CM_PER_CELL);
   return Math.max(1, Math.floor(areaCm / SLUG_AREA_CM));
 }

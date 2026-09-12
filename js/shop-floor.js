@@ -573,7 +573,7 @@ function drawObject(o){
     }
     if(it.dec){                                        // ---- หิน/ของตกแต่ง ----
       const dd=it.dec, def=TANK_DECOR[dd.key], e=decorImg(dd.key);
-      const dw=def.wCm*pxPerCm*cam.zoom;
+      const dw=def.wCm*(d.decorScale||1)*pxPerCm*cam.zoom;
       const dh=(e.ok? dw*(e.img.naturalHeight/e.img.naturalWidth) : dw*0.8);
       const anc=def.anchor||{x:0.5,y:0.9};
       const dm=dpos.get(dd), p=P(cx+dm[0], cy+dm[1], standH);
@@ -587,12 +587,13 @@ function drawObject(o){
       return;
     }
     const s=it.s;                                      // ---- ทาก ----
-    const a=Math.min(w*0.92,Math.max(w*0.08,it.sm[0]));      // เผื่อขอบไม่ให้ตัวโผล่พ้นกระจก
-    const b=Math.min(h*0.92,Math.max(h*0.08,it.sm[1]));
+    const showcaseScale=d.shopSlugScale||1;
+    const a=Math.min(w*.92,Math.max(w*.08,it.sm[0]));
+    const b=Math.min(h*.92,Math.max(h*.08,it.sm[1]));
     const p=P(cx+a, cy+b, standH+1);
     if(engineReady){
       const PP=slugPartsOf(s);
-      const sa=(s._breedScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*pxPerCm*cam.zoom/(PP.bw*PP.s), spriteH=PP.h*sa;
+      const sa=showcaseScale*(s._breedScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*pxPerCm*cam.zoom/(PP.bw*PP.s), spriteH=PP.h*sa;
       if(slugOnWall(s)){
         /* ⚠️ เดิมคิดความสูงด้วยหน่วยของ "โหมดดูตู้" — บวก SAND_CELLS (1.3 ช่อง) ทั้งที่พื้นทราย
            ในหน้าร้านอยู่ที่ standH พอดี และ half ถูกแปลงด้วย CELLW/ZH = 1.33 ทั้งที่หน้าร้าน
@@ -606,9 +607,9 @@ function drawObject(o){
         const waterPoint=P(cx+point[0],cy+point[1],standH+tankH*0.88);
         const sprite=slugSprite(s), sw=sprite.w*sa, sh=sprite.h*sa;
         const span=floorPoint.y-waterPoint.y;
-        if(sw<=span-2){
+        if(sw<=span-2||showcaseScale>1){
           const frac=limits.rise>0?Math.max(0,Math.min(1,(s.climbZ||0)/limits.rise)):0;
-          const yy=floorPoint.y-sw/2-frac*(span-sw);
+          const yy=floorPoint.y-Math.min(sw,span)/2-frac*Math.max(0,span-sw);
           /* ด้านในตู้อยู่ฝั่งไหนของจอ ดูจากจุดที่ลึกเข้าไป 1 ช่อง — รองรับตู้ที่ถูกหมุน (o.rot) ไปด้วย
              หงอนหันเข้ากลางตู้เสมอ เหมือนโหมดดูตู้ · ไต่ลงสลับแค่หัว-หาง */
           const inScr=P(cx+inPt[0],cy+inPt[1],standH), sgn=(inScr.x-floorPoint.x)>=0?1:-1;
@@ -629,7 +630,7 @@ function drawObject(o){
         return;
       }
       const aura=PP.D.aMetal>0.30;
-      if(shopAnim && spriteH>=ANIM_MIN_PX && animBudget>0){       // ซูมใกล้ + ในจอ = อนิเมชันเต็ม
+      if(shopAnim && spriteH>=ANIM_MIN_PX && animBudget>0){
         animBudget--;
         SlugEngine.drawSlug(ctx, PP, p.x, p.y - spriteH*0.44, !!s.flip, (s.ph||0)*120, sa, aura, s.state==='walk'||s.state==='seekFood'||s.state==='seekDecor'||s.state==='seekNap'||s.state==='follow'||s.state==='dash'||s.state==='flee', s);
       } else {                                                    // ไกล/ซูมออก = สไปรต์นิ่ง blit ทีเดียว (ลื่น)

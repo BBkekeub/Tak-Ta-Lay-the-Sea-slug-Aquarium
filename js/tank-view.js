@@ -698,7 +698,7 @@ function drawDecorAt(key, fx, fy, alpha, flip){
   const def=TANK_DECOR[key]; if(!def) return null;
   const e=decorImg(key);
   const p=S(fx, fy, SAND_CELLS);
-  const w=def.wCm*depthPxPerCm();
+  const w=def.wCm*(curTank?.def.decorScale||1)*depthPxPerCm();
   const h=(e.ok? w*(e.img.naturalHeight/e.img.naturalWidth) : w*0.8);
   const anc=def.anchor||{x:0.5,y:0.9};
   const ax=w*anc.x, ay=h*anc.y;
@@ -1121,7 +1121,7 @@ function drawWallSlug(s,parts,sa){
   const spr=tankSlugSprite(s,parts,sa,slugWalking(s),false);if(!spr)return null;
   const factor=sa/(spr.sa||sa),width=spr.w*factor,height=spr.h*factor;
   const floor=S(edge,s.fy,SAND_CELLS),water=S(edge,s.fy,limits.water);
-  if(width>floor.y-water.y-2)return null;
+  if(width>floor.y-water.y-2&&(curTank.def.shopSlugScale||1)===1)return null;
   const center=S(edge,s.fy,SAND_CELLS+limits.half+(s.climbZ||0));
   const pose=slugWallPose(s,sgn);
   /* ดันตัวออกจากกระจกครึ่งความหนา "ตามทิศที่หลังชี้" — ท่านอนเอียงก็ยังแนบกระจกพอดี */
@@ -1578,7 +1578,7 @@ function drawTank(){
     if(it.kind==='food'){drawFood(it.f);return;}
     if(it.kind==='decor'){ drawDecor(it.d); return; }
     const s=it.s;
-    const bodyLen=slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*depthPxPerCm(s.fx,s.fy)*(s._breedScale||1);
+    const bodyLen=(curTank.def.shopSlugScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*depthPxPerCm(s.fx,s.fy)*(s._breedScale||1);
     const p=S(s.fx,s.fy,sandT+(s.climbZ||0));          // เกาะกระจก/หิน = ยกความสูง z ขึ้น
     const lifted = (s===heldSlug);
     if(lifted){                                        // เงาบนพื้นใต้ตัว (ตัวเองลอยอยู่ที่เคอร์เซอร์)
