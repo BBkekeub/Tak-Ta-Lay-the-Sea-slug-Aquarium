@@ -1,5 +1,5 @@
 import {projectedHeading,intersectsCanvas} from './slug-view-math.js?v=direction16';
-import {SlugCrowd} from './slug-crowd.js?v=eyes17';
+import {SlugCrowd} from './slug-crowd.js?v=gilln2';
 import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -8,7 +8,23 @@ import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {softenBody} from './slug-surface.js';
 const api=window.Slug3D={ready:false,enabled:true,all:true,targetId:null,error:null,stats:{renders:0,reuses:0,culled:0,ms:0,triangles:0,drawCalls:0,instances:0,copies:0,animationHz:0},clip:null};
 let farCrowd,crowd,highCrowd,atlasCamera,atlasUp,lastFlush=0;
-let renderer,scene,camera,model,mixer,actions,meta,template,clips,groundY=.72;
+let renderer,scene,camera,model,mixer,actions,meta,template,clips,groundY=.72,cameraRotation;
+/* ทากเกาะกระจก = ตัวตั้งฉาก จุดยึดจึงเป็น "กลางไทล์" ไม่ใช่จุดเท้าเหมือนบนพื้น
+   (ไม่งั้นหัวหรือหางจะทะลุขอบไทล์ เพราะใต้จุดเท้ามีที่เหลือแค่ ~0.36 ของความสูงไทล์) */
+const WALL_ANCHOR=.5;
+const wallX=new THREE.Vector3(),wallY=new THREE.Vector3(),wallZ=new THREE.Vector3();
+/* สร้างเมทริกซ์หมุนเต็มจาก "แกนบนจอ" ที่ฝั่งเรียกวัดมาให้ (พิกัดแคนวาส แกน y ชี้ลง)
+   หัว → (hx,hy) · หลัง/หงอน → (dx,dy) ซึ่งตั้งฉากกันเสมอ ที่เหลือคือแกนข้างลำตัว
+   คิดในระบบพิกัดของกล้องก่อน แล้วค่อยคูณกลับเป็นพิกัดโลก ผลที่ได้จึงตรงกับที่เห็นบนจอเป๊ะ
+   ⚠️ นี่คือ "การหมุนจริง" ไม่ใช่การพลิกกระจกแบบสไปรต์ 2D — ตัวบนกำแพงซ้าย/ขวา
+      จึงหันคนละสีข้างให้กล้องโดยอัตโนมัติ ไม่ต้องมี flipY */
+function wallBasis(w,out){
+ wallX.set(w.hx,-w.hy,0).normalize();
+ wallY.set(w.dx,-w.dy,0).normalize();
+ wallZ.crossVectors(wallX,wallY).normalize();
+ wallY.crossVectors(wallZ,wallX);
+ return out.makeBasis(wallX,wallY,wallZ).premultiply(cameraRotation);
+}
 let resolution=256,atlasW=2048,atlasH=1920,columns=8,atlasRows=10,viewMode=null;const slotsPerPage=256;
 const highGeometries=new Map();
 const posePool=new Map();
@@ -40,6 +56,10 @@ function renderJob(job,now){
  if(v.orientation===null)v.orientation=face;
  const turnDelta=Math.atan2(Math.sin(face-v.orientation),Math.cos(face-v.orientation));
  v.orientation+=Math.max(-dt*10,Math.min(dt*10,turnDelta));v.model.rotation.y=0;
+ /* บนกำแพงใช้ basis เต็มแทน yaw และสแนปทันทีไม่เลี้ยวนุ่ม — ตรงกับกติกาของฉาก
+    ที่ s.dir ถูกปัดเป็น ±90° อยู่แล้ว (ถ้าเลี้ยวนุ่มจะกลายเป็น "ทากหมุนตัวกลางกระจก") */
+ if(job.wall){v.basis=wallBasis(job.wall,v.basis||new THREE.Matrix4());v.tileLift=groundY-WALL_ANCHOR;}
+ else{v.basis=null;v.tileLift=0;}
  const eyes={sleep:.07,sneeze:.08,startle:1.25,flee:1.18,held:1.12,eat:.72,dashCharge:.38,dash:.5,greet:.78,inspect:.85,mating:.65,larvaDeath:.07};
  let eyeTarget=eyes[key]??1;
  const blinkPhase=(now/1000+v.slot*.731)%4.7;if(eyeTarget===1&&blinkPhase<.16)eyeTarget=.08;
@@ -87,17 +107,20 @@ function flush(){
  api.stats.ms=api.stats.ms*.9+(performance.now()-start)*.1;
 }
 
-api.draw=(ctx,s,x,y,len,lifted=false,direction=null)=>{
+/* wall = {hx,hy,dx,dy} ทิศ "หัว" กับ "หลัง" บนจอ (พิกัดแคนวาส) — ส่งมาเมื่อทากเกาะกระจก
+   ตอนนั้น (x,y) คือจุดที่ "ท้องแตะกระจก" กลางลำตัว ไม่ใช่จุดเท้าบนพื้นทราย */
+api.draw=(ctx,s,x,y,len,lifted=false,direction=null,wall=null)=>{
  if(!api.ready||!api.enabled||(!api.all&&s.id!==api.targetId))return false;
- const width=len*2.2,height=width*.75,top=y-height*groundY,tr=ctx.getTransform();
+ const width=len*2.2,height=width*.75,top=y-height*(wall?WALL_ANCHOR:groundY),tr=ctx.getTransform();
  if(document.hidden||!intersectsCanvas(tr,x-width/2,top,width,height,ctx.canvas.width,ctx.canvas.height)){pending.delete(s.id);api.stats.culled++;api.stats.frameCulled++;return true;}
- const v=instance(s);const pixelWidth=width*Math.hypot(tr.a,tr.b),wanted=Math.max(64,Math.min(1024,Math.ceil(Math.max(1,pixelWidth)/64)*64));if(!v.requestSize||wanted>v.requestSize||wanted<v.requestSize-64)v.requestSize=wanted;pending.set(s.id,{s,v,len,lifted,size:v.requestSize,frame:viewFrame,heading:direction?projectedHeading(direction.x,direction.y):null});
+ const v=instance(s);const pixelWidth=width*Math.hypot(tr.a,tr.b),wanted=Math.max(64,Math.min(1024,Math.ceil(Math.max(1,pixelWidth)/64)*64));if(!v.requestSize||wanted>v.requestSize||wanted<v.requestSize-64)v.requestSize=wanted;pending.set(s.id,{s,v,len,lifted,wall,size:v.requestSize,frame:viewFrame,heading:direction?projectedHeading(direction.x,direction.y):null});
  if(!scheduled){scheduled=true;requestAnimationFrame(flush);}
  if(v.valid){
-  if(!lifted){ctx.save();ctx.translate(x,y);ctx.scale(1,.24);const r=len*.46,g=ctx.createRadialGradient(0,0,0,0,0,r);g.addColorStop(0,'rgba(0,0,0,.2)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.restore();}
+  /* เงาวงรีเป็นเงาบนพื้นทราย ตัวเกาะกระจกไม่มีพื้นให้ทอดเงา */
+  if(!lifted&&!wall){ctx.save();ctx.translate(x,y);ctx.scale(1,.24);const r=len*.46,g=ctx.createRadialGradient(0,0,0,0,0,r);g.addColorStop(0,'rgba(0,0,0,.2)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.restore();}
   ctx.drawImage(v.page.canvas,v.sx,v.sy,v.sw,v.sh,x-width/2,top,width,height);api.stats.reuses++;
  }
- s._hit={x,y:y-len*.2,r:Math.max(26,len*.62)};return true;
+ s._hit=wall?{x,y,r:Math.max(20,len*.5)}:{x,y:y-len*.2,r:Math.max(26,len*.62)};return true;
 };
 try{
  const [gltf,data,eyes,lod,farLod]=await Promise.all([new GLTFLoader().loadAsync('assets/slug3d/slug-behaviors.glb?v=2'),fetch('assets/slug3d/behaviors.json').then(r=>r.json()),fetch('assets/slug3d/edited-eyes.json?v=1').then(r=>{if(!r.ok)throw Error('Edited eyes failed to load');return r.json();}),fetch('assets/slug3d/slug-lod.json').then(r=>r.json()),fetch('assets/slug3d/slug-lod-far.json').then(r=>r.json())]);
@@ -128,6 +151,7 @@ try{
  camera=new THREE.OrthographicCamera(-1.1,1.1,.825,-.825,.01,20);
  camera.position.set(0,1.12,2.5);camera.lookAt(0,.23,0);camera.updateMatrixWorld();
  groundY=(1-new THREE.Vector3(0,0,0).project(camera).y)/2;
+ cameraRotation=new THREE.Matrix4().extractRotation(camera.matrixWorld);   // ใช้แปลง basis ของท่าเกาะกระจกจากพิกัดกล้อง → พิกัดโลก
  atlasCamera=camera.clone();atlasCamera.right=atlasW/128*2.2-1.1;atlasCamera.bottom=.825-atlasH/96*1.65;atlasCamera.updateProjectionMatrix();atlasUp=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1);
  scene.add(new THREE.HemisphereLight(0xc6e8ed,0x8a7865,.4));
  const light=new THREE.DirectionalLight(0xffedcf,2.2);light.position.set(-2,4,3);scene.add(light);
@@ -138,7 +162,8 @@ try{
  mixer=new THREE.AnimationMixer(gltf.scene);meta=Object.fromEntries(data.clips.map(c=>[c.id,c]));
  actions=Object.fromEntries(gltf.animations.map(c=>{const a=mixer.clipAction(c),m=meta[c.name];a.setLoop(m?.loop?THREE.LoopRepeat:THREE.LoopOnce,m?.loop?Infinity:1);a.clampWhenFinished=true;return[c.name,a];}));
  if(Object.keys(actions).length!==27)throw Error('Expected 27 animation clips');
- template=cloneSkeleton(model);clips=gltf.animations;scene.remove(model);crowd=new SlugCrowd(template,scene);const detailed=cloneSkeleton(template);detailed.traverse(o=>{if(o.isMesh&&highGeometries.has(o.name))o.geometry=highGeometries.get(o.name);});highCrowd=new SlugCrowd(detailed,scene);const distant=cloneSkeleton(template);applyLOD(distant,farLod);farCrowd=new SlugCrowd(distant,scene);api.stats.meshes=crowd.parts.map(p=>({name:p.name,triangles:p.mesh.geometry.index.count/3}));
+ template=cloneSkeleton(model);clips=gltf.animations;scene.remove(model);crowd=new SlugCrowd(template,scene);const detailed=cloneSkeleton(template);detailed.traverse(o=>{if(o.isMesh&&highGeometries.has(o.name))o.geometry=highGeometries.get(o.name);});highCrowd=new SlugCrowd(detailed,scene);const distant=cloneSkeleton(template);applyLOD(distant,farLod);farCrowd=new SlugCrowd(distant,scene);api.stats.meshes=crowd.parts.map(p=>({name:p.name,triangles:p.mesh.geometry.index.count/3,rank:p.rank}));   // rank = ลำดับที่หงอนพุ่มนี้โผล่ตามยีน gillN (undefined = ไม่ใช่หงอน โชว์เสมอ)
+ api.crowds={crowd,highCrowd,farCrowd};   // เปิดไว้ให้ตรวจได้จากคอนโซล เช่น เช็กว่าหงอนที่เกินยีนถูกย่อเป็นศูนย์จริงไหม
  api.ready=true;api.names=Object.keys(actions);api.meta=meta;
  api.checkClips=()=>{
   const s={id:'__validation',genes:{mainC:200,accC:250,len:50,girth:50,gillLen:50,gillN:50,spotN:50,tentLen:50,vigor:50},flip:false},v=instance(s),slot=v.slot,canvas=document.createElement('canvas');canvas.width=512;canvas.height=384;const ctx=canvas.getContext('2d'),results=[];v.slot=0;v.tile=0;v.sx=0;v.sy=0;v.sw=128;v.sh=96;

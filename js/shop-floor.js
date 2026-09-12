@@ -626,6 +626,8 @@ function drawObject(o){
           const pose=slugWallPoseAxes(Number.isFinite(s.dir)?s.dir:Math.PI/2,
                        along.x-floorPoint.x, along.y-floorPoint.y,
                        upPt.x-floorPoint.x,  upPt.y-floorPoint.y, sgn);
+          /* 3D ใช้แกนชุดเดียวกับสไปรต์ แต่ไม่ต้องดันออกจากกระจก (จุดกำเนิดโมเดล = ท้อง) */
+          if(window.Slug3D?.draw(ctx,s,floorPoint.x,yy,Math.min(30*pxPerCm*cam.zoom,showcaseScale*(s._breedScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*pxPerCm*cam.zoom),false,null,{hx:pose.hx,hy:pose.hy,dx:pose.dx,dy:pose.dy}))return;
           ctx.save();
           ctx.translate(floorPoint.x+pose.dx*(sh/2+1), yy);
           ctx.rotate(pose.rot);

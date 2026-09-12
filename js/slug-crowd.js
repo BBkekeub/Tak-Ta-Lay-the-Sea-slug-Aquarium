@@ -1,4 +1,15 @@
 import * as THREE from 'three';
+/* ---- ยีน gillN: หงอนโผล่ทีละ "คู่" ตามลำดับนี้ ----
+   ใน GLB มีหงอน 9 พุ่ม ผูกกระดูกคนละชุด `Crown_0..8` (ชุดละ 3 ข้อ) ตำแหน่งตายตัวย้ายไม่ได้
+   สไปรต์ 2D จัดผังใหม่ทุกจำนวน (GILL_SETS ใน slug-engine) ซึ่ง 3D ทำตามไม่ได้
+   ที่ทำให้เหมือนได้คือ **จำนวน** — ใช้บันได LADDER ตัวเดียวกันผ่าน `d.nGill`
+   ลำดับนี้เลือกให้ทุกขั้นของบันได [2,3,5,6,8,9] ลงตัวเป็น "คู่ซ้าย-ขวา" หรือ "ต้นกลาง" พอดี
+   จึงไม่มีขั้นไหนที่พุ่มเบี้ยวข้างเดียว:
+     2 → คู่กลาง 4,5 · 3 → +ต้นกลางสูงสุด 6 · 5 → +คู่นอก 0,2
+     6 → +ต้นกลาง 8 · 8 → +คู่หลัง 1,3 · 9 → +ต้นหน้าเล็กสุด 7
+   ⚠️ ยีน gillN = 50 (ค่าเริ่มต้น) ให้ 2 พุ่ม ไม่ใช่ 9 — ตรงกับ 2D แต่ต่างจากของเดิมที่โชว์ครบเสมอ */
+const CROWN_ORDER=[4,5,6,0,2,8,1,3,7];
+const HIDDEN=new THREE.Vector3(0,0,0);
 // GPU instancing: one draw per mesh part, with independent skeleton matrices and colors.
 export class SlugCrowd {
  constructor(template,scene,capacity=256){
@@ -10,6 +21,21 @@ export class SlugCrowd {
   template.traverse(source=>{
    if(!source.isMesh)return;
    const g=source.geometry.clone(),m=source.material.clone(),skin=source.isSkinnedMesh,palette=!!source.material.userData.palette;
+   /* หาว่าหงอนพุ่มนี้เป็น Crown ไหน จาก "กระดูกที่ถ่วงน้ำหนักมากที่สุด" ไม่ใช่จากชื่อเมช
+      เพราะชื่อเมชเป็นแค่ร่องรอยว่าก๊อปมาจากสกัลป์ไหน (Style1_gill_* / Gill_Type2_Updated*)
+      และเปลี่ยนได้ทุกครั้งที่ export ใหม่ ส่วนชื่อกระดูกคือผังจริง */
+   let rank;
+   if(skin&&/gill/i.test(source.name)){
+    const wi=g.attributes.skinIndex,wv=g.attributes.skinWeight,tally=new Map();
+    for(let k=0;k<wv.count;k++)for(let c=0;c<4;c++){
+     const w=wv.array[k*4+c];if(w<=.05)continue;
+     const bone=skeleton.bones[wi.array[k*4+c]];if(!bone)continue;
+     tally.set(bone.name,(tally.get(bone.name)||0)+w);
+    }
+    let best='',bw=0;for(const [nm,v] of tally)if(v>bw){bw=v;best=nm;}
+    const crown=/^Crown_(\d+)/.exec(best);
+    if(crown){const r=CROWN_ORDER.indexOf(+crown[1]);if(r>=0)rank=r;}   // ไม่เจอในผัง = โชว์เสมอ
+   }
    if(palette&&source.name!=='Body'){
     const p=g.attributes.position,n=g.attributes.normal,ix=g.index,acc=new Float32Array(p.count),num=new Float32Array(p.count);
     const edge=(a,b)=>{const x=p.getX(a)-p.getX(b),y=p.getY(a)-p.getY(b),z=p.getZ(a)-p.getZ(b),len=Math.hypot(x,y,z);if(len<1e-7)return;acc[a]+=(x*n.getX(a)+y*n.getY(a)+z*n.getZ(a))/len;num[a]++;};
@@ -41,7 +67,7 @@ export class SlugCrowd {
    };
    const thisCrowd=this;m.customProgramCacheKey=()=>key.call(source.material)+'-crowd-'+skin;
    const mesh=new THREE.InstancedMesh(g,m,capacity);mesh.frustumCulled=false;if(source.morphTargetInfluences?.length)mesh.setMorphAt(0,source);mesh.count=0;scene.add(mesh);
-   this.parts.push({name:source.name,mesh,pose,colors,skin,metal,traits});
+   this.parts.push({name:source.name,mesh,pose,colors,skin,metal,traits,rank});
   });
   this.transform=new THREE.Matrix4();this.rotation=new THREE.Matrix4();this.offset=new THREE.Matrix4();this.shape=new THREE.Matrix4();this.appendage=new THREE.Matrix4();this.anchor=new THREE.Vector3();
  }
@@ -69,11 +95,18 @@ export class SlugCrowd {
    const d=SlugEngine.derived(genes);
    const colorKey=genes.mainC+'|'+genes.accC;
    if(v.colorKey!==colorKey){const d=SlugEngine.derived(genes),rgb=c=>new THREE.Color(SlugEngine.hex(c));v.palette={geneBase:rgb(d.base),geneAcc:rgb(d.acc),geneDark:rgb(d.matA.d),geneLight:rgb(d.matA.l)};v.bodyMetal=0;v.gillMetal=0;v.colorKey=colorKey;}
-   const scale=v.sw/128,offset=up.clone().multiplyScalar(-v.sy/96*1.65-(scale-1)*.825);offset.x+=v.sx/128*2.2+(scale-1)*1.1;offset.y+=.23*(1-scale);this.offset.makeTranslation(offset.x,offset.y,offset.z);this.offset.scale(new THREE.Vector3(scale,scale,scale));this.rotation.makeRotationY(v.orientation||0);
+   // tileLift slides the model inside its own tile, in tile heights, positive upward on screen.
+   // Wall poses stand the body on end, so they need the tile's vertical centre, not the floor anchor.
+   const scale=v.sw/128,offset=up.clone().multiplyScalar(-v.sy/96*1.65-(scale-1)*.825+(v.tileLift||0)*1.65*scale);offset.x+=v.sx/128*2.2+(scale-1)*1.1;offset.y+=.23*(1-scale);this.offset.makeTranslation(offset.x,offset.y,offset.z);this.offset.scale(new THREE.Vector3(scale,scale,scale));
+   // basis carries a full orientation (head and back axes), yaw alone cannot express a slug on glass.
+   if(v.basis)this.rotation.copy(v.basis);else this.rotation.makeRotationY(v.orientation||0);
    this.shape.makeScale(d.stretch,1,1);this.shape.setPosition(0,floorLift,0);
    for(const part of this.parts){const src=parts.get(part.name);
     this.appendage.identity();
-    const appendageScale=part.name==='rhino_base'?d.tScale:part.name.startsWith('Gill')?d.gScale:1;
+    /* ⚠️ ห้ามกลับไปใช้ startsWith('Gill') — หงอนใน GLB ตั้งชื่อสองชุด
+       `Gill_Type2_Updated*` (3 ชิ้น) กับ `Style1_gill_*` (6 ชิ้น) ชุดหลังขึ้นต้นด้วย S
+       เทียบแบบเดิมเลยโดนแค่ 3 ใน 9 = ยีน gillLen ยืดหงอนไม่เท่ากันทั้งพุ่ม */
+    const appendageScale=part.name==='rhino_base'?d.tScale:/gill/i.test(part.name)?d.gScale:1;
     if(appendageScale!==1){
      if(src.userData.geneAnchor===undefined){const p=src.geometry.attributes.position;let k=0;for(let j=1;j<p.count;j++)if(p.getY(j)<p.getY(k))k=j;src.userData.geneAnchor=k;}
      this.anchor.fromBufferAttribute(src.geometry.attributes.position,src.userData.geneAnchor);
@@ -87,6 +120,9 @@ export class SlugCrowd {
      const openness=v.eyeOpen??1;this.appendage.makeScale(1,openness,1);this.appendage.setPosition(0,this.anchor.y*(1-openness),0);
     }
     this.transform.copy(this.offset).multiply(this.rotation).multiply(this.shape).multiply(this.appendage).multiply(src.matrixWorld);
+    /* หงอนที่เกินจำนวนของยีนตัวนี้ → ย่อเป็นศูนย์ ไม่มีพิกเซลออกมา
+       (อินสแตนซ์ทุกตัวใช้ mesh.count เดียวกัน ซ่อนรายตัวได้แค่ทางนี้ · ไม่มีต้นทุนเพิ่ม) */
+    if(part.rank>=d.nGill)this.transform.scale(HIDDEN);
     part.traits.setXYZW(i,d.aura,d.nSpot,d.shape==='sq'?1:d.shape==='tri'?2:0,part.name==='Body'?d.deep:d.gdeep);part.mesh.setMatrixAt(i,this.transform);part.pose.setX(i,i);part.metal.setX(i,part.name==='Body'?v.bodyMetal:v.gillMetal);for(const [k,attr] of Object.entries(part.colors)){const c=v.palette[k];attr.setXYZ(i,c.r,c.g,c.b);}if(src.morphTargetInfluences?.length)part.mesh.setMorphAt(i,src);}
   });
   this.texture.needsUpdate=true;

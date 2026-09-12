@@ -1134,6 +1134,20 @@ function drawWallSlug(s,parts,sa){
   s._hit={x,y,r:Math.max(20,width*.5)};
   return {x, y, hx:pose.hx, hy:pose.hy, len:width};
 }
+/* ทากเกาะกระจกแบบ 3D — ส่ง "แกนบนจอ" ชุดเดียวกับที่สไปรต์ 2D ใช้เข้าไปให้ Slug3D หมุนโมเดลจริง
+   ต่างจาก 2D ตรงที่ไม่ต้องดันตัวออกจากกระจก เพราะจุดกำเนิดของโมเดลอยู่ที่ "ท้อง" อยู่แล้ว
+   ตัวจึงงอกออกจากกระจกเข้าหากลางตู้เอง คืน null = วาดไม่ได้ ให้ตกไปใช้สไปรต์ต่อ */
+function drawWallSlug3D(s,bodyLen){
+  if(!(window.Slug3D&&Slug3D.ready&&Slug3D.enabled))return null;
+  const left=s.wall!=='right', edge=left?0:(curTank.def.breeder?20:curTank.def.w), sgn=left?1:-1;
+  const limits=slugWallLimits(s,curTank.def.w,curTank.def.h,curTank.def);
+  const floor=S(edge,s.fy,SAND_CELLS),water=S(edge,s.fy,limits.water);
+  if(bodyLen>floor.y-water.y-2&&(curTank.def.shopSlugScale||1)===1)return null;   // ตัวยาวเกินช่องน้ำ = ไม่วาด (เกณฑ์เดียวกับ 2D)
+  const c=S(edge,s.fy,SAND_CELLS+limits.half+(s.climbZ||0));
+  const pose=slugWallPose(s,sgn);
+  if(!Slug3D.draw(tctx,s,c.x,c.y,bodyLen,false,null,{hx:pose.hx,hy:pose.hy,dx:pose.dx,dy:pose.dy}))return null;
+  return {x:c.x, y:c.y, hx:pose.hx, hy:pose.hy, rot:pose.rot, len:bodyLen};
+}
 
 function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
   if(tankDef?.breeder){slugs=slugs.filter(s=>{if(s.breedZone){walkBreedingZone(s,dt);return false;}return true;});}
@@ -1600,6 +1614,16 @@ function drawTank(){
       const sg=tctx.createRadialGradient(0,0,0,0,0,rx);
       sg.addColorStop(0,'rgba(0,0,0,0.34)'); sg.addColorStop(0.6,'rgba(0,0,0,0.15)'); sg.addColorStop(1,'rgba(0,0,0,0)');
       tctx.fillStyle=sg; tctx.beginPath(); tctx.arc(0,0,rx,0,6.283); tctx.fill(); tctx.restore();
+    }
+    /* เกาะกระจกแบบ 3D — มาก่อนเส้นทางพื้น เพราะจุดยึด/ท่าหันคนละชุดกัน
+       ตัวที่ถูกอุ้มอยู่ (lifted) ไม่นับว่าเกาะกระจก ใช้เส้นทางปกติเหมือนเดิม */
+    if(engineReady&&!lifted&&slugOnWall(s)){
+      const w3=drawWallSlug3D(s,bodyLen);
+      if(w3){
+        if(s.state==='sneeze')drawSneezeBubbles(s,{x:w3.x-w3.hx*w3.len*0.20, y:w3.y-w3.hy*w3.len*0.20},bodyLen,w3.hx,w3.hy);
+        if(s===selSlug){tctx.save();tctx.strokeStyle='#9fffdc';tctx.lineWidth=2;tctx.beginPath();tctx.ellipse(w3.x,w3.y,bodyLen*.5,bodyLen*.12,w3.rot,0,Math.PI*2);tctx.stroke();tctx.restore();}   // วงเลือกหมุนตามลำตัว ไม่ใช่วงบนพื้น
+        return;
+      }
     }
     if(engineReady&&!slugOnWall(s)&&window.Slug3D?.draw(tctx,s,p.x,lifted?p.y-6*tankCam.zoom:p.y,bodyLen,lifted,{x:CELLW*Math.cos(s._motionHeading??s.dir??0)+DEPX*Math.sin(s._motionHeading??s.dir??0),y:-DEPY*Math.sin(s._motionHeading??s.dir??0)})){
       if(s.state==='sneeze')drawSneezeBubbles(s,p,bodyLen);
