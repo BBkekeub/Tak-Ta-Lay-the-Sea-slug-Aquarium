@@ -36,17 +36,72 @@
 
  const nav=document.createElement('div');nav.className='context-nav';top.insertBefore(nav,helpButton);
  let active='';const buttons=new Map();
+ /* "คลังทาก" กับ "ของที่เก็บ" คือของที่เรามีอยู่เหมือนกัน — ข้างนอกเหลือปุ่มเดียว แล้วมาแยกเป็นแท็บในแผง */
+ const STORAGE=['inventory','shelf'];
+ const tabs=document.createElement('div');tabs.className='rail-tabs';tabs.hidden=true;
+ for(const [key,label] of [['inventory','คลังทาก'],['shelf','ของที่เก็บ']]){
+  const t=document.createElement('button');t.className='tbtn';t.dataset.tab=key;t.textContent=label;
+  t.onclick=()=>show(key);tabs.append(t);
+ }
  function show(name){
    active=name;for(const s of rail.querySelectorAll(':scope > .sec'))s.hidden=s.dataset.panel!==name;
-   rail.hidden=!name;for(const [key,b] of buttons){b.classList.toggle('on',key===name);b.setAttribute('aria-expanded',String(key===name));}
+   rail.hidden=!name;
+   for(const [key,b] of buttons){const on=key===name||(key==='inventory'&&STORAGE.includes(name));b.classList.toggle('on',on);b.setAttribute('aria-expanded',String(on));}
+   tabs.hidden=!STORAGE.includes(name);
+   for(const t of tabs.children)t.classList.toggle('on',t.dataset.tab===name);
    window.dispatchEvent(new Event('resize'));
  }
- for(const [key,label] of [['inventory','คลังทาก'],['shelf','ของที่เก็บ'],['offers','ข้อเสนอ'],['settings','ตั้งค่า']]){const b=document.createElement('button');b.className='tbtn';b.textContent=label;b.onclick=()=>{if(appMode==='build')setMode('view');show(active===key?'':key);};buttons.set(key,b);nav.append(b);}
- const close=document.createElement('button');close.className='tbtn panel-close';close.textContent='✕';close.setAttribute('aria-label','ปิดแผง');close.onclick=()=>{if(appMode==='build')setMode('view');show('');};rail.prepend(close);
+ /* ⚠️ ตั้ง id ตรงนี้เอง ไม่ปล่อยให้ quests.js เดาจากข้อความปุ่ม เพราะผังใหม่กระจายปุ่มไปคนละมุมแล้ว
+    #navOffers ถูกอ้างโดย cat-seller.js (ปุ่ม "ข้อเสนอหน้าร้าน" ในคอมพิวเตอร์ร้าน) · #navInv ถูกอ้างโดยเควส */
+ for(const [key,label,id] of [['inventory','📦 คลัง','navInv'],['offers','ข้อเสนอ','navOffers'],['settings','⚙ ตั้งค่า','navSettings']]){
+  const b=document.createElement('button');b.className='tbtn';b.id=id;b.textContent=label;
+  b.onclick=()=>{if(appMode==='build')setMode('view');show((key==='inventory'?STORAGE.includes(active):active===key)?'':key);};
+  buttons.set(key,b);nav.append(b);
+ }
+ const close=document.createElement('button');close.className='tbtn panel-close';close.textContent='✕';close.setAttribute('aria-label','ปิดแผง');close.onclick=()=>{if(appMode==='build')setMode('view');show('');};
+ rail.prepend(tabs);rail.prepend(close);
  window.toggleFloorBuildTools=()=>show(active==='build'?'':'build');
  const previous=setMode;setMode=function(mode){previous(mode);show('');};
  const badge=buttons.get('offers');const offers=document.getElementById('tradeOffers');
- new MutationObserver(()=>{const count=typeof TRADE_OFFERS!=='undefined'?TRADE_OFFERS.length:offers.querySelectorAll('select').length;badge.textContent=count?'ข้อเสนอ ('+count+')':'ข้อเสนอ';}).observe(offers,{childList:true,subtree:true});
+ new MutationObserver(()=>{const count=typeof TRADE_OFFERS!=='undefined'?TRADE_OFFERS.length:offers.querySelectorAll('select').length;badge.textContent=count?'ข้อเสนอ ('+count+')':'ข้อเสนอ';badge.classList.toggle('has-news',!!count);}).observe(offers,{childList:true,subtree:true});
+
+ /* ===== ผังใหม่ 2026-09-13 — แยกของตาม "หน้าที่" ไม่ใช่กองรวมบนหัว =====
+      ซ้ายล่าง = ทุกอย่างที่กด (ซูม → โหมด → คลัง) · ขวาล่าง = แจ้งเตือนล้วน · บนขวา = สวิตช์ระดับเกม
+    ⚠️ มือถือมีผังของตัวเองใน mobile.css อยู่แล้ว (.context-nav = แถบล่างเต็มความกว้าง) จึงย้ายเฉพาะจอใหญ่
+       และย้ายกลับเองเมื่อจอเล็กลง — เงื่อนไขสื่อต้องเป็น "ส่วนเติมเต็ม" ของ mobile.css เป๊ะ */
+ const stage=document.querySelector('.stage-wrap'),zoombar=document.querySelector('.zoombar');
+ const dockRow=document.createElement('div');dockRow.className='dock-row';
+ const notify=document.createElement('div');notify.id='notifyDock';notify.setAttribute('aria-label','แจ้งเตือน');stage.append(notify);
+ const modeseg=document.querySelector('.modeseg');
+ const modeSlot=document.createComment('modeseg');top.insertBefore(modeSlot,modeseg);   // จำที่เดิมไว้ ย้ายกลับตอนจอเล็ก
+ const big=matchMedia('(min-width:821px) and (min-height:601px),(min-width:1001px)');
+ function applyLayout(){
+  if(big.matches){
+   zoombar.append(dockRow);dockRow.append(modeseg,nav);
+   notify.append(buttons.get('offers'));
+   top.append(buttons.get('settings'),helpButton);
+  }else{
+   modeSlot.parentNode.insertBefore(modeseg,modeSlot);
+   nav.append(buttons.get('inventory'),buttons.get('offers'),buttons.get('settings'));
+   top.append(nav,helpButton);
+  }
+  window.dispatchEvent(new Event('resize'));
+ }
+ applyLayout();big.addEventListener('change',applyLayout);
+
+ /* ยุบชิปตัวเลข 6 → 3 · ย้ายเฉพาะ <b id="…"> ไม่แตะ id เดิม โค้ดที่อัปเดตตัวเลขจึงทำงานเหมือนเดิมทุกบรรทัด
+    (ต้องทำก่อน mobile-ui.js ซึ่งโหลดทีหลังแล้วกวาด .stat ทั้งหมดไปใส่ .mobileStats) */
+ const statOf=id=>document.getElementById(id)?.closest('.stat');
+ statOf('hCoin')?.classList.add('lead');                       // เหรียญ = ตัวเดียวที่ต้องเหลือบดูตลอด
+ const draw=statOf('hAttraction'),vis=statOf('hVisitors');
+ if(draw&&vis){draw.append(document.createTextNode(' · ลูกค้า '),document.getElementById('hVisitors'));vis.remove();}
+ const tanks=statOf('hTanks'),slugs=statOf('hSlugs'),area=statOf('hArea');
+ if(tanks&&slugs&&area){
+  tanks.replaceChildren(document.getElementById('hTanks'),document.createTextNode(' ตู้ · '),
+                        document.getElementById('hSlugs'),document.createTextNode(' ทาก · '),
+                        document.getElementById('hArea'));
+  slugs.remove();area.remove();
+ }
  const ov=document.getElementById('ov');new MutationObserver(()=>{document.body.classList.toggle('inside-tank',ov.classList.contains('on'));window.dispatchEvent(new Event('resize'));}).observe(ov,{attributes:true,attributeFilter:['class']});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!help.open&&active&&appMode!=='build')show('');});
  show('');

@@ -46,7 +46,7 @@
   {t:'แต่งร้านสักหน่อย', h:'เข้าโหมดก่อสร้าง (🔧) ซื้อของตกแต่งมาวางในร้าน 1 ชิ้น', cond:b=>decorCount()>b.decor, reward:{coin:250, rep:0, txt:'ปลดล็อกชุดตกแต่งใหม่'}, btn:'#mBuild'},
   {t:'ทำประตูเข้าร้าน', h:'กด 🔧 ก่อสร้าง → แท็บ "อุปกรณ์สำคัญ" → เลือก 🚪 ประตู แล้วแตะบนกำแพงเพื่อวาง', cond:b=>!!G.door, reward:{coin:100, rep:0, txt:'ลูกค้าเดินเข้าร้านได้แล้ว'}, btn:['#shop .item[data-k="wall-door"]','#floorBuildDock .decorTabs [data-cat="อุปกรณ์สำคัญ"]','#mBuild']},
   {t:'เพิ่มความดึงดูดของร้าน', h:'ซื้อของตกแต่งเพิ่ม (และมีทากอยู่ในตู้) ให้ค่าความดึงดูดแตะ 6', cond:b=>attraction()>=6, reward:{coin:500, rep:0, tank:'tank_breed', txt:'รับตู้เพาะพันธุ์ฟรีในที่พักพิง แล้วนำมาวางในร้านได้เลย'}, btn:'#mBuild'},
-  {t:'วางตู้เพาะพันธุ์', h:'กดปุ่ม "ของที่เก็บ" (แถบบน) → ลากตู้เพาะพันธุ์ฟรีที่ได้รับมาวางในร้าน', cond:b=>breederExists(), reward:{coin:200, rep:2, txt:'ปลดล็อกการเพาะพันธุ์'}, btn:['#navShelf','#mBuild']},
+  {t:'วางตู้เพาะพันธุ์', h:'กดปุ่ม "📦 คลัง" (มุมซ้ายล่าง) → แท็บ "ของที่เก็บ" → ลากตู้เพาะพันธุ์ฟรีที่ได้รับมาวางในร้าน', cond:b=>breederExists(), reward:{coin:200, rep:2, txt:'ปลดล็อกการเพาะพันธุ์'}, btn:['#navInv','#mBuild']},
   {t:'ผสมพันธุ์ทากคู่แรก', h:'เข้าตู้เพาะ → กดปุ่มที่ไฟกะพริบ "เลือกทากมาผสมพันธุ์" → เลือก 2 ตัว แล้วเริ่ม (จากนั้นจะเข้าสู่ช่วงรอผสม → รอไข่ → ฟักไข่)', cond:b=>S().bred>b.bred, reward:{coin:150, rep:1, txt:'รอลูกทากตัวแรกได้เลย'}, btn:['#startBreeder','#ovBreedBtn','canvas:breeder'],
    force:()=>{ try{ if(typeof tankMode!=='undefined'&&!tankMode) return; const bp=document.getElementById('breederPanel'), det=bp&&bp.closest('details'); if(det&&!det.hidden&&!det.open) det.open=true; }catch(e){} }},
   {t:'วางเคาน์เตอร์ขายทาก', h:'กด 🔧 ก่อสร้าง → แท็บ "อุปกรณ์สำคัญ" → เลือกเคาน์เตอร์แมว (ฟรี) แล้ววางในร้านให้ลูกค้ามาเสนอราคา', cond:b=>(G.objs||[]).some(o=>o&&o.type==='deco'&&o._key==='counter'), reward:{coin:100, rep:1, txt:'พร้อมขายทากแล้ว'}, btn:['#shop .item[data-k="counter"]','#floorBuildDock .decorTabs [data-cat="อุปกรณ์สำคัญ"]','#mBuild']},
@@ -68,7 +68,7 @@
   {t:'ตกแต่งภายในตู้เลี้ยง', h:'คลิกเข้าตู้ → เปิด 🔧 จัดของ แล้ววางของตกแต่งในตู้สัก 1 ชิ้น', cond:b=>tankDecorated(), reward:{coin:120, rep:1, txt:'ตู้สวยขึ้น น่าดูขึ้น'}, btn:['#ovBuild','canvas:anytank']},
   {t:'ย้ายทากข้ามตู้', h:'เข้าตู้ → ปุ่ม "จัดการทาก" เลือกทากแล้วย้ายเข้า/ออกระหว่างตู้กับคลัง', cond:b=>S().transferred>b.transferred, reward:{coin:120, rep:1, txt:'จัดกลุ่มทากได้ตามใจ'}, btn:['#ovAdd','canvas:anytank']},
   {t:'วางโต๊ะเล่นแล้วเล่นกับทาก', h:'กด 🔧 ก่อสร้าง → แท็บ "อุปกรณ์สำคัญ" → ซื้อ "โต๊ะเล่นกับทาก" มาวาง แล้วคลิกที่โต๊ะ (ตามลูกศร) เพื่อเล่น', cond:b=>S().played>b.played, reward:{coin:120, rep:1, txt:'เล่นกับทากให้มันมีความสุข'}, btn:['canvas:playtable','#shop .item[data-k="play_table"]','#floorBuildDock .decorTabs [data-cat="อุปกรณ์สำคัญ"]','#mBuild']},
-  {t:'ค้าขายกับพ่อค้าเร่/คนรับเหมา', h:'บางครั้งพ่อค้าเร่จะเอาทากมาขาย หรือคนรับเหมามารับซื้อทากทีละเยอะ ๆ — เปิดปุ่ม "ข้อเสนอ" แล้วลองซื้อหรือขายสักครั้ง', cond:b=>S().sellerTrade>b.sellerTrade, reward:{coin:150, rep:2, txt:'ช่องทางซื้อ-ขายนอกหน้าร้าน'}, btn:'#navOffers'},
+  {t:'ค้าขายกับพ่อค้าเร่/คนรับเหมา', h:'บางครั้งพ่อค้าเร่จะเอาทากมาขาย หรือคนรับเหมามารับซื้อทากทีละเยอะ ๆ — กดปุ่ม "ข้อเสนอ" ที่ถาดแจ้งเตือนมุมขวาล่าง แล้วลองซื้อหรือขายสักครั้ง', cond:b=>S().sellerTrade>b.sellerTrade, reward:{coin:150, rep:2, txt:'ช่องทางซื้อ-ขายนอกหน้าร้าน'}, btn:'#navOffers'},
   {t:'ลองแข่งทากทะเล', h:'กด 🔧 ก่อสร้าง → แท็บ "ตู้เลี้ยง" → ซื้อ "ตู้แข่งทากทะเล" มาวาง เดี๋ยวจะมีคนมาท้าแข่ง — กดรับคำท้าแล้วลุยเลย!', cond:b=>!!(G.racing&&G.racing.purchased), reward:{coin:200, rep:2, txt:'ชนะแล้วมีรางวัลด้วยนะ'}, btn:['#shop .item[data-k="tank_race"]','#floorBuildDock .decorTabs [data-cat="ตู้เลี้ยง"]','#mBuild'],
    force:()=>{ try{ if(G.racing&&G.racing.purchased&&!G.racing.offer&&!G.racing.active) G.racing.nextAt=Date.now(); }catch(e){} }},
 
@@ -113,9 +113,15 @@
  if(!Array.isArray(G.questCompleted))G.questCompleted=[];
  if(!G.questBase || typeof G.questBase!=='object') G.questBase=snapshot();
 
- /* ---- ชิป rep บนแถบบน ---- */
+ /* ---- ชิป rep บนแถบบน ----
+    ⚠️ ปิดไว้ 2026-09-13 — ไล่โค้ดทั้งเกมแล้ว **ไม่มีที่ไหนอ่าน `G.rep` ไปใช้เลย**
+    ไม่มีผลกับราคาขาย ลูกค้า ปลดล็อก ตลาดโลก ออเดอร์ (เพดานทั้งเกมแค่ 27)
+    ชิปเลยกินที่บนแถบบนฟรี ๆ และสับสนกับ "ความดึงดูด" ซึ่งมีผลจริง (= ทากในตู้ × ความสะอาด)
+    ค่ายังสะสมและเซฟตามปกติ วันไหนให้ rep มีงานทำแล้วค่อยสลับกลับเป็น true */
+ const SHOW_REP_CHIP=false;
  let repEl=null;
  function ensureRepChip(){
+  if(!SHOW_REP_CHIP)return;
   if(repEl&&document.body.contains(repEl))return;
   const bar=document.querySelector('.topbar'); if(!bar)return;
   const coin=document.getElementById('hCoin'), host=coin?coin.closest('.stat'):null;

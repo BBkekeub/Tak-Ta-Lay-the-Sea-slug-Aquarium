@@ -1,5 +1,7 @@
 [hidden]{display:none!important}
-.topbar{flex-wrap:wrap;height:auto;min-height:64px;gap:8px;padding:10px 14px}
+/* min-height เดิม 64px เผื่อไว้ตอนแถบบนล้นเป็นสองแถว · ผังใหม่เหลือแถวเดียวแล้ว
+   ค่านี้คุมความสูงการ์ดเควสด้วย (quests.js อ่าน topbar.getBoundingClientRect().bottom) */
+.topbar{flex-wrap:wrap;height:auto;min-height:48px;gap:8px;padding:8px 14px}
 .context-nav{display:flex;gap:6px;flex-wrap:wrap}
 .context-nav .on{background:var(--gold,#c9a457);color:#191710}
 .rail{position:relative;width:310px;max-width:85vw}
@@ -9,6 +11,32 @@
 .rail [data-panel="unused"]{display:none!important}
 .rail [data-panel="settings"]{display:flex;flex-direction:column;gap:12px}
 .inside-tank .rail,.inside-tank .modeseg,.inside-tank .context-nav{display:none!important}
+
+/* ===== ผังใหม่ 2026-09-13 (เดสก์ท็อป) — ซ้ายล่าง=กด · ขวาล่าง=แจ้งเตือน · บนขวา=สวิตช์ ===== */
+.zoombar{align-items:flex-start}
+.dock-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:min(420px,46vw)}
+.dock-row .tbtn{background:rgba(14,14,17,.88);backdrop-filter:blur(6px)}
+.dock-row .modeseg{background:rgba(14,14,17,.92);backdrop-filter:blur(6px)}
+.dock-row .context-nav{gap:6px}
+/* ขวาล่าง: วางเหนือ #newSlugTray (ถาดทากใหม่ จองมุมนี้ที่ right:12px;bottom:12px อยู่ก่อนแล้ว) */
+#notifyDock{position:absolute;right:16px;bottom:calc(72px + var(--mobile-nav,0px));z-index:6;
+  display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+#notifyDock:empty{display:none}
+#notifyDock .tbtn{background:rgba(14,14,17,.88);backdrop-filter:blur(6px)}
+#notifyDock .tbtn.has-news{border-color:#b49e66;color:#ffe1a0;background:#20464bec}
+/* อยู่ในตู้แล้วห้ามโผล่: .zoombar ถูกโอเวอร์เลย์ (z-index 8) ทับอยู่แล้ว แต่สองตัวนี้อยู่นอกเงาของมัน */
+.inside-tank #notifyDock,.inside-tank #navSettings{display:none!important}
+/* ⚠️ #floorBuildDock เป็น absolute เต็มความกว้างขอบล่าง สูง 250px · z-index:8 — สูงกว่า .zoombar (6)
+   ถ้าไม่ยกขึ้น พอกดก่อสร้าง ปุ่มโหมดจะจมใต้แผง = กดกลับมาโหมดดู/เล่นไม่ได้เลย
+   (มือถือมีกฎนี้อยู่แล้วใน mobile.css ผ่าน --mobile-build · ฝั่งเดสก์ท็อปเพิ่งมีรอบนี้ ปุ่มซูมก็เคยจมมาตลอด) */
+@media(min-width:821px) and (min-height:601px),(min-width:1001px){
+  body.mode-build:not(.inside-tank) .zoombar{bottom:262px}
+  body.mode-build:not(.inside-tank) #notifyDock{bottom:322px}
+}
+/* แท็บในแผงคลัง */
+.rail-tabs{display:flex;gap:6px;padding:0 10px 10px}
+.rail-tabs .tbtn{flex:1}
+.rail-tabs .on{background:var(--gold,#c9a457);color:#191710}
 .help-dialog{width:min(520px,85vw);max-height:80vh;overflow:auto;border:1px solid #786342;border-radius:16px;background:#191c1d;color:#eee2cb;padding:24px;font-family:inherit}
 .help-dialog::backdrop{background:#0009}.help-dialog form{float:right}.help-dialog details{padding:14px 0;border-bottom:1px solid #ffffff20}.help-dialog summary{cursor:pointer}.help-dialog p{line-height:1.8;color:#c7c0b1}
 @media(max-width:820px){.topbar .brand{display:none}.topbar .stat{font-size:12px;padding:6px}.rail{position:absolute;right:0;top:0;bottom:0;z-index:8}.body{position:relative}}

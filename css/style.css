@@ -186,13 +186,15 @@ kbd{font-family:"IBM Plex Mono",monospace; font-size:10.5px; background:#0C0C0F;
 .toast.good{border-color:rgba(212,176,106,.5); color:var(--accent)}
 
 .zoombar{position:absolute; left:16px; bottom:16px; display:flex; flex-direction:column; gap:7px; z-index:6}
-.zoombar button{
+/* ⚠️ ต้องเป็น "ลูกตรง ๆ" เท่านั้น — ตั้งแต่ผังใหม่ 2026-09-13 ในแถบนี้มีปุ่มโหมดกับปุ่มคลังมาอยู่ด้วย
+   ถ้าเขียน .zoombar button เฉย ๆ ปุ่มพวกนั้นจะโดนบีบเป็นสี่เหลี่ยม 34×34 จนอ่านไม่ออกและล้นขอบจอ */
+.zoombar>button{
   width:34px; height:34px; font-size:17px; cursor:pointer; color:var(--muted);
   border:1px solid var(--line); border-radius:8px;
   background:rgba(14,14,17,.88); box-shadow:var(--shadow); backdrop-filter:blur(6px);
   transition:color .15s, border-color .15s;
 }
-.zoombar button:hover{color:var(--accent); border-color:rgba(212,176,106,.5)}
+.zoombar>button:hover{color:var(--accent); border-color:rgba(212,176,106,.5)}
 @media (max-width:820px){ .rail{width:250px} }
 
 /* ---- แถบวางของตกแต่งในตู้ ---- */
