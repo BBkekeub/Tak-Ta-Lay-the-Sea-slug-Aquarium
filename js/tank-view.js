@@ -1372,7 +1372,6 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
     if(s.wall) return;                       // อยู่บนกำแพง = ใช้บล็อกเดินของกำแพงไปแล้ว
     let dd=((s.turn-s.dir+Math.PI*3)%(Math.PI*2))-Math.PI;
     s.dir+=dd*Math.min(1,dt*SLUG_TURN*(nearEdge?EDGE_TURN_BOOST:1));
-    const headingX=s.fx,headingY=s.fy;
     if(s.state==='walk' || s.state==='seekDecor' || s.state==='seekNap' || s.state==='seekClimb' || s.state==='follow' || s.state==='dash' || s.state==='flee'){
       const speedMul=s.state==='dash'?DASH_SPEED:s.state==='flee'?FLEE_SPEED:1;
       const paceMul=(s.state==='dash'||s.state==='flee')?1:slugPace(s);   // ดีด/หนีคงจังหวะเดิม
@@ -1383,8 +1382,7 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
       else if(!blk(s.fx,ny)){ s.fy=ny; }
       else { s.turn=s.dir+Math.PI*(0.6+Math.random()*0.8); s.stt=Math.min(s.stt,0.5); }
     }
-    const ownDX=s.fx-headingX,ownDY=s.fy-headingY;
-    s._motionHeading=Math.hypot(ownDX,ownDY)>1e-7?Math.atan2(ownDY,ownDX):s.dir;
+    /* (ทิศที่โมเดล 3D หัน `s._motionHeading` ย้ายไปตั้งท้ายเฟรมพร้อม s.flip แล้ว — ดูคอมเมนต์ตรงนั้น) */
     s.ph+=dt*(0.8+((s.traits&&s.traits.energy)||0.5)*0.5)*(s.state==='dash'?3.2:s.state==='flee'?2.35:(s.state==='walk'||s.state==='seekDecor'||s.state==='seekNap'||s.state==='seekClimb'||s.state==='follow')?1.45:s.state==='wake'?2.0:0.62);
     if(hit(s.fx,s.fy)){                                   // ค้างในช่อง solid → หาที่ว่างใกล้สุดแล้วย้ายไปเลย
       const g=freeSpotNear(s.fx, s.fy, SOLID, fw, fh, slugCm(s.genes)/CM_PER_CELL*0.55+0.2);
@@ -1437,6 +1435,16 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
        ต้องวัดจาก "การเลื่อนบนจอ" คือ ndx*CELLW + ndy*DEPX */
     const sdx=ndx*CELLW+ndy*DEPX;
     if(!s.wall && FACE_STATES.includes(s.state) && Math.abs(sdx)>SLUG_SPEED*dt*0.2*CELLW) s.flip=sdx>0;
+    /* ⚠️ โมเดล 3D ไม่ได้ใช้ s.flip — มันหันตาม s._motionHeading (ดูจุดที่เรียก Slug3D.draw)
+       ซึ่งเดิมตั้งไว้กลางเฟรมจาก "ก้าวเดินของตัวเอง" ก่อนแรงผลักระหว่างตัวและการบีบขอบ
+       3D จึงยังมูนวอคอยู่ 4.6% ของเฟรมเดิน (เห็นชัด 2.7%) ทั้งที่สไปรต์ 2D แก้ไปตั้งแต่ 2026-09-07
+       ตอนนี้วัดจาก ndx/ndy ชุดเดียวกับ s.flip · ต้องมี dead-band ด้วย ของเดิมใช้ 1e-7
+       ซึ่งเล็กกว่าก้าวปกติเป็นหมื่นเท่า = สั่นระดับตามองไม่เห็นก็พลิกหน้าได้
+       ใช้ระยะในโลก (ไม่ใช่แค่แกน x บนจอ) เพราะ 3D หันได้รอบตัว เดินลึกเข้าจอก็ต้องหันตาม */
+    if(FACE_STATES.includes(s.state)){
+      if(Math.hypot(ndx,ndy)>SLUG_SPEED*dt*0.2) s._motionHeading=Math.atan2(ndy,ndx);
+    } else s._motionHeading=s.dir;                               // eat/greet/inspect ตั้งหน้าเอง
+    if(!Number.isFinite(s._motionHeading)) s._motionHeading=s.dir;
     /* ---- จังหวะคืบผูกกับระยะทางที่เดินได้จริง ----
        เดิมท่าคืบวิ่งด้วยนาฬิกาจริง (sin(performance.now()/700)) รอบละ 4.4 วิเท่ากันหมด
        ตัวเล็กเดินเร็วกว่า จึงไถลไป 0.7 ช่วงตัวต่อการคืบหนึ่งรอบ (ตัวใหญ่ 0.25) = เห็นเป็นไถล/กระตุก */
