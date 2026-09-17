@@ -254,7 +254,7 @@ function personGesture(action,t,dur){
   return ss(Math.max(0,Math.min(1,(d-t)/fall)));
 }
 function beginPersonBrowse(p){
-  p.state='look';p.t=0;p.lookT=(p.raceChallenger||p.tugChallenger)?Infinity:5;p._browseActed=false;
+  p.state='look';p.t=0;p.lookT=(p.raceChallenger||p.tugChallenger||p.eatChallenger)?Infinity:5;p._browseActed=false;
   p.action='watch';p.actionT=0;p.actionDuration=0;p.socialPartner=null;
   p.socialCooldown=.5+Math.random()*.5;
 }
@@ -329,7 +329,7 @@ function chooseQuietKind(need,capacity){
 /* ดูกี่ตู้ก่อนกลับ — ผูกกับจำนวนตู้ในร้าน
    ร้านมี 2 ตู้แล้วเดินวน 5 รอบมันประหลาด ช่วงแรกจึงเป็น "เข้ามาดู แล้วออก" */
 /* ตู้ที่ถูกจองให้อีเวนต์ — มีผู้ท้าแข่งชักเย่อ/วิ่งยืนรออยู่ หรือกำลังมีทัวร์นาเมนต์ · ลูกค้าปกติไม่เดินไปดู ไม่ยื่นซื้อ */
-function eventReservedTank(o){return !!(window.SlugTug?.reserved?.(o)||window.SlugRace?.reserved?.(o));}
+function eventReservedTank(o){return !!(window.SlugTug?.reserved?.(o)||window.SlugRace?.reserved?.(o)||window.SlugEat?.reserved?.(o));}
 function visitorVisits(){
   const tanks=(G.objs||[]).filter(o=>o&&o.type==='tank'&&o!==moving).length;
   const cap=Math.min(VISIT_MAX,tanks),min=Math.min(VISIT_MIN,cap);
@@ -661,6 +661,7 @@ function crowdRoute(p,target){
 function nextGoal(p){
   if(p.raceChallenger&&window.SlugRace&&SlugRace.goal(p))return;
   if(p.tugChallenger&&window.SlugTug&&SlugTug.goal(p))return;
+  if(p.eatChallenger&&window.SlugEat&&SlugEat.goal(p))return;
   if(p._columnFollower)return;
   if(p._yieldResume)return;
   if(p.tradeOffer)return;
@@ -719,7 +720,7 @@ function stepPeople(){
     if(p.state === 'look'){
       if(p.focus && G.objs.indexOf(p.focus) < 0){ nextGoal(p); continue; }   // ตู้ถูกย้ายหาย
       /* ผู้ท้าแข่งมาถึงตู้ระหว่างที่ลูกค้ายืนดูอยู่ = ลูกค้าปกติเดินไปดูตู้อื่นแทน (ครอบครัวรอจบรอบดูของกลุ่มแล้วเลือกตู้ใหม่เอง) */
-      if(p.focus && !p.tugChallenger && !p.raceChallenger && !p.family && eventReservedTank(p.focus)){ nextGoal(p); continue; }
+      if(p.focus && !p.tugChallenger && !p.raceChallenger && !p.eatChallenger && !p.family && eventReservedTank(p.focus)){ nextGoal(p); continue; }
       if(p.focus){                                   // หันหน้าเข้าหากลางตู้
         p.fdx = (p.focus.cx + oW(p.focus)/2) - p.x;
         p.fdy = (p.focus.cy + oH(p.focus)/2) - p.y;

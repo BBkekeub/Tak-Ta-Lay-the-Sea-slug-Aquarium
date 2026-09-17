@@ -904,6 +904,8 @@ function canPlaceDecor(key, fx, fy, flip, ignore){
   if(curTank.def.race&&(fy<8||[...mine].some(k=>(Number(k.split(',')[1])*DCELL)<8)))return false;
   /* ตู้ชักเย่อ: แถบหน้าตู้ (ขอบหน้า → หลังเลน) ต้องโล่งเสมอ แบบตู้แข่งวิ่ง — ของที่อยู่หน้าเลนจะบังการแข่ง (config.js TUG_FRONT) */
   if(curTank.def.tug){const b=decorRequiredBounds(key,fx,fy,flip);if(!b||tugLaneBlocked(curTank.def,b.top,b.bottom))return false;}
+  /* ตู้แข่งกินจุ: แถบสนามหน้าตู้ต้องโล่งเสมอ แบบตู้แข่งวิ่ง/ชักเย่อ — กันวางหินดักทางคู่แข่ง (slug-eat.js ARENA_H) */
+  if(curTank.def.eat&&window.SlugEat&&!SlugEat.decorOk(curTank,mine,decorRequiredBounds(key,fx,fy,flip)))return false;
   if(!mine.size) return true;
   if(isBreeder(curTank)){const zone=fx<20?[0,20]:fx<25?[20,25]:[25,30];for(const k of mine){const [ix,iy]=k.split(',').map(Number),x=ix*DCELL,y=iy*DCELL;if(x<zone[0]||x+DCELL>zone[1])return false;if(zone[0]===20&&!(fy<1?y>=0&&y+DCELL<=1:fy>=curTank.def.h-1&&y>=curTank.def.h-1&&y+DCELL<=curTank.def.h))return false;}}
   for(const k of mine){ const c=k.split(','), ix=+c[0], iy=+c[1];
@@ -959,7 +961,7 @@ const ENTER_ZOOM = 3.0;                       // ซูมเข้าหนั�
 const TANK_MAX_ZOOM = 5.0;
 const TANK_SLUG_VIEW_SCALE = 0.7;             // ลดขนาดทาก "ในโหมดในตู้" ให้เข้าสัดส่วนกับที่เห็นจากนอกตู้ (1 = เท่าเดิม · เล็กลง = ค่าน้อยลง)
 function applyEnterView(focus){
-  if(isBreeder(curTank)||curTank.def.race){fitTankZoom();centerTankCam();return;}
+  if(isBreeder(curTank)||curTank.def.race||curTank.def.eat){fitTankZoom();centerTankCam();return;}
   fitTankZoom();
   const R=tankZoomRange();
   tankCam.zoom = Math.max(R.min, Math.min(Math.min(TANK_MAX_ZOOM, R.max), tankCam.zoom*ENTER_ZOOM));
@@ -1590,6 +1592,7 @@ function drawTank(){
   }
   if(window.SlugRace?.isRacing(curTank))SlugRace.updateTankFrame(performance.now());
   if(window.SlugTug?.isPulling(curTank))SlugTug.updateTankFrame(performance.now());
+  if(window.SlugEat?.isEating(curTank))SlugEat.updateTankFrame(performance.now());
 
   const fw=curTank.def.w, fh=curTank.def.h;
   const wallH=wallCells(), standH=STAND_CELLS, sandT=SAND_CELLS;   // ความสูง (หน่วยช่อง)
@@ -1637,6 +1640,7 @@ function drawTank(){
     fillQuad(a0,a1,a2,a3, sandStyle, null);
     if(curTank.def.race&&window.SlugRace)SlugRace.drawTrack(tctx,(x,y)=>S(x,y,sandT));
     if(curTank.def.tug&&window.SlugTug)SlugTug.drawLane(tctx,(x,y)=>S(x,y,sandT));
+    if(curTank.def.eat&&window.SlugEat)SlugEat.drawArena(tctx,(x,y)=>S(x,y,sandT),curTank);
   };
   /* ---------- ชั้นนิ่งที่อยู่ "หน้า" ตัวทาก: น้ำ + ผิวน้ำ + กระจกใกล้ ---------- */
   const drawGlass=(x)=>{
@@ -1653,7 +1657,7 @@ function drawTank(){
     SIDES.map(s=>face(s.a,s.b,sandT,wallH)).sort(byFar).slice(2)
          .forEach(f=> qfill(f.p,'rgba(150,205,215,0.05)','rgba(200,235,240,0.24)',1.3));
   };
-  const layKey=[window.DecorGLB?.viewRevision||0,TCW,TCH,DPR,tankCam.zoom.toFixed(4),fw,fh,wallH,!!curTank.def.race,!!curTank.def.tug,
+  const layKey=[window.DecorGLB?.viewRevision||0,TCW,TCH,DPR,tankCam.zoom.toFixed(4),fw,fh,wallH,!!curTank.def.race,!!curTank.def.tug,!!curTank.def.eat,
                 (_sandImg&&_sandImg.naturalWidth)?1:0, texOK(woodSrc())?1:0].join('|');
   if(performance.now() >= _zoomBusyT && (_lay.key!==layKey || !layCovers())){
     const box=layBox();
@@ -1706,13 +1710,16 @@ function drawTank(){
   const now=performance.now(); let dt=(now-(tankLastT||now))/1000; tankLastT=now; if(dt>0.05) dt=0.05;
   const racing=window.SlugRace?.isRacing(curTank);
   const pulling=!racing&&!!window.SlugTug?.isPulling(curTank);
+  /* แข่งกินจุ: ผู้แข่ง 4 ตัววาด/เดินโดย slug-eat.js ทั้งหมด · ทากอื่นในตู้เดินเล่นได้แต่อยู่หลังแถบสนาม (SlugEat.stepNormal) */
+  const eating=!racing&&!pulling&&!!window.SlugEat?.isEating(curTank);
   /* ตัวที่ลงแข่งชักเย่อถูกคัดออกจาก slugs — ทั้งเดินและวาดจะถูกคุมโดย slug-tug.js เองทั้งหมด
      (แบบเดียวกับนักวิ่งใน slug-race.js) ที่เหลือในตู้กลายเป็นผู้ชมยืนดูขอบตู้ */
-  const slugs=racing?SlugRace.normalSlugs(curTank):pulling?SlugTug.spectatorSlugs(curTank):curTank.slugs;
+  const slugs=racing?SlugRace.normalSlugs(curTank):pulling?SlugTug.spectatorSlugs(curTank):eating?SlugEat.normalSlugs(curTank):curTank.slugs;
   tuneSpriteBudget(dt*1000);
   _tsprBudget = TSPR_MAX;                 // งบเรนเดอร์สไปรต์ต่อเฟรม ปรับตามความเร็วเครื่อง
   if(racing)SlugRace.stepNormal(slugs,dt);
   else if(pulling)SlugTug.stepSpectators(slugs,dt);
+  else if(eating)SlugEat.stepNormal(slugs,dt);
   else stepTankSlugs(heldSlug? slugs.filter(s=>s!==heldSlug) : slugs, fw, fh, dt, true, curTank.decor, curTank.def);
 
   // --- วาดทาก + ของตกแต่ง รวมกัน เรียงลึก (fy มาก=ไกล วาดก่อน) · clip กล่องแก้วแบบเปิดฝา ---
@@ -1721,7 +1728,7 @@ function drawTank(){
   drawBreederInterior(curTank);
   const masks=(curTank.decor||[]).map(d=>({ d, behind:decorCellSet(d,'behind'), front:decorCellSet(d,'front') }));
   const items=[];
-  (curTank.foods||[]).forEach(f=>items.push({sortY:f.fy,kind:'food',f}));
+  (curTank.foods||[]).forEach(f=>{if(!eating||f.fy>=SlugEat.ARENA_H)items.push({sortY:f.fy,kind:'food',f});});
   if(typeof foodGhostItem==='function'){const _g=foodGhostItem();if(_g)items.push({sortY:_g.fy,kind:'food',f:_g});}
   (curTank.decor||[]).forEach(d=> items.push({sortY:d.fy, kind:'decor', d}));
   [...slugs,...breederVisualSlugs(curTank)].forEach(s=>{ let sy=s.fy; const k=ptKey(s.fx,s.fy);   // อยู่หลังหิน→วาดก่อน(ไกล) · อยู่หน้า→วาดหลัง(ใกล้)
@@ -1730,6 +1737,7 @@ function drawTank(){
     items.push({sortY:sy, kind:'slug', s}); });
   if(racing)items.push(...SlugRace.racingItems());
   if(pulling)items.push(...SlugTug.tugItems());
+  if(eating)items.push(...SlugEat.items());
   items.sort((a,b)=> b.sortY - a.sortY);
   const ghKey = dragDecor ? dragDecor.key : (tankBuildMode ? selDecorKey : null);
   const ghPos = dragDecor ? dragGhost : decorHover;
@@ -1737,6 +1745,7 @@ function drawTank(){
   items.forEach(it=>{
     if(it.kind==='race'){SlugRace.drawRunner(it.r,it.i);return;}
     if(it.kind==='tug'){SlugTug.drawPart(it);return;}
+    if(it.kind==='eat'){SlugEat.drawItem(it);return;}
     if(it.kind==='food'){drawFood(it.f);return;}
     if(it.kind==='decor'){ drawDecor(it.d); return; }
     const s=it.s;

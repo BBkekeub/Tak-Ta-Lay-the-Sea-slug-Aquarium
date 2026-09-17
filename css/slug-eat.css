@@ -1,0 +1,89 @@
+/* แข่งกินจุ 4 ตัว (js/slug-eat.js) — โมดอลใช้ธีม .slug-race-dialog ร่วมกัน */
+.eat-rivals{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 10px}
+.eat-rival{display:flex;flex-direction:column;align-items:center;padding:6px;border:1px solid #cfb7774d;border-radius:10px;background:#102f365c;min-width:0}
+.eat-rival canvas{width:100%;height:auto;max-height:64px;object-fit:contain}
+.eat-rival b{font-size:14px;color:#ffe1a0}.eat-rival small{font-size:12px;color:#c8dbd2}
+.slug-eat-dialog .eat-rule{font-size:13px;color:#c9ddd1;margin:6px 0}
+
+/* ---- เต็มจอในตู้ (ยกแบบ .race-in-tank) ---- */
+body.eat-in-tank{overflow:hidden}
+.eat-in-tank #ov{position:fixed!important;inset:0!important;z-index:50;padding:env(safe-area-inset-top) 0 0!important;box-sizing:border-box}
+.eat-in-tank #ov .ov-top{flex:0 0 auto;min-height:38px!important;padding:6px 14px!important}
+.eat-in-tank #ov .ov-title{font-size:15px!important}
+.eat-in-tank #ov .ov-body{padding:0!important;overflow:hidden}
+.eat-in-tank #ovBack,.eat-in-tank #ov .ov-top .stat,.eat-in-tank #ov .tank-side,.eat-in-tank #ov .ov-decor,.eat-in-tank #ov .mobileTankBar,.eat-in-tank #ov .mobileTankZoom,.eat-in-tank #tankDecorDock,.eat-in-tank #newSlugTray{display:none!important}
+.eat-in-tank #tankCv{pointer-events:none;touch-action:none}
+
+/* HUD ไม่รับคลิกเอง (กินด้วย F / K แล้ว) — เฉพาะปุ่ม/จอยที่รับ */
+#eatTankHUD{position:absolute;inset:0;z-index:15;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;pointer-events:none}
+.eat-top{position:absolute;top:10px;left:50%;transform:translateX(-50%);max-width:calc(100% - 24px);box-sizing:border-box;padding:6px 22px;background:#17393fe8;border:1px solid #b69c66;border-radius:12px;text-align:center;color:#f3e8ca;white-space:nowrap;box-shadow:0 4px 16px #0004;pointer-events:none}
+.eat-time{font-size:24px;line-height:1.2;font-weight:800;color:#ffe19b;font-variant-numeric:tabular-nums}
+.eat-time.is-urgent{color:#ff8f7e;animation:eatBlink .5s steps(2) infinite}
+.eat-status{font-size:13px;color:#c8dbd2}
+@keyframes eatBlink{50%{opacity:.45}}
+
+.eat-board{position:absolute;top:10px;left:12px;margin:0;padding:6px 8px;list-style:none;display:flex;flex-direction:column;gap:3px;min-width:132px;background:#10292ed9;border:1px solid #b69c6680;border-radius:10px;pointer-events:none}
+.eat-board li{display:flex;align-items:center;gap:6px;font-size:13px;color:#e6efe8}
+.eat-board li i{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}
+.eat-board li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eat-board li b{font-variant-numeric:tabular-nums;color:var(--c)}
+.eat-board li.is-me span{font-weight:700;color:#ffe19b}
+
+.eat-bigcount{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);font-size:clamp(64px,14vw,130px);font-weight:900;color:#ffe19b;text-shadow:0 6px 0 #6b4a1c,0 10px 30px #000a;pointer-events:none}
+.eat-bigcount.pop{animation:eatPop .5s ease-out}
+@keyframes eatPop{from{transform:translate(-50%,-50%) scale(1.6);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+
+.eat-plate{position:absolute;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);min-width:220px;padding:6px 12px;background:#17393fe8;border:1px solid #ffd36b;border-radius:10px;color:#fff0c8;font-size:13px;text-align:center}
+.eat-plate.is-away{border-color:#b69c6680;opacity:.75}
+.eat-plate-bar{height:8px;margin-top:4px;border-radius:4px;background:#0006;overflow:hidden}
+.eat-plate-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ffd36b,#ffae4a)}
+
+.eat-hint{position:absolute;left:50%;bottom:calc(10px + env(safe-area-inset-bottom));transform:translateX(-50%);font-size:12px;color:#d9e6df;background:#0e262bcc;padding:4px 12px;border-radius:999px;white-space:nowrap;pointer-events:none}
+
+.eat-controls{position:absolute;left:16px;right:16px;bottom:calc(40px + env(safe-area-inset-bottom));display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none}
+.eat-stick{display:none;position:relative;width:132px;height:132px;border-radius:50%;background:radial-gradient(#ffffff14,#0000003d);border:2px solid #ffe19b66;pointer-events:auto;touch-action:none}
+.eat-stick i{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:linear-gradient(#f6dc98,#c99a45);box-shadow:0 4px 12px #0007}
+.eat-buttons{display:flex;gap:10px;align-items:flex-end;margin-left:auto}
+.eat-btn{pointer-events:auto;touch-action:none;position:relative;overflow:hidden;min-width:74px;height:62px;padding:0 14px;border:1px solid #c1a76d;border-bottom:4px solid #78623b;border-radius:14px;font:bold 18px "IBM Plex Sans Thai",sans-serif;background:linear-gradient(#3d696c,#23484e);color:#fff0c8;box-shadow:0 5px 18px #0005;cursor:pointer}
+.eat-btn:disabled{opacity:.45}
+.eat-btn:active{transform:translateY(3px)}
+.eat-dash,.eat-bite{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15}
+.eat-dash b,.eat-key{position:relative;z-index:1}
+.eat-key{font-size:11px;font-weight:600;opacity:.8}
+@media (pointer:coarse){.eat-key{display:none}}
+.eat-dash i{position:absolute;left:0;right:0;bottom:0;height:0;background:#4fa3b077;border-top:2px solid var(--cost-line,#9fe3ee)}
+.eat-dash.ready{border-color:#9fe3ee;box-shadow:0 0 0 2px #9fe3ee55,0 5px 18px #0005}
+/* ปุ่มกิน F / K — ปุ่มที่ต้องกดถัดไปสว่างเด้ง (ต้องสลับกัน) */
+/* โผล่กลางจอทันทีที่ของถึงฐาน: หัวข้อใหญ่ + ปุ่มคีย์บอร์ด F / K ตัวโต */
+.eat-chew-keys{position:absolute;left:50%;top:58%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 18px 14px;background:#10292ee6;border:2px solid #ffd36b;border-radius:16px;box-shadow:0 0 0 4px #ffd36b33,0 10px 30px #0008;animation:eatIn .25s ease-out}
+.eat-chew-keys[hidden]{display:none}
+.eat-chew-title{font-size:16px;font-weight:800;color:#ffe19b;white-space:nowrap}
+.eat-chew-row{display:flex;align-items:center;gap:10px}
+.eat-chew-row>span{font-size:20px;color:#c8dbd2;font-weight:700}
+@keyframes eatIn{from{transform:translate(-50%,-50%) scale(.7);opacity:0}}
+.eat-chew{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:84px;height:84px;padding:0 10px;opacity:.55}
+.eat-chew b{font-size:36px;line-height:1}.eat-chew small{font-size:12px;font-weight:600}
+.eat-chew.next{opacity:1;background:linear-gradient(#f6dc98,#d6ae5c);color:#1d2f31;border-color:#ffe2a0;border-bottom-color:#8a6a2c;animation:eatWiggle .6s ease-in-out infinite}
+@keyframes eatWiggle{50%{transform:scale(1.06)}}
+/* ชิปบัฟของเรา ใต้ป้ายเวลา */
+.eat-buffs{position:absolute;top:74px;left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:calc(100% - 24px);pointer-events:none}
+.eat-buff{padding:3px 10px;border-radius:999px;background:#2c5a3fe6;border:1px solid #9fe3a6;color:#eaffea;font-size:12px;font-weight:600;white-space:nowrap}
+
+.eat-result .eat-podium{max-width:460px}
+.place-4 .race-podium-block{height:40px;background:linear-gradient(#9fb2b0,#667a7a)}
+.eat-result .race-podium-block b{font-size:14px}
+
+/* จอสัมผัส: โชว์จอย ซ่อนคำอธิบายคีย์บอร์ด */
+@media (pointer:coarse){
+  .eat-stick{display:block}
+  .eat-hint{display:none}
+  .eat-controls{bottom:calc(14px + env(safe-area-inset-bottom))}
+  .eat-plate{bottom:calc(160px + env(safe-area-inset-bottom))}
+}
+@media (max-width:520px){
+  .eat-board{top:auto;bottom:calc(172px + env(safe-area-inset-bottom));min-width:118px}
+  .eat-time{font-size:20px}
+  .eat-btn{min-width:64px;height:56px;font-size:16px}
+  .eat-chew{min-width:64px;height:68px}
+}
+@media (prefers-reduced-motion:reduce){.eat-chew,.eat-time.is-urgent,.eat-bigcount.pop{animation:none}}

@@ -134,6 +134,7 @@ const CATALOG = {
   tank_showcase:{kind:'tank',name:'ตู้โชว์',icon:'🔎',price:500,w:SUB,h:SUB,glass:TANK_GLASS_COLOR,foodMax:8,maxSlugs:1,shopSlugScale:7.2,decorScale:1.3},
   tank_race:{kind:'tank',name:'ตู้แข่งทากทะเล',icon:'🏁',price:2500,w:4*SUB,h:2*SUB,glass:TANK_GLASS_COLOR,race:true,foodMax:24},
   tank_tug:{kind:'tank',name:'ตู้ชักเย่อ',icon:'🪢',price:2500,w:2*SUB,h:SUB,glass:TANK_GLASS_COLOR,tug:true,foodMax:12},
+  tank_eat:{kind:'tank',name:'ตู้แข่งกินจุ',icon:'🍽️',price:2500,w:2*SUB,h:2*SUB,glass:TANK_GLASS_COLOR,eat:true,foodMax:8},   // 100×100 ซม. · แข่ง 4 ตัว (slug-eat.js)
   play_table:{kind:'deco',name:'โต๊ะเล่นกับทาก',icon:'',price:500,w:SUB,h:SUB,col:'#98744b',playTable:true},
   tank_breed:{kind:'tank',name:'ตู้เพาะพันธุ์ 3 ส่วน',icon:'🥚',price:2000,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,breeder:true,foodMax:10},
   counter: {kind:'deco',name:'เคาน์เตอร์แมวขายทาก',icon:'🐱',price:0,w:2*SUB,h:2*SUB,col:'#826448'},

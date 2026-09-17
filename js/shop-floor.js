@@ -411,6 +411,7 @@ function drawFloor(){
   drawAreaBadges();
   if(window.SlugRace)SlugRace.drawChallengers();
   if(window.SlugTug)SlugTug.drawChallengers();
+  if(window.SlugEat)SlugEat.drawChallengers();
   window.DecorGLB?.endShop();
 }
 
@@ -544,6 +545,7 @@ function drawObject(o){
   if(d.race&&window.SlugRace)SlugRace.drawTrack(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);});
   /* ตู้ชักเย่อ: วาดเลน/เส้นชนะ-แพ้บนพื้นทรายให้เห็นจากหน้าร้านด้วย แบบเดียวกับสนามตู้แข่งวิ่งบรรทัดบน (เดิมเห็นแค่ตอนเข้าตู้) */
   if(d.tug&&window.SlugTug)SlugTug.drawLane(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);});
+  if(d.eat&&window.SlugEat)SlugEat.drawArena(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);},o);
   // ทากอยู่ก้นตู้ (ในน้ำ) — clip ให้อยู่ในกรอบตู้ (หัวไม่ทะลุกระจก) · ขนาด = ความยาวลำตัวจริง
   const displaySlugs=[...o.slugs,...breederVisualSlugs(o)];
   const pxPerCm=TW/CM_PER_CELL, shown=window.Slug3D?.ready&&Slug3D.enabled&&Slug3D.all?displaySlugs.length:Math.min(displaySlugs.length,isBreeder(o)?70:20);   // ระยะแนวนอนต่อ 1 ช่อง (ตรงกับในตู้)
@@ -733,10 +735,12 @@ function placeBuy(cell){
   if(!canPlace(o.cx,o.cy,def,null,buyRot)){ toast('วางไม่ได้: ของทับกัน บังประตู หรือเหลือทางเข้าตู้ไม่พอ','bad'); return; }
   if(def.race&&[...G.objs,...G.shelter].some(t=>t.def.race)){toast('มีตู้แข่งได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   if(def.tug&&[...G.objs,...G.shelter].some(t=>t.def.tug)){toast('มีตู้ชักเย่อได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
+  if(def.eat&&[...G.objs,...G.shelter].some(t=>t.def.eat)){toast('มีตู้แข่งกินจุได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   addCoin(-def.price);
   G.objs.push({ id:'o'+(G.seq++), type:def.kind, _key:buyKey, cx:o.cx, cy:o.cy, def, rot:buyRot, slugs:[] });
   if(def.race&&window.SlugRace)SlugRace.purchased();
   if(def.tug&&window.SlugTug)SlugTug.purchased();
+  if(def.eat&&window.SlugEat)SlugEat.purchased();
   toast('วาง'+def.name+' −'+def.price,'good'); syncHUD();finishConstruction();
 }
 function objAt(cell){

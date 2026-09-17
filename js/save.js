@@ -38,7 +38,7 @@ function saveGame(){
   if(!_saveOK) return;
   try{
     const data={
-      v:1, racing:G.racing||null, tug:G.tug||null, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||{}, floorTiles:G.floorTiles||null, floorPaint:G.floorPaint||{}, wallPaint:G.wallPaint||{}, coin:G.coin, ck:CoinGuard.ck(), boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, orders:G.orders||[], nextOrderAt:G.nextOrderAt||0, orderSeq:G.orderSeq||0, nextPeddlerAt:G.nextPeddlerAt||0, nextWholesalerAt:G.nextWholesalerAt||0, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
+      v:1, racing:G.racing||null, tug:G.tug||null, eat:G.eat||null,computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||{}, floorTiles:G.floorTiles||null, floorPaint:G.floorPaint||{}, wallPaint:G.wallPaint||{}, coin:G.coin, ck:CoinGuard.ck(), boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, orders:G.orders||[], nextOrderAt:G.nextOrderAt||0, orderSeq:G.orderSeq||0, nextPeddlerAt:G.nextPeddlerAt||0, nextWholesalerAt:G.nextWholesalerAt||0, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
       newSlugNotices:G.newSlugNotices||[],
       objs:(G.objs||[]).map(_saveObj),
       shelter:(G.shelter||[]).map(_saveObj),
@@ -176,6 +176,7 @@ function loadGame(){
     G.nextOrderAt=_NUM(d.nextOrderAt,0); G.orderSeq=_NUM(d.orderSeq,0)|0;
     G.newSlugNotices=Array.isArray(d.newSlugNotices)?d.newSlugNotices.slice(-5):[];
     G.racing=(d.racing&&typeof d.racing==='object')?d.racing:null;
+    G.eat=(d.eat&&typeof d.eat==='object')?d.eat:null;   /* แข่งกินจุ — ตรวจรูปร่างซ้ำตอนโหลด slug-eat.js */
     G.tug=(d.tug&&typeof d.tug==='object')?d.tug:null;   /* รูปร่างสเตทถูกตรวจซ้ำตอนโหลด slug-tug.js */
     G.nextPeddlerAt=_NUM(d.nextPeddlerAt,0);   /* คิวพ่อค้าเร่ (slug-peddler.js) เป็นเวลาจริง เดินต่อแม้ปิดเกม */
     G.nextWholesalerAt=_NUM(d.nextWholesalerAt,0);   /* คิวพ่อค้ารับเหมา (slug-wholesaler.js) เป็นเวลาจริงเช่นกัน */
