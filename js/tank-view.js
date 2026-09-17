@@ -128,7 +128,7 @@ function tankSlugSprite(s, P, sa, walking, lifted){
   const now = performance.now();
   if(s._tsOff===undefined) s._tsOff = Math.random()*1000/TSPR_FPS;   // กระจายจังหวะ ไม่ให้รีเฟรชพร้อมกันทั้งฝูง
   const zb = now < _zoomBusyT;                                       // ซูมอยู่ → ใช้ของเดิมยืดเอา ไม่เรนเดอร์ใหม่
-  const poseKey=s.state+'|'+Math.round((s.wake||0)*12)+'|'+Math.round((s.startle||0)*10)+'|'+(lifted?1:0)+'|'+(s._bakeEyes?1:0);
+  const poseKey=s.state+'|'+Math.round((s.wake||0)*12)+'|'+Math.round((s.startle||0)*10)+'|'+(lifted?1:0)+'|'+(s._bakeEyes?1:0)+'|'+Math.round((s.tugLean||0)*8);   // tugLean: หงอนสะบัดตอนชักเย่อ ต้องรีเฟรชสไปรต์ตามจังหวะกด
   const due = !s._ts || (!zb && ((now - s._tsT) > (1000/TSPR_FPS) || s._tsWalk!==walking || s._tsPose!==poseKey));
   const sized = s._ts && (zb || Math.abs(s._tsSa - sa) < sa*0.06);   // ขนาดเพี้ยนไม่เกิน 6% ใช้ของเดิมยืดเอา
   if(due && _tsprBudget>0 || !s._ts || !sized && _tsprBudget>0){
@@ -280,57 +280,80 @@ function drawTankSlug(s, P, sa, x, cy, lifted){
 const SAND_TEX_CM = 40;
 let _sandImg=null, _sandPat=null;
 
-/* ---- ฉากหลังโหมดดูตู้: ผนังหินอ่อนดำ ห้องเดียวกับหน้าร้าน ----
-   เลื่อนตามกล้องแบบ parallax ช้า ๆ (0.25 เท่า) ให้รู้สึกว่าผนังอยู่ไกลออกไปข้างหลัง */
-const BG_MARBLE_PX = 520;         // ขนาดลายบนจอที่ซูม 1 (px ต่อ 1 ผืน)
+/* ---- ฉากหลังโหมดดูตู้ = ผนัง/พื้น "จริง" ของร้านรอบตู้นั้น ----
+   เดิมฝังหินอ่อนดำ (assets/marble.jpg) + แกรนิต (assets/granite.jpg) ไว้ตายตัว
+   พอร้านเปลี่ยนวัสดุ (ชุดใหม่ใน assets/textures/More/ + ทาสีทีละช่องใน tile-paint.js)
+   เข้าตู้แล้วยังเป็นห้องหินอ่อนดำแบบเก่า ไม่ตรงกับหน้าร้าน — ตอนนี้ดึงวัสดุจากร้านจริง:
+     ผนัง = บานที่อยู่ใกล้ตู้ที่สุด (ผนังที่เห็นชัดสุดข้างหลังตู้) ใช้วัสดุที่ทาเยอะสุดในบานนั้น
+     พื้น = ช่องพื้นใต้กลางตู้
+   ผนังเลื่อนตามกล้องแบบ parallax ช้า ๆ (0.25 เท่า) ให้รู้สึกว่าอยู่ไกลออกไปข้างหลัง */
+const BG_PX_PER_CM = 520/120;     // ขนาดลายบนจอที่ซูม 1 · เทียบจากของเดิม (ลาย 120 ซม. = 520 px)
 const BG_PARALLAX  = 0.25;
-let _bgImg=null, _bgPat=null;
-/* พื้นห้อง — แกรนิตดำแผ่นเดียวกับหน้าร้าน วางที่ระดับก้นขาตั้งตู้ (z = −STAND_CELLS)
+/* พื้นห้อง — วางที่ระดับก้นขาตั้งตู้ (z = −STAND_CELLS)
    ยืดไปข้างหลัง FLOOR_BACK ช่อง ขอบบนของมันคือเส้นบรรจบผนัง = เส้นขอบฟ้าของห้อง */
-const ROOM_GRANITE_CM = 90, FLOOR_SIDE = 60;
+const FLOOR_SIDE = 60;
 /* เส้นขอบฟ้า (ที่ผนังบรรจบพื้น) ให้ไปตรงกับ "ก้นชั้นทรายด้านหลังตู้" พอดี
    หาจากสมการ: −FLOOR_BACK·DEPY + STAND_CELLS·ZH = 0  →  FLOOR_BACK = STAND_CELLS·ZH/DEPY
    บวก FLOOR_NUDGE ถ้าอยากดันเส้นขึ้น (บวก) หรือลงมาอีก (ลบ) */
 const FLOOR_NUDGE = 0;
 const FLOOR_BACK  = STAND_CELLS*ZH/DEPY + FLOOR_NUDGE;
-let _graImg2=null, _graPat2=null;
-function graniteTank(ctx){
-  if(!_graImg2){ _graImg2=new Image(); _graImg2.src='assets/granite.jpg'; }
-  if(!_graImg2.complete || !_graImg2.naturalWidth) return null;
-  if(!_graPat2) _graPat2=ctx.createPattern(_graImg2,'repeat');
-  return _graPat2;
+/* หาวัสดุครั้งเดียวต่อ "ตู้ + รุ่นการทาสี + รุ่นพื้น" — ไล่หาผนังทุกช่องทุกเฟรมเปลืองเปล่า ๆ
+   (paintRevision ขยับทุกครั้งที่ทาสี · floorRevision ขยับตอนขยายร้าน) */
+let _roomMatsKey='', _roomMats=null;
+function tankRoomMats(o){
+  const key=[o.id,o.cx,o.cy,o.rot|0,paintRevision,floorRevision].join('|');
+  if(key===_roomMatsKey&&_roomMats) return _roomMats;
+  const mx=o.cx+oW(o)/2, my=o.cy+oH(o)/2;
+  let best=null, bd=Infinity;
+  for(const [x,y] of allFloorTiles())for(const side of [0,1]){
+    if(ownsTile(x-(side===1),y-(side===0))) continue;   // มีพื้นติดกันด้านนั้น = ไม่มีผนัง (กติกาเดียวกับ drawTileWalls)
+    const wx=side===0?(x+.5)*SUB:x*SUB, wy=side===0?y*SUB:(y+.5)*SUB, d=(wx-mx)**2+(wy-my)**2;
+    if(d<bd){ bd=d; best=[x,y,side]; }
+  }
+  let wallId=currentWallMat().id;
+  if(best){                                           // ทาไม่เท่ากันทั้งบาน → เอาวัสดุที่มีหลายชั้นสุด (เสมอกันเอาชั้นล่าง)
+    const count=new Map(); let top=0;
+    for(let l=0;l<wallLayerCount();l++){
+      const id=wallMatIdAt(wallKey(best[0],best[1],best[2],l)), n=(count.get(id)||0)+1;
+      count.set(id,n); if(n>top){ top=n; wallId=id; }
+    }
+  }
+  _roomMatsKey=key;
+  return _roomMats={wall:wallMatDef(wallId), floor:floorMatAt(Math.floor(mx/SUB),Math.floor(my/SUB))};
+}
+const _bgPats=new Map();          // ไฟล์ภาพ → pattern (ภาพโหลดผ่าน matImage() ชุดเดียวกับหน้าร้าน ไม่โหลดซ้ำ)
+function roomPat(ctx, m){
+  const img=matImage(m.file); if(!img) return null;
+  let pat=_bgPats.get(m.file); if(!pat){ pat=ctx.createPattern(img,'repeat'); _bgPats.set(m.file,pat); }
+  return (pat && pat.setTransform && typeof DOMMatrix!=='undefined') ? {pat,img,m} : null;
 }
 function drawRoomFloor(ctx){
   if(!curTank) return;
-  const pat=graniteTank(ctx);
-  if(!pat || !pat.setTransform || typeof DOMMatrix==='undefined') return;
-  const fw=curTank.def.w, fh=curTank.def.h, zf=-STAND_CELLS, z=tankCam.zoom;
+  const r=roomPat(ctx, tankRoomMats(curTank).floor); if(!r) return;
+  const {pat,img,m}=r;
+  const fw=curTank.def.w, fh=curTank.def.h, zf=-STAND_CELLS;
   const q=[ S(-FLOOR_SIDE, fh+FLOOR_BACK, zf), S(fw+FLOOR_SIDE, fh+FLOOR_BACK, zf),
             S(fw+FLOOR_SIDE, -FLOOR_BACK, zf), S(-FLOOR_SIDE, -FLOOR_BACK, zf) ];
-  const T=_graImg2.naturalWidth/(ROOM_GRANITE_CM/CM_PER_CELL), o=S(0,0,zf);
-  pat.setTransform(new DOMMatrix([CELLW*z/T, 0, DEPX*z/T, -DEPY*z/T, o.x, o.y]));
+  const T=img.naturalWidth/(m.cm/CM_PER_CELL), o=S(0,0,zf);
+  const ux=S(1,0,zf),uy=S(0,1,zf);
+  pat.setTransform(new DOMMatrix([(ux.x-o.x)/T,(ux.y-o.y)/T,(uy.x-o.x)/T,(uy.y-o.y)/T,o.x,o.y]));
   ctx.beginPath(); q.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.closePath();
   ctx.fillStyle=pat; ctx.fill();
   /* ไล่แสง: ไกล(บน)จมมืดกลืนกับผนัง ใกล้(ล่าง)สว่างขึ้นเล็กน้อยเหมือนมีไฟจากเพดาน */
   const gy0=Math.min(q[0].y,q[1].y), gy1=Math.max(q[2].y,q[3].y);
   const g=ctx.createLinearGradient(0,gy0,0,gy1);
-  g.addColorStop(0,'rgba(0,0,0,0.55)'); g.addColorStop(0.35,'rgba(150,170,180,0.07)');
-  g.addColorStop(1,'rgba(0,0,0,0.35)');
+  g.addColorStop(0,'rgba(0,0,0,0.30)'); g.addColorStop(0.35,'rgba(150,170,180,0.07)');
+  g.addColorStop(1,'rgba(0,0,0,0.22)');
   ctx.fillStyle=g; ctx.fill();
   ctx.strokeStyle='rgba(190,205,212,0.16)'; ctx.lineWidth=1.5;   // บัวเชิงผนัง
   ctx.beginPath(); ctx.moveTo(q[0].x,q[0].y); ctx.lineTo(q[1].x,q[1].y); ctx.stroke();
 }
-function bgMarble(ctx){
-  if(!_bgImg){ _bgImg=new Image(); _bgImg.src='assets/marble.jpg'; }
-  if(!_bgImg.complete || !_bgImg.naturalWidth) return null;
-  if(!_bgPat) _bgPat=ctx.createPattern(_bgImg,'repeat');
-  return _bgPat;
-}
 let _bgC=null, _bgX=null, _bgKey='';
-function drawTankBg(ctx){                 // แคชไว้ เปลี่ยนเฉพาะตอนกล้องขยับ/จอเปลี่ยนขนาด
-  if(!bgMarble(ctx)) return false;
+function drawTankBg(ctx){                 // แคชไว้ เปลี่ยนเฉพาะตอนกล้องขยับ/จอเปลี่ยนขนาด/วัสดุเปลี่ยน/ภาพโหลดเสร็จ
+  const mats=curTank?tankRoomMats(curTank):null;
+  if(!mats || !roomPat(ctx,mats.wall)) return false;
   const k=[TCW,TCH,tankCam.zoom.toFixed(4),Math.round(tankCam.ox),Math.round(tankCam.oy),
-           curTank?curTank.def.w:0, curTank?curTank.def.h:0, !!(_graImg2&&_graImg2.complete)].join('|');
+           curTank.def.w, curTank.def.h, mats.wall.id, mats.floor.id, matGen()].join('|');
   if(k!==_bgKey){
     _bgKey=k;
     if(!_bgC){ _bgC=document.createElement('canvas'); _bgX=_bgC.getContext('2d'); }
@@ -342,21 +365,23 @@ function drawTankBg(ctx){                 // แคชไว้ เปลี่�
   return true;
 }
 function _bgPaint(ctx){
-  const pat=bgMarble(ctx);
-  if(!pat || !pat.setTransform || typeof DOMMatrix==='undefined') return false;
+  const r=curTank&&roomPat(ctx, tankRoomMats(curTank).wall); if(!r) return false;
+  const {pat,img,m}=r;
   const z=0.75+0.25*tankCam.zoom;                     // ผนังไกล ซูมมีผลน้อยกว่าตัวตู้
-  const s=(BG_MARBLE_PX*z)/_bgImg.naturalWidth;
+  const s=(m.cm*BG_PX_PER_CM*z)/img.naturalWidth;     // ลายใหญ่เท่าของจริง (วัสดุแต่ละตัวบอกขนาดผืนเป็น ซม.)
   pat.setTransform(new DOMMatrix([s,0,0,s, tankCam.ox*BG_PARALLAX, tankCam.oy*BG_PARALLAX]));
   ctx.fillStyle=pat; ctx.fillRect(0,0,TCW,TCH);
-  drawRoomFloor(ctx);                                 // พื้นแกรนิตทับครึ่งล่าง = ตู้มีที่ยืน
+  drawRoomFloor(ctx);                                 // พื้นจริงของร้านทับครึ่งล่าง = ตู้มีที่ยืน
   const g=ctx.createLinearGradient(0,0,0,TCH);        // บนสว่างอมทอง ล่างจมมืด
   g.addColorStop(0,'rgba(255,236,205,0.05)');
-  g.addColorStop(0.55,'rgba(6,14,18,0.30)');
-  g.addColorStop(1,'rgba(4,10,13,0.72)');
+  /* ไล่มืดเบาลงจากเดิม (0.30/0.72) — ของเดิมจูนกับหินอ่อนดำ พอผนังเป็นวัสดุจริงของร้าน (ส่วนใหญ่สีอ่อน)
+     เงาหนักขนาดนั้นกลบสีจริงจนผนังขาวกลายเป็นเทาหม่น ไม่ตรงกับที่เห็นหน้าร้าน */
+  g.addColorStop(0.55,'rgba(6,14,18,0.14)');
+  g.addColorStop(1,'rgba(4,10,13,0.42)');
   ctx.fillStyle=g; ctx.fillRect(0,0,TCW,TCH);
   const v=ctx.createRadialGradient(TCW/2,TCH*0.48,Math.min(TCW,TCH)*0.28,
                                    TCW/2,TCH*0.48,Math.max(TCW,TCH)*0.72);
-  v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(0,0,0,0.55)');   // วิกเนตต์ ดึงสายตาเข้าตู้
+  v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(0,0,0,0.32)');   // วิกเนตต์ ดึงสายตาเข้าตู้ (เบาลงเพื่อให้สีผนังจริงยังอ่านออก)
   ctx.fillStyle=v; ctx.fillRect(0,0,TCW,TCH);
   return true;
 }
@@ -366,11 +391,21 @@ function sandPattern(ctx){
   if(!_sandPat) _sandPat=ctx.createPattern(_sandImg,'repeat');
   return _sandPat;
 }
+/* เตรียมของที่ใช้เฉพาะในตู้ไว้ตอนเบราว์เซอร์ว่าง — เดิมโหลด/ถอดรหัสภาพทราย และคำนวณผืนลายแสง
+   ตอนกดเข้าตู้ครั้งแรก ซ้อนกับงานวาดเฟรมแรกพอดี (ตู้กระตุกตอนเปิด) · ทำครั้งเดียวต่อการโหลดหน้า */
+(window.requestIdleCallback||setTimeout)(()=>{
+  if(!_sandImg){ _sandImg=new Image(); _sandImg.src='assets/sand.jpg'; }
+  _sandImg.decode?.().catch(()=>{});
+  (window.requestIdleCallback||setTimeout)(()=>{ try{ causticCanvas(); }catch(e){} });
+});
 function sandFill(ctx, ox, oy, zoom, cw, dx, dy){        // คืน pattern ที่วางแนวแล้ว (null = ใช้สีล้วนแทน)
   const pat=sandPattern(ctx);
   if(!pat || !pat.setTransform || typeof DOMMatrix==='undefined') return null;
   const T=_sandImg.naturalWidth/(SAND_TEX_CM/CM_PER_CELL);   // px เท็กซ์เจอร์ ต่อ 1 ช่องเล็ก
-  pat.setTransform(new DOMMatrix([cw*zoom/T, 0, dx*zoom/T, -dy*zoom/T, ox, oy]));
+  if(window.DecorGLB?.ready&&tankMode&&curTank){
+    const o=S(0,0,SAND_CELLS),x=S(1,0,SAND_CELLS),y=S(0,1,SAND_CELLS);
+    pat.setTransform(new DOMMatrix([(x.x-o.x)/T,(x.y-o.y)/T,(y.x-o.x)/T,(y.y-o.y)/T,o.x,o.y]));
+  }else pat.setTransform(new DOMMatrix([cw*zoom/T, 0, dx*zoom/T, -dy*zoom/T, ox, oy]));
   return pat;
 }
 
@@ -410,6 +445,10 @@ function causticPat(ctx, sc, dx, dy, zTop){
   if(!pat || !pat.setTransform || typeof DOMMatrix==='undefined') return null;
   const z=tankCam.zoom, T=(src.width/(CAUSTIC_CM/CM_PER_CELL))*sc;
   const o=S(0,0,zTop);
+  if(window.DecorGLB?.ready&&tankMode){
+    const a=S(1,0,zTop),b=S(0,1,zTop),ux=a.x-o.x,uy=a.y-o.y,vx=b.x-o.x,vy=b.y-o.y;
+    pat.setTransform(new DOMMatrix([ux/T,uy/T,vx/T,vy/T,o.x+dx*ux+dy*vx,o.y+dx*uy+dy*vy]));return pat;
+  }
   const ox=o.x+(dx*CELLW+dy*DEPX)*z, oy=o.y-dy*DEPY*z;    // เลื่อนต้นทางไปตามระนาบพื้น
   pat.setTransform(new DOMMatrix([CELLW*z/T, 0, DEPX*z/T, -DEPY*z/T, ox, oy]));
   return pat;
@@ -503,7 +542,8 @@ function facePat(ctx, src, texCm, a, b, zt){
   const T = W/(texCm/CM_PER_CELL);                       // px เท็กซ์เจอร์ ต่อ 1 ช่องเล็ก
   const L = Math.hypot(b[0]-a[0], b[1]-a[1]) || 1;       // ความยาวขอบ (ช่อง)
   const o = S(a[0],a[1],zt), q = S(b[0],b[1],zt);
-  pat.setTransform(new DOMMatrix([(q.x-o.x)/(L*T), (q.y-o.y)/(L*T), 0, ZH*tankCam.zoom/T, o.x, o.y]));
+  const down=S(a[0],a[1],zt-1);
+  pat.setTransform(new DOMMatrix([(q.x-o.x)/(L*T),(q.y-o.y)/(L*T),(down.x-o.x)/T,(down.y-o.y)/T,o.x,o.y]));
   return pat;
 }
 
@@ -557,13 +597,13 @@ function drawSleepFace(P, cx, cy, flip, k, base){
   tctx.restore();
 }
 /* หน้ามุ่งมั่นตอนหดชาร์จ/พุ่ง ＞＜ */
-function drawDashFace(P, cx, cy, flip, k, base, charge){
+function drawDashFace(P, cx, cy, flip, k, base, charge, big=1){   // big = ขยาย ＞＜ (ชักเย่อใช้ 2.2 ให้อ่านออกในตู้)
   const sgn=flip?-1:1, ox=(P.L+P.R)/2, oy=(P.T+P.B)/2;
   const rise=(charge||0)*0.06;                              // หดชาร์จ = ยกตาขึ้นนิดหน่อย (ตาอยู่กับหน้าเสมอ ไม่หลุด)
   tctx.save(); tctx.lineCap='round'; tctx.lineJoin='round';
   (SlugEngine.FACE.eyes||[]).forEach((E,i)=>{
     const localX=E.u*P.bw;
-    const x=cx+sgn*k*(localX-ox), y=cy+k*(E.v*P.bh-oy)-k*P.bh*rise, r=k*P.bh*E.hR*0.5;
+    const x=cx+sgn*k*(localX-ox), y=cy+k*(E.v*P.bh-oy)-k*P.bh*rise, r=k*P.bh*E.hR*0.5*big;
     
     
     tctx.strokeStyle='#11181b'; tctx.lineWidth=Math.max(1.1,r*0.38);
@@ -694,6 +734,25 @@ function dropHeldSlug(){
   s.fx=g.fx; s.fy=g.fy;                    // ปล่อยลงหิน → เด้งไปที่ว่างใกล้สุด
   s.state='rest'; s.stt=0.8+Math.random()*1.2;
 }
+/* ---- สไปรต์ย่อของของตกแต่ง ----
+   เดิม drawDecorAt() สั่ง drawImage ย่อจากภาพเต็ม (อาร์ตหิน 1536×1024 · ชุด 3D 640×488)
+   ลงเหลือ ~150 px ใหม่ทุกชิ้นทุกเฟรม = รีแซมเปิลภาพเดิมซ้ำ ๆ 60 ครั้ง/วินาที
+   ย่อเก็บไว้ครั้งเดียวต่อขนาด แล้ว blit ตรง ๆ — วิธีเดียวกับสไปรต์ทากที่ทำไว้แล้วใน config.js
+   เก็บแคชไว้บน entry ของ decorImg() จึงหายไปพร้อมกันเอง ไม่ต้องล้างเอง */
+const DECOR_SPRITE_STEP=1.08;      // ขนาดต่างไม่ถึง 8% ใช้ใบเดิม (กันอบใหม่ทุกเฟรมตอนซูมลื่น ๆ)
+function decorBitmap(e, w, h){
+  const src=e.img, iw=src.naturalWidth||src.width;
+  if(!iw||!(w>0)||!(h>0)) return src;
+  if(w>iw*0.85) return src;                                  // ต้องการใหญ่พอ ๆ กับต้นฉบับ ย่อไปก็ไม่ได้อะไร
+  let c=e._sprite;
+  if(!c || !(w<c.width*DECOR_SPRITE_STEP && c.width<w*DECOR_SPRITE_STEP)){
+    c=e._sprite=c||document.createElement('canvas');
+    c.width=Math.max(1,Math.round(w)); c.height=Math.max(1,Math.round(h));
+    const x=c.getContext('2d'); x.imageSmoothingQuality='high';
+    x.drawImage(src,0,0,c.width,c.height);
+  }
+  return c;
+}
 /* วาดรูปของตกแต่งที่พิกัดใดก็ได้ (alpha ไว้ทำโกสต์) — คืนกล่องบนจอไว้ใช้ทดสอบคลิก */
 function drawDecorAt(key, fx, fy, alpha, flip){
   const def=TANK_DECOR[key]; if(!def) return null;
@@ -707,7 +766,7 @@ function drawDecorAt(key, fx, fy, alpha, flip){
   if(flip & 1){ tctx.translate(p.x,0); tctx.scale(-1,1); tctx.translate(-p.x,0); }        // กระจกรอบแกนที่ anchor
   if(flip & 2){ const my=p.y-ay+h/2;                                                       // กลับภาพในกรอบเดิม
     tctx.translate(0,my); tctx.scale(1,-1); tctx.translate(0,-my); }
-  if(e.ok) tctx.drawImage(e.img, p.x-ax, p.y-ay, w, h);
+  if(e.ok) tctx.drawImage(decorBitmap(e,w,h), p.x-ax, p.y-ay, w, h);
   else { tctx.fillStyle='rgba(90,100,105,0.5)'; tctx.fillRect(p.x-ax, p.y-ay, w, h); }
   tctx.restore();
   return { x: (flip & 1)? p.x-(w-ax) : p.x-ax, y:p.y-ay, w, h };
@@ -843,6 +902,8 @@ function canPlaceDecor(key, fx, fy, flip, ignore){
   const NX=Math.round(curTank.def.w/DCELL), NY=Math.round(curTank.def.h/DCELL);
   const mine=decorFootprint(key,fx,fy,flip);
   if(curTank.def.race&&(fy<8||[...mine].some(k=>(Number(k.split(',')[1])*DCELL)<8)))return false;
+  /* ตู้ชักเย่อ: แถบหน้าตู้ (ขอบหน้า → หลังเลน) ต้องโล่งเสมอ แบบตู้แข่งวิ่ง — ของที่อยู่หน้าเลนจะบังการแข่ง (config.js TUG_FRONT) */
+  if(curTank.def.tug){const b=decorRequiredBounds(key,fx,fy,flip);if(!b||tugLaneBlocked(curTank.def,b.top,b.bottom))return false;}
   if(!mine.size) return true;
   if(isBreeder(curTank)){const zone=fx<20?[0,20]:fx<25?[20,25]:[25,30];for(const k of mine){const [ix,iy]=k.split(',').map(Number),x=ix*DCELL,y=iy*DCELL;if(x<zone[0]||x+DCELL>zone[1])return false;if(zone[0]===20&&!(fy<1?y>=0&&y+DCELL<=1:fy>=curTank.def.h-1&&y>=curTank.def.h-1&&y+DCELL<=curTank.def.h))return false;}}
   for(const k of mine){ const c=k.split(','), ix=+c[0], iy=+c[1];
@@ -852,8 +913,15 @@ function canPlaceDecor(key, fx, fy, flip, ignore){
   return true;
 }
 
+/* กรอบจอของแคนวาสตู้ — แคชไว้ อ่านใหม่เฉพาะตอนขนาดเปลี่ยน (ResizeObserver / resize / เข้าตู้)
+   ⚠️ 2026-09-16 เดิมอ่าน getBoundingClientRect ทุกเฟรม 3 ครั้ง (resizeTank + decor-glb beginTank/endTank)
+      คั่นด้วย HUD/สไตล์ที่เพิ่งแก้ในเฟรมเดียวกัน = บังคับคำนวณ layout ซ้ำกลางเฟรม วัดได้ 20–60ms/วิ ในโหมดตู้ */
+let tankRectCache=null;
+function tankCvRect(){ return tankRectCache||(tankRectCache=tankCv.getBoundingClientRect()); }
+if(typeof ResizeObserver==='function') new ResizeObserver(()=>{ tankRectCache=null; }).observe(tankCv);
+addEventListener('resize',()=>{ tankRectCache=null; });
 function resizeTank(){
-  const r=tankCv.getBoundingClientRect(); TCW=r.width; TCH=r.height;
+  const r=tankCvRect(); TCW=r.width; TCH=r.height;
   const w=Math.round(TCW*DPR), h=Math.round(TCH*DPR);
   if(tankCv.width!==w || tankCv.height!==h){ tankCv.width=w; tankCv.height=h; }
 }
@@ -916,7 +984,7 @@ function tankZoomRange(){ const f=tankFitZoom(); return { min:f*phoneZoomOutScal
 function fitTankZoom(){ tankCam.zoom = tankFitZoom(); }
 function enterTank(o, focus){
   if(typeof exitModes==='function') exitModes('tank');
-  curTank=o; tankMode=true; selSlug=null; tankBuildMode=false; ov.classList.add('on');
+  curTank=o; tankMode=true; selSlug=null; tankBuildMode=false; ov.classList.add('on'); tankRectCache=null;
   document.getElementById('ovBuild').textContent='🔧 จัดของ: ปิด';
   document.getElementById('ovTitle').textContent=o.def.name+' · '+(o.def.w*CM_PER_CELL)+'×'+(o.def.h*CM_PER_CELL)+'×'+tankGlassCm(o.def)+' ซม. · จุได้ '+tankCap(o.def)+' ตัว';
   resizeTank();
@@ -967,8 +1035,11 @@ function buildDecorBar(){
   if(rm) rm.onclick=()=>{
     if(!curTank || !selDecor){ toast('เลือกของในตู้ก่อน (คลิกที่ของ)','bad'); return; }
     const i=curTank.decor.indexOf(selDecor);
-    if(i>=0){ curTank.decor.splice(i,1); G.decorCredit=(G.decorCredit||0)+1;
-      toast('เก็บ'+TANK_DECOR[selDecor.key].name+' · ได้ 1 เครดิต (ซื้อของตกแต่งฟรี 1 ชิ้น)','good');
+    if(i>=0){ const key=selDecor.key; curTank.decor.splice(i,1);
+      /* เครดิตผูกกับ "ของชิ้นนี้ชนิดนี้" เท่านั้น ห้ามเป็นตั๋วฟรีใช้กับของชนิดไหนก็ได้
+         (เดิมเป็นตัวเลขเดียวรวมทุกชนิด — เก็บของถูกแล้วเอาไปวางของแพงฟรีได้ เป็นช่องโหว่) */
+      G.decorCredit=G.decorCredit||{}; G.decorCredit[key]=(G.decorCredit[key]||0)+1;
+      toast('เก็บ'+TANK_DECOR[key].name+' · วาง'+TANK_DECOR[key].name+'ฟรีได้อีก 1 ชิ้น','good');
       if(typeof syncHUD==='function')syncHUD(); if(typeof saveGame==='function')saveGame(); if(typeof syncDecorBar==='function')syncDecorBar(); }
     selDecor=null; syncDecorBar();
   };
@@ -992,10 +1063,10 @@ function flipDecor(){
       toast('พลิกแล้วชนของชิ้นอื่นหรือล้นขอบตู้ — ย้ายที่ก่อน','bad'); return; }
     selDecor.flip=f;
     nudgeSlugsOutOfSolid(curTank.slugs, curTank.def.w, curTank.def.h, curTank.decor);
-    toast(FLIP_NAME[f],'good');
+    toast(typeof decorRotationName==='function'?decorRotationName(key,f):FLIP_NAME[f],'good');
   } else {
     placeFlip=nextFlip(selDecorKey, placeFlip);
-    toast('ชิ้นที่จะวางถัดไป: '+FLIP_NAME[placeFlip],'good');
+    toast('ชิ้นที่จะวางถัดไป: '+(typeof decorRotationName==='function'?decorRotationName(key,placeFlip):FLIP_NAME[placeFlip]),'good');
   }
   syncDecorBar();
 }
@@ -1023,7 +1094,7 @@ function syncDecorBar(){
     fl.classList.toggle('on', can && cur!==0);
     /* ความยาวข้อความต้องคงที่เป๊ะ — ถ้ายาว-สั้นสลับกัน แถบล่างจะจัดบรรทัดใหม่
        ความสูงแถบเปลี่ยน → แคนวาสเปลี่ยนขนาด → resizeTank() จัดกล้องใหม่ = ภาพกระตุกทุกครั้งที่กด R */
-    fl.textContent = '🔄 พลิก (R) ' + (can ? FLIP_SYM[cur] : '–');
+    fl.textContent = (typeof TidalDecor!=='undefined'&&TidalDecor.is(key))?'🔄 หมุน (R) '+cur*90+'°':'🔄 พลิก (R) ' + (can ? FLIP_SYM[cur] : '–');
   }
 }
 document.getElementById('ovAdd').onclick=()=>{
@@ -1077,6 +1148,12 @@ function slugOnWall(s){ return !!s.wall; }
 const FACE_STATES = ['walk','seekFood','seekDecor','seekNap','seekClimb','follow','dash','flee'];
 const SEP_PUSH_MAX = 3.0;      // แรงผลักแยกตัวต่อเฟรม ไม่เกินกี่เท่าของความเร็วเดินปกติ
 const EDGE_TURN_BOOST = 2.5;   // ใกล้ขอบตู้ให้หันไวขึ้นกี่เท่า (กันเดินชนขอบแล้วค้าง)
+/* ระยะเผื่อจากขอบตู้ (หน่วยช่อง) — ต้องเป็น "ค่าเดียวกัน" ทั้งสามที่ ไม่งั้นทากไต่กำแพงไม่ขึ้น
+   ⚠️ 2026-09-13 เคยเพี้ยนมาแล้ว: บล็อกบีบขอบท้ายเฟรมถูกขยายเป็น ×0.9+0.7 ("เผื่อเต็มความยาวลำตัว
+   กันหงอนล้นกล่อง") แต่เป้าหมายของสเตต seekClimb ยังเป็น ×0.55+0.3 ของเดิม
+   ห่างกัน ~0.93 ช่อง ขณะที่เกณฑ์ "ถึงแล้ว" คือ dist < 0.5 → ทากถูกบีบค้างอยู่ห่างเป้าตลอดกาล
+   วัดได้: จำลอง 20 นาที ตั้งใจไปไต่ 37 ครั้ง ขึ้นกำแพงได้ 0 ครั้ง (26% ของเฟรมเดินไปหากำแพงเปล่า ๆ) */
+function slugEdgeMargin(s, fw){ return Math.min(fw/2, slugCm(s.genes)/CM_PER_CELL*0.9 + 0.7); }
 const CREEP_BODY_PER_CYCLE = 0.35;   // คืบหนึ่งรอบ = เคลื่อนที่กี่เท่าของความยาวตัว
 const MOVE_STATES = ['walk','seekDecor','seekNap','seekClimb','follow','dash','flee','goDown'];
 function slugWalking(s){ return MOVE_STATES.includes(s.state)||s.state==='seekFood'; }
@@ -1252,7 +1329,7 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
           s.state='sneeze'; s.stt=SNEEZE_TIME; s.sneeze=0;
         } else if(r < (acc+=pClimb)){
           const limits=slugWallLimits(s,fw,fh,tankDef);
-          const mgW=Math.min(fw/2,slugCm(s.genes)/CM_PER_CELL*.55+.3);
+          const mgW=slugEdgeMargin(s,fw);          // ต้องเท่ากับบล็อกบีบขอบเป๊ะ ไม่งั้นเดินไปเท่าไรก็ไม่ "ถึง"
           s.climbSide=s.fx<fw/2?'left':'right';
           s.intentX=s.climbSide==='left'?mgW:fw-mgW;s.intentY=s.fy;
           if(limits.rise<=0){s.state='rest';s.stt=REST_MIN;return;}
@@ -1284,7 +1361,7 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
     s.charge=s.state==='dashCharge' ? Math.max(0,Math.min(1,1-s.stt/DASH_CHARGE_TIME)) : 0;
     if(s.wall){
       /* ===== เดินบนกำแพง — พิกัด (fy, climbZ) ความเร็วชุดเดียวกับบนพื้นทุกอย่าง ===== */
-      const margin=Math.min(fw/2,slugCm(s.genes)/CM_PER_CELL*.55+.3);
+      const margin=slugEdgeMargin(s,fw);
       s.fx=s.wall==='left'?margin:fw-margin;        // ตรึงตัวไว้กับกระจก
       s.climbSide=s.wall;                            // หน้าร้าน/เซฟรุ่นเก่ายังอ่านคีย์นี้
       delete s.climbDir;
@@ -1376,7 +1453,37 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
       const speedMul=s.state==='dash'?DASH_SPEED:s.state==='flee'?FLEE_SPEED:1;
       const paceMul=(s.state==='dash'||s.state==='flee')?1:slugPace(s);   // ดีด/หนีคงจังหวะเดิม
       const v=SLUG_SPEED*dt*speedMul*paceMul;
-      const nx=s.fx+Math.cos(s.dir)*v, ny=s.fy+Math.sin(s.dir)*v;
+      let mvx=Math.cos(s.dir)*v, mvy=Math.sin(s.dir)*v;
+      /* ---- หลบกันก่อนชน (2026-09-17 ผู้เล่น: "ทากกระตุกเวลาเดินชนกัน") ----
+         เดิมเดินดันเข้าหากันเต็มก้าว แล้วแรงแยกตัวท้ายเฟรมผลักกลับได้ถึง SEP_PUSH_MAX เท่า
+         → ระยะที่ขยับจริงกลับทิศไปมาทุกเฟรม · _motionHeading (หน้าของโมเดล 3D) พลิก 180° สลับกัน = กระตุก
+         วัดได้: ทาก 10 ตัวเดินเข้ากลาง 20 วิ หน้าพลิก >90° 40 ครั้ง · ถอยหลัง 61 เฟรม
+         ตอนนี้: ถ้าก้าวนี้พาเข้าใกล้ตัวที่อยู่ข้างหน้าในระยะชน ตัด "ส่วนที่พุ่งเข้าหา" ทิ้ง เหลือแต่ส่วนที่ไถลเลียบข้าง
+         เดินอ้อมไปเองแบบลื่น ๆ · ไถลต่อไม่ได้ (ชนตรง ๆ) ค่อยเลี้ยวหลบทางขวา */
+      if(!s.wall && s.state!=='dash' && s.state!=='flee'){
+        for(const o of slugs){
+          if(o===s||o.wall)continue;
+          const ox=o.fx-s.fx, oy=o.fy-s.fy, d=Math.hypot(ox,oy)||1e-3;
+          const reach=(slugCm(s.genes)+slugCm(o.genes))/CM_PER_CELL*0.42+v;
+          if(d>reach)continue;
+          const ux=ox/d, uy=oy/d, toward=mvx*ux+mvy*uy;
+          if(toward<=0)continue;                                  // กำลังเดินออกห่างอยู่แล้ว
+          mvx-=ux*toward; mvy-=uy*toward;                          // เหลือแต่ส่วนเลียบข้าง
+          /* เลียบข้างได้น้อย (เดินชนเกือบตรง) = หยุดยืนแทนการไถลนิด ๆ — ไถลเศษก้าวแล้วโดนดันกลับทุกเฟรมคือต้นเหตุตัวสั่นกลางฝูง */
+          if(Math.hypot(mvx,mvy)<v*0.5){
+            mvx=0;mvy=0;
+            /* ชนเข้า "ข้างตัว" อีกตัว = ให้ตัวนั้นเดินไปข้างหน้าหน่อยเพื่อหลบทาง (ผู้เล่นขอ 2026-09-17)
+               ข้างตัว = ทิศหัวของมันเกือบตั้งฉากกับทิศที่เราเข้าหา · ไม่ปลุกตัวที่หลับ/กิน/ทักทาย/อยู่บนกระจก/ถูกยก */
+            const side=Math.abs(Math.cos(o.dir)*ux+Math.sin(o.dir)*uy)<0.55;
+            if(side&&!o.wall&&o!==heldSlug&&['rest','walk','inspect','stretch'].includes(o.state)){
+              o.state='walk';o.stt=Math.max(o.stt||0,2.8);o.turn=o.dir;   // 2.8 วิ ≈ พ้นความยาวลำตัวของทั้งคู่ (1.2 วิเดิมได้แค่ครึ่งตัว ยังขวางอยู่)   // เดินตรงไปตามทิศที่หันอยู่ ไม่หันมาหาเรา
+            }
+            if(!['seekFood','follow','seekNap'].includes(s.state))s.turn=s.dir-Math.PI/2*(0.6+Math.random()*0.3);   // ชนตรง ๆ = เลี้ยวขวาอ้อม (ทิศเดียวกันทุกตัว ไม่เลี้ยวชนกันซ้ำ)
+            break;
+          }
+        }
+      }
+      const nx=s.fx+mvx, ny=s.fy+mvy;
       if(!blk(nx,ny)){ s.fx=nx; s.fy=ny; }               // ชนช่อง solid → ไถลตามแกน/หันหนี
       else if(!blk(nx,s.fy)){ s.fx=nx; }
       else if(!blk(s.fx,ny)){ s.fy=ny; }
@@ -1418,7 +1525,7 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
   // จำกัดขอบ "วัดที่ขอบตัว" — เผื่อครึ่งความยาวลำตัว (หน่วยช่อง) ไม่ให้หัว-ท้ายล้น
   slugs.forEach(s=>{
     /* เผื่อขอบเขตเดิน "เต็มความยาวลำตัว" (เดิมเผื่อแค่ครึ่งตัว 0.55 → หัว/ท้าย/หงอนล้นกล่องแล้วโดน clip) */
-    const mg=slugCm(s.genes)/CM_PER_CELL*0.9 + 0.7;
+    const mg=slugEdgeMargin(s,fw);
     if(!Number.isFinite(s.fx)||!Number.isFinite(s.fy)){
       s.fx=s._lastGoodFx;s.fy=s._lastGoodFy;s.state='rest';s.stt=REST_MIN;s.dir=s.turn=0;
     }
@@ -1434,7 +1541,10 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
        (เดินเฉียงขึ้นไปทางซ้าย) ตัวเลื่อนไปทางขวาบนจอแต่หันหน้าซ้าย = มูนวอค
        ต้องวัดจาก "การเลื่อนบนจอ" คือ ndx*CELLW + ndy*DEPX */
     const sdx=ndx*CELLW+ndy*DEPX;
-    if(!s.wall && FACE_STATES.includes(s.state) && Math.abs(sdx)>SLUG_SPEED*dt*0.2*CELLW) s.flip=sdx>0;
+    /* ⚠️ 2026-09-17 กันหน้าพลิกตอนโดนเบียด: ระยะที่ขยับ "สวนทางกับทิศที่ตั้งใจเดิน" (โดนแรงแยกตัวผลักถอย)
+       ไม่ใช้ตั้งหน้า — ถ้าใช้ ตัวที่อัดกันกลางฝูงจะพลิกหน้าไป-กลับทุกเฟรม (กระตุก) · ขยับไปข้างหน้า/ข้าง ๆ ยังหันตามจริงเหมือนเดิม (กันมูนวอค) */
+    const pushedBack=(ndx*Math.cos(s.dir)+ndy*Math.sin(s.dir))<-0.2*Math.hypot(ndx,ndy);
+    if(!s.wall && FACE_STATES.includes(s.state) && !pushedBack && Math.abs(sdx)>SLUG_SPEED*dt*0.2*CELLW) s.flip=sdx>0;
     /* ⚠️ โมเดล 3D ไม่ได้ใช้ s.flip — มันหันตาม s._motionHeading (ดูจุดที่เรียก Slug3D.draw)
        ซึ่งเดิมตั้งไว้กลางเฟรมจาก "ก้าวเดินของตัวเอง" ก่อนแรงผลักระหว่างตัวและการบีบขอบ
        3D จึงยังมูนวอคอยู่ 4.6% ของเฟรมเดิน (เห็นชัด 2.7%) ทั้งที่สไปรต์ 2D แก้ไปตั้งแต่ 2026-09-07
@@ -1442,7 +1552,14 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
        ซึ่งเล็กกว่าก้าวปกติเป็นหมื่นเท่า = สั่นระดับตามองไม่เห็นก็พลิกหน้าได้
        ใช้ระยะในโลก (ไม่ใช่แค่แกน x บนจอ) เพราะ 3D หันได้รอบตัว เดินลึกเข้าจอก็ต้องหันตาม */
     if(FACE_STATES.includes(s.state)){
-      if(Math.hypot(ndx,ndy)>SLUG_SPEED*dt*0.2) s._motionHeading=Math.atan2(ndy,ndx);
+      /* โมเดล 3D หันได้รอบตัว หน้าพลิกครั้งเดียวก็เห็นตัวหมุนวืบ (ผู้เล่น: "มีปัญหาโดยเฉพาะกับ 3D")
+         เปลี่ยนทิศเกิน 100° ต้องขยับไปทางใหม่ต่อเนื่อง 0.25 วิก่อน ถึงยอมหันตาม · เลี้ยวปกติ (มุมน้อย) หันตามทันทีเหมือนเดิม */
+      if(!pushedBack && Math.hypot(ndx,ndy)>SLUG_SPEED*dt*0.2){
+        const want=Math.atan2(ndy,ndx),cur=Number.isFinite(s._motionHeading)?s._motionHeading:want;
+        const diff=Math.abs(((want-cur+Math.PI*3)%(Math.PI*2))-Math.PI);
+        if(diff<Math.PI*100/180){s._motionHeading=want;s._flipT=0;}
+        else if((s._flipT=(s._flipT||0)+dt)>0.25){s._motionHeading=want;s._flipT=0;}
+      }
     } else s._motionHeading=s.dir;                               // eat/greet/inspect ตั้งหน้าเอง
     if(!Number.isFinite(s._motionHeading)) s._motionHeading=s.dir;
     /* ---- จังหวะคืบผูกกับระยะทางที่เดินได้จริง ----
@@ -1456,23 +1573,23 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
 
 /* ---------- ฉากในตู้ (มองจากด้านหน้า — ขอบหน้าตรง ไม่มีมุมแหลม) ---------- */
 function drawTank(){
-  if(document.hidden||window.SlugRace?.isOpen()){requestAnimationFrame(()=>{if(tankMode)drawTank();else tankLoopOn=false;});return;}
+  if(document.hidden||window.SlugRace?.isOpen()){window.DecorGLB?.hide();requestAnimationFrame(()=>{if(tankMode)drawTank();else tankLoopOn=false;});return;}
+  if(!curTank){requestAnimationFrame(()=>{if(tankMode)drawTank();else tankLoopOn=false;});return;}
+  resizeTank();
+  if(tankNeedFit){applyEnterView(tankFocus);tankNeedFit=false;}
+  window.DecorGLB?.beginTank();
   window.Slug3D?.beginFrame();
   _tankFrame++;
   tctx.setTransform(DPR,0,0,DPR,0,0);
   tctx.clearRect(0,0,TCW,TCH);
   if(engineReady) SlugEngine.ANIM=true;            // ในตู้: เปิดอนิเมชันหงอน/คืบ
-  if(!drawTankBg(tctx)){                           // ผนังหินอ่อน · ถ้ารูปยังไม่มาใช้สีเดิมไปก่อน
+  if(!drawTankBg(tctx)){                           // ผนัง/พื้นจริงของร้าน · ถ้ารูปยังไม่มาใช้สีเดิมไปก่อน
     const bg=tctx.createLinearGradient(0,0,0,TCH);
     bg.addColorStop(0,'#0c3540'); bg.addColorStop(1,'#07222a');
     tctx.fillStyle=bg; tctx.fillRect(0,0,TCW,TCH);
   }
-  if(!curTank){ requestAnimationFrame(()=>{ if(tankMode) drawTank(); else tankLoopOn=false; }); return; }
-
-  // จัดกล้องใหม่เมื่อเลย์เอาต์นิ่งแล้ว (ขนาด canvas ตอนคลิกเปิดตู้อาจยังไม่พร้อม → ซูมเพี้ยน)
-  resizeTank();
-  if(tankNeedFit){ applyEnterView(tankFocus); tankNeedFit=false; }
   if(window.SlugRace?.isRacing(curTank))SlugRace.updateTankFrame(performance.now());
+  if(window.SlugTug?.isPulling(curTank))SlugTug.updateTankFrame(performance.now());
 
   const fw=curTank.def.w, fh=curTank.def.h;
   const wallH=wallCells(), standH=STAND_CELLS, sandT=SAND_CELLS;   // ความสูง (หน่วยช่อง)
@@ -1519,6 +1636,7 @@ function drawTank(){
     } else if(spat){ fillQuad(a0,a1,a2,a3, spat, null); }
     fillQuad(a0,a1,a2,a3, sandStyle, null);
     if(curTank.def.race&&window.SlugRace)SlugRace.drawTrack(tctx,(x,y)=>S(x,y,sandT));
+    if(curTank.def.tug&&window.SlugTug)SlugTug.drawLane(tctx,(x,y)=>S(x,y,sandT));
   };
   /* ---------- ชั้นนิ่งที่อยู่ "หน้า" ตัวทาก: น้ำ + ผิวน้ำ + กระจกใกล้ ---------- */
   const drawGlass=(x)=>{
@@ -1535,7 +1653,7 @@ function drawTank(){
     SIDES.map(s=>face(s.a,s.b,sandT,wallH)).sort(byFar).slice(2)
          .forEach(f=> qfill(f.p,'rgba(150,205,215,0.05)','rgba(200,235,240,0.24)',1.3));
   };
-  const layKey=[TCW,TCH,DPR,tankCam.zoom.toFixed(4),fw,fh,wallH,!!curTank.def.race,
+  const layKey=[window.DecorGLB?.viewRevision||0,TCW,TCH,DPR,tankCam.zoom.toFixed(4),fw,fh,wallH,!!curTank.def.race,!!curTank.def.tug,
                 (_sandImg&&_sandImg.naturalWidth)?1:0, texOK(woodSrc())?1:0].join('|');
   if(performance.now() >= _zoomBusyT && (_lay.key!==layKey || !layCovers())){
     const box=layBox();
@@ -1581,13 +1699,20 @@ function drawTank(){
     }
   }
 
+  /* ชักเย่อ: เชือก+ผ้าแดงต้องอยู่ "ใต้" ทาก 3D ซึ่งวาดบนแคนวาส WebGL ที่ซ้อนอยู่เหนือชั้นพื้นหลังนี้ */
+  if(window.SlugTug?.isPulling(curTank))SlugTug.drawUnder();
+  window.DecorGLB?.splitTankBackground();
   // --- delta time + พฤติกรรม ---
   const now=performance.now(); let dt=(now-(tankLastT||now))/1000; tankLastT=now; if(dt>0.05) dt=0.05;
   const racing=window.SlugRace?.isRacing(curTank);
-  const slugs=racing?SlugRace.normalSlugs(curTank):curTank.slugs;
+  const pulling=!racing&&!!window.SlugTug?.isPulling(curTank);
+  /* ตัวที่ลงแข่งชักเย่อถูกคัดออกจาก slugs — ทั้งเดินและวาดจะถูกคุมโดย slug-tug.js เองทั้งหมด
+     (แบบเดียวกับนักวิ่งใน slug-race.js) ที่เหลือในตู้กลายเป็นผู้ชมยืนดูขอบตู้ */
+  const slugs=racing?SlugRace.normalSlugs(curTank):pulling?SlugTug.spectatorSlugs(curTank):curTank.slugs;
   tuneSpriteBudget(dt*1000);
   _tsprBudget = TSPR_MAX;                 // งบเรนเดอร์สไปรต์ต่อเฟรม ปรับตามความเร็วเครื่อง
   if(racing)SlugRace.stepNormal(slugs,dt);
+  else if(pulling)SlugTug.stepSpectators(slugs,dt);
   else stepTankSlugs(heldSlug? slugs.filter(s=>s!==heldSlug) : slugs, fw, fh, dt, true, curTank.decor, curTank.def);
 
   // --- วาดทาก + ของตกแต่ง รวมกัน เรียงลึก (fy มาก=ไกล วาดก่อน) · clip กล่องแก้วแบบเปิดฝา ---
@@ -1604,15 +1729,18 @@ function drawTank(){
     if(s===heldSlug) sy=-1e9;                                 // ตัวที่ยกอยู่ = หน้าสุดเสมอ
     items.push({sortY:sy, kind:'slug', s}); });
   if(racing)items.push(...SlugRace.racingItems());
+  if(pulling)items.push(...SlugTug.tugItems());
   items.sort((a,b)=> b.sortY - a.sortY);
   const ghKey = dragDecor ? dragDecor.key : (tankBuildMode ? selDecorKey : null);
   const ghPos = dragDecor ? dragGhost : decorHover;
   const ghFlip= dragDecor ? dragDecor.flip : placeFlip;
   items.forEach(it=>{
     if(it.kind==='race'){SlugRace.drawRunner(it.r,it.i);return;}
+    if(it.kind==='tug'){SlugTug.drawPart(it);return;}
     if(it.kind==='food'){drawFood(it.f);return;}
     if(it.kind==='decor'){ drawDecor(it.d); return; }
     const s=it.s;
+    if(window.DecorGLB?.drawSlug(s)){return;}
     const bodyLen=TANK_SLUG_VIEW_SCALE*(curTank.def.shopSlugScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*depthPxPerCm(s.fx,s.fy)*(s._breedScale||1);
     const p=S(s.fx,s.fy,sandT+(s.climbZ||0));          // เกาะกระจก/หิน = ยกความสูง z ขึ้น
     const lifted = (s===heldSlug);
@@ -1694,44 +1822,143 @@ function drawTank(){
   // ---- น้ำ + ผิวน้ำ + กระจกใกล้ (ชั้นนิ่ง วาดทับตัวทาก) ----
   if(haveLay) blitLayer(_lay.glass, _lay.box, vis); else drawGlass(tctx);
   if(selSlug) drawGeneCard(selSlug, 12, 12);
+  window.DecorGLB?.endTank();
   requestAnimationFrame(()=>{ if(tankMode) drawTank(); else tankLoopOn=false; });
 }
 
-/* การ์ดยีน — ค่าจริงจาก SlugEngine.derived */
-function drawGeneCard(s, x, y){
+/* ---- การ์ดยีน (ยกเครื่อง 2026-09-14) ----
+   ทุกแถวขนาดแสดง "ค่าจริงเป็นเซนติเมตร (ค่ายีน)" · แถวสีโชว์ตัวอย่างสีคู่กับค่ายีน
+   บัฟอาหารยุบเหลือบรรทัดเดียว รายละเอียดไปอยู่ในกล่องที่โผล่ตอนชี้/แตะ (เดิมกางเป็นแถวละบัฟ)
+   ⚠️ ออร่าหงอนกับความสมบูรณ์คือยีน vigor ตัวเดียวกัน (derived(): aura = vigor/100 · README §4)
+      แยกสองแถวจะได้เลขซ้ำกันเป๊ะ จึงรวมเป็นแถวเดียว */
+const SPOT_SHAPE_TH={circle:'วงกลม',sq:'สี่เหลี่ยม',tri:'สามเหลี่ยม'};
+/* ชื่อไทยของยีนที่อาหารบัฟได้ — ใช้ในกล่องรายละเอียดบัฟ */
+const BUFF_TH={gillLen:'ขนาดหงอน',girth:'ขนาดตัว',tentLen:'ขนาดหนวด',len:'ความยาวลำตัว',
+               vigor:'ความสมบูรณ์',mainC:'สีลำตัว',accC:'สีหงอนเหงือก',
+               bodyDepth:'สีร่องลำตัว',gillDepth:'สีร่องหงอน',gillN:'จำนวนหงอน',spotN:'ลาย'};
+/* ---- ขนาดจริงเป็นเซนติเมตร ----
+   ไม้บรรทัดคือ slugCm(g) = ความยาวลำตัวที่เกมใช้จริงทุกที่ (กันชน/กินอาหาร/ชั้นวาง)
+   slugParts() คืนขนาดชิ้นส่วนเป็น "หน่วยอาร์ต" (bw/bh/stalks[].h/rhinos[].h)
+   bw = bodyW0 × stretch × size → ซม.ต่อหน่วยอาร์ต = slugCm × stretch ÷ bw (ตัด bodyW0×size ทิ้ง)
+   ได้ความยาวลำตัว = slugCm × stretch พอดี (ยีน len 50 → stretch 1 → เท่า slugCm เป๊ะ) */
+function slugRealCm(s,g){
+  const P=typeof slugPartsOf==='function'?slugPartsOf(s):null;
+  if(!P||!P.bw||!P.D)return null;
+  const cmU=slugCm(g)*P.D.stretch/P.bw, tall=a=>a&&a.length?Math.max(...a.map(o=>o.h)):0;
+  return {len:P.bw*cmU, girth:P.bh*cmU, gill:tall(P.stalks)*cmU, tent:tall(P.rhinos)*cmU};
+}
+const cmTxt=(v,gene)=>v==null?String(gene):v.toFixed(1)+' ซม. ('+gene+')';
+function buffMinutes(b){const m=Math.ceil((b.until-Date.now())/60000);return m>=60?Math.floor(m/60)+' ชม. '+(m%60)+' น.':m+' นาที';}
+/* ชื่อสั้นสำหรับบรรทัดเดียวบนการ์ด — ชื่อเต็มไปโชว์ในกล่องรายละเอียด */
+const BUFF_SHORT={gillLen:'หงอน',girth:'ตัว',tentLen:'หนวด',len:'ยาว',vigor:'ออร่า',
+                  mainC:'สีตัว',accC:'สีหงอน',bodyDepth:'ร่องตัว',gillDepth:'ร่องหงอน',gillN:'จำนวนหงอน',spotN:'ลาย'};
+function buffKeys(s){
+  const out=[];
+  for(const b of s.foodBuffs||[])for(const k of Object.keys(b.delta||{}))if(BUFF_SHORT[k]&&!out.includes(k))out.push(k);
+  return out;
+}
+/* ตัดข้อความให้พอดีความกว้างที่เหลือจริง ๆ (วัดด้วย measureText ไม่ใช่เดาจำนวนตัวอักษร)
+   ⚠️ ป้ายไทยกับค่าอยู่คนละฟอนต์/ขนาด เดาความกว้างไม่ได้ เคยล้นทับป้ายมาแล้ว */
+function fitText(ctx,parts,sep,max){
+  let out=parts.join(sep);
+  while(parts.length>1&&ctx.measureText(out).width>max){parts=parts.slice(0,-1);out=parts.join(sep)+'…';}
+  return ctx.measureText(out).width>max?'…':out;
+}
+let geneCardBuffHit=null, geneCardRect=null, geneCardBuffOpen=false, geneCardBuffHover=false, geneCardFor=null;
+/* ความกว้างมาจากแถบเครื่องมือฝั่งซ้าย (tank-sidebar.js ส่งมาให้) การ์ดจะได้เป็นคอลัมน์เดียวกับปุ่มด้านบน
+   ป้ายไทยกับค่ายาวไม่เท่ากันทุกแถว แคบ ๆ แล้วชนกันได้ → ย่อฟอนต์ค่าเฉพาะแถวที่ไม่พอ (ดู VALUE_SM) */
+/* แถวข้อมูลของการ์ดยีน — ใช้ร่วมกันระหว่างการ์ดบนแคนวาสในตู้ (drawGeneCard ข้างล่าง)
+   กับแผงที่โผล่ตอนชี้การ์ดในหน้าเลือกทากผสมพันธุ์ (breeding-picker.js)
+   อ่านจากที่เดียวกัน เพิ่มยีนใหม่ทีเดียวขึ้นครบทั้งสองที่ ไม่มีทางหลุดข้างใดข้างหนึ่ง
+   {l:ป้าย · v:ค่า · k:ชนิดแถว · sw:สีตัวอย่าง · gene:คีย์ยีน(ไว้ไฮไลต์ตอนโดนบัฟ) · fit:ตัดให้พอดี} */
+function geneCardRows(s){
   const g=typeof foodGenes==='function'?foodGenes(s):s.genes, D=SlugEngine.derived(g);
-  const rows=[
-    ['ความอิ่ม', Math.round(s.satiety==null?50:s.satiety)+' / 100'],
-    ['บัฟอาหาร', (s.foodBuffs||[]).length+' ชนิด'],
-    ['นิสัย', slugPersona(s.traits)],
-    ['สีลำตัว', SlugEngine.hex(D.base)],
-    ['สีหงอนเหงือก', SlugEngine.hex(D.acc)],
-    ['ออร่าหงอน', Math.round(D.aura*100)+' / 100'],
-    ['ความยาวลำตัว', g.len],
-    ['ขนาดตัว (girth)', g.girth],
-    ['ขนาดจริง', slugCm(g).toFixed(1)+' ซม.'],
-    ['หงอนเหงือก', D.nGill+' ต้น'],
-    ['ลายจุด', D.nSpot+' ดวง'],
-    ['ความยาวหนวด', g.tentLen],
-    ...(s.foodBuffs||[]).map(b=>[FOOD_TYPES[b.type].name+' Lv.'+b.level,Math.ceil((b.until-Date.now())/60000)+' นาที']),
+  const cm=slugRealCm(s,g);
+  return [
+    {l:'ความอิ่ม', v:Math.round(s.satiety==null?50:s.satiety)+' / 100'},
+    {l:'บัฟอาหาร', v:buffKeys(s).map(k=>BUFF_SHORT[k]), k:'buff', fit:true},
+    {l:'นิสัย', v:slugPersona(s.traits)},
+    {l:'สีลำตัว', v:g.mainC, k:'swatch', sw:SlugEngine.hex(D.base), gene:'mainC'},
+    {l:'สีหงอนเหงือก', v:g.accC, k:'swatch', sw:SlugEngine.hex(D.acc), gene:'accC'},
+    {l:'สีร่องลำตัว', v:g.bodyDepth, gene:'bodyDepth'},
+    {l:'สีร่องหงอน', v:g.gillDepth, gene:'gillDepth'},
+    {l:'ความสมบูรณ์', v:g.vigor, gene:'vigor'},   // = ออร่าหงอนด้วย (aura = vigor/100) ไม่ต้องแยกแถว
+    {l:'ความยาวลำตัว', v:cmTxt(cm&&cm.len, g.len), gene:'len'},
+    {l:'ขนาดตัว', v:cmTxt(cm&&cm.girth, g.girth), gene:'girth'},
+    {l:'ขนาดหงอน', v:cmTxt(cm&&cm.gill, g.gillLen), gene:'gillLen'},
+    {l:'ขนาดหนวด', v:cmTxt(cm&&cm.tent, g.tentLen), gene:'tentLen'},
+    {l:'จำนวนหงอน', v:D.nGill+' ต้น ('+g.gillN+')', gene:'gillN'},
+    {l:'ลาย', v:D.nSpot+' '+(SPOT_SHAPE_TH[D.shape]||'')+' ('+g.spotN+')', gene:'spotN'},
   ];
-  const w=200, h=22+rows.length*17;
+}
+function drawGeneCard(s, x, y, cardW){
+  if(geneCardFor!==s){geneCardFor=s;geneCardBuffOpen=false;}   // เปลี่ยนตัวที่เลือก = พับรายละเอียดบัฟกลับ
+  const g=typeof foodGenes==='function'?foodGenes(s):s.genes;
+  const rows=geneCardRows(s);
+  /* ROW = ระยะห่างบรรทัด · เคยลดเหลือ 16 ตอนบีบการ์ดให้แคบลง แล้วอ่านแล้วอึดอัด
+     ที่ประหยัดที่จริง ๆ คือความกว้าง (250→206) ไม่ใช่ความถี่บรรทัด — 18 คือค่าที่หายใจออก */
+  const PAD=9, ROW=18;
+  const w=Math.max(176, Math.round(cardW||206)), h=24+rows.length*ROW;
+  geneCardRect={x,y,w,h};
   tctx.fillStyle='rgba(12,29,34,0.92)'; tctx.strokeStyle='rgba(95,168,174,0.5)';
   rrPath(tctx,x,y,w,h,8); tctx.fill(); tctx.lineWidth=1; tctx.stroke();
   tctx.textAlign='left'; tctx.textBaseline='top';
-  tctx.fillStyle='#D9A03C'; tctx.font='500 10px "IBM Plex Mono",monospace'; tctx.fillText(slugNick(s)+' · '+s.id, x+11, y+7);
+  tctx.fillStyle='#D9A03C'; tctx.font='500 10px "IBM Plex Mono",monospace'; tctx.fillText(slugNick(s)+' · '+s.id, x+PAD, y+7);
+  geneCardBuffHit=null;
+  const LABEL='400 12px "IBM Plex Sans Thai",sans-serif',
+        VALUE='500 12px "IBM Plex Mono",monospace', VALUE_SM='500 10.5px "IBM Plex Mono",monospace';
   rows.forEach((r,i)=>{
-    const yy=y+24+i*17;
-    tctx.fillStyle='#9CB4B7'; tctx.font='400 12px "IBM Plex Sans Thai",sans-serif'; tctx.textAlign='left'; tctx.fillText(r[0], x+11, yy);
-    const val=''+r[1];
-    if(val[0]==='#'){
-      tctx.fillStyle=val; rrPath(tctx,x+w-36,yy+1,24,11,3); tctx.fill();
+    const yy=y+26+i*ROW;
+    if(r.k==='buff'){
+      geneCardBuffHit={x, y:yy-3, w, h:ROW};
+      if(geneCardBuffHover||geneCardBuffOpen){tctx.fillStyle='rgba(95,168,174,0.14)';rrPath(tctx,x+4,yy-3,w-8,ROW,4);tctx.fill();}
+    }
+    tctx.font=LABEL; tctx.textAlign='left'; tctx.fillStyle='#9CB4B7'; tctx.fillText(r.l, x+PAD, yy);
+    const room=w-PAD*2-tctx.measureText(r.l).width-6-(r.k==='swatch'?30:0);
+    /* ยีนที่กำลังโดนบัฟ = โชว์เป็นสีทอง จะได้ไม่เข้าใจผิดว่าเป็นค่าถาวรตอนเอาไปผสมพันธุ์ */
+    const buffed=r.gene&&s.genes&&g[r.gene]!==s.genes[r.gene];
+    tctx.fillStyle=buffed?'#F0D08A':'#E4EDEC'; tctx.textAlign='right';
+    tctx.font=r.k==='buff'?LABEL:VALUE;
+    let txt=r.fit?(r.v.length?fitText(tctx,r.v.slice(),'+',room):'—'):''+r.v;
+    if(!r.fit&&tctx.measureText(txt).width>room)tctx.font=VALUE_SM;   // แถวที่ยาวเกิน = ย่อฟอนต์แทนที่จะทับป้าย
+    if(r.k==='buff')tctx.fillStyle=r.v.length?'#F0D08A':'#9CB4B7';
+    tctx.fillText(txt, x+w-PAD, yy);
+    if(r.k==='swatch'){
+      tctx.fillStyle=r.sw; rrPath(tctx,x+w-PAD-tctx.measureText(txt).width-28,yy+1,22,10,3); tctx.fill();
       tctx.strokeStyle='rgba(255,255,255,0.2)'; tctx.lineWidth=1; tctx.stroke();
-    } else {
-      tctx.fillStyle='#E4EDEC'; tctx.textAlign='right'; tctx.font='500 12px "IBM Plex Mono",monospace'; tctx.fillText(val, x+w-11, yy);
     }
   });
+  if((geneCardBuffHover||geneCardBuffOpen)&&(s.foodBuffs||[]).length)drawBuffTip(s, geneCardRect);
 }
+/* กล่องรายละเอียดบัฟ — โผล่ตอนชี้/แตะแถว "บัฟอาหาร"
+   ⚠️ วางข้างการ์ดได้เฉพาะตอนจอกว้างพอ · จอมือถือ (412px) กล่อง 270 ไม่เหลือที่ด้านขวา
+      แล้วโดนดันมาทับกลางการ์ดจนอ่านยีนไม่ออก → ตกลงไปอยู่ "ใต้การ์ด" แทน */
+function drawBuffTip(s, card){
+  const lines=[];
+  for(const b of s.foodBuffs){
+    /* บัฟที่ไม่ใช่อาหาร (เช่น raceFatigue = เหนื่อยจากทัวร์นาเมนต์วิ่ง) ไม่มีใน FOOD_TYPES — เดิมอ่าน .icon ของ undefined แล้วการ์ดยีนพัง */
+    const f=FOOD_TYPES[b.type]||(b.type==='raceFatigue'?{icon:'😮‍💨',name:'เหนื่อยจากการวิ่ง'}:{icon:'✨',name:String(b.type||'บัฟ')});
+    lines.push(['head',(f.icon||'')+' '+f.name+(FOOD_TYPES[b.type]?' Lv.'+b.level:'')+' · เหลือ '+buffMinutes(b)]);
+    const d=Object.entries(b.delta||{}).filter(([k,v])=>BUFF_TH[k]&&v);
+    lines.push(['body',d.length?d.map(([k,v])=>BUFF_TH[k]+' '+(v>0?'+':'−')+Math.abs(Math.round(v))).join(' · '):'ไม่มีผลกับยีน (เพิ่มความอิ่มอย่างเดียว)']);
+  }
+  const w=Math.min(270, TCW-16), h=12+lines.length*16;
+  let x=card.x+card.w+8, y=card.y+24+17;
+  if(x+w>TCW-8){ x=card.x; y=card.y+card.h+8; }
+  if(y+h>TCH-8) y=Math.max(8, TCH-h-8);
+  if(x+w>TCW-8) x=Math.max(8, TCW-w-8);
+  tctx.fillStyle='rgba(8,22,26,0.96)'; tctx.strokeStyle='rgba(217,160,60,0.55)';
+  rrPath(tctx,x,y,w,h,8); tctx.fill(); tctx.lineWidth=1; tctx.stroke();
+  tctx.textAlign='left'; tctx.textBaseline='top';
+  lines.forEach(([kind,text],i)=>{
+    tctx.fillStyle=kind==='head'?'#F0D08A':'#9CB4B7';
+    tctx.font=(kind==='head'?'500 12px':'400 11px')+' "IBM Plex Sans Thai",sans-serif';
+    tctx.fillText(text, x+11+(kind==='body'?8:0), y+7+i*16);
+  });
+}
+const inBox=(r,mx,my)=>!!r&&mx>=r.x&&mx<=r.x+r.w&&my>=r.y&&my<=r.y+r.h;
+const inGeneCardBuff=(mx,my)=>inBox(geneCardBuffHit,mx,my);
+const inGeneCard=(mx,my)=>inBox(geneCardRect,mx,my);
 
 /* ลากเลื่อนดู · ล้อเมาส์ซูม · คลิกเลือกทาก · โหมดจัดของ: วาง/ลาก/เลือกของตกแต่ง */
 let tDrag=false, tMoved=false, tlx=0,tly=0, tdx0=0,tdy0=0;
@@ -1741,6 +1968,9 @@ tankCv.addEventListener('pointerdown', e=>{
   tankCv.setPointerCapture(e.pointerId);
   tMoved=false; tlx=tdx0=e.clientX; tly=tdy0=e.clientY;
   dragDecor=null; tDrag=false; cancelHold(); pendSlug=null;
+  /* กดบนการ์ดยีน = ไม่แพนจอ ไม่ยกเลิกการเลือก (เดิมกดโดนการ์ดแล้วการ์ดหายไปเลย)
+     กดแถวบัฟ = สลับกางรายละเอียด — จำเป็นสำหรับจอสัมผัสที่ไม่มี hover */
+  if(selSlug){const q=tankXY(e); if(inGeneCard(q.mx,q.my)){ if(inGeneCardBuff(q.mx,q.my))geneCardBuffOpen=!geneCardBuffOpen; return; }}
   if(!tankBuildMode){
     const {mx,my}=tankXY(e);
     const feedMode=(typeof foodMode!=='undefined'&&foodMode);      // ย้ายอาหารได้เฉพาะตอนเปิดโหมดวางอาหาร
@@ -1758,6 +1988,8 @@ tankCv.addEventListener('pointerdown', e=>{
 });
 tankCv.addEventListener('pointermove', e=>{
   if(!curTank) return;
+  /* ชี้แถว "บัฟอาหาร" ในการ์ดยีน = กางรายละเอียด (drawTank วิ่ง rAF อยู่แล้ว ตั้งค่าตัวแปรพอ) */
+  {const q=tankXY(e); geneCardBuffHover=!!selSlug&&inGeneCardBuff(q.mx,q.my);}
   if(!tankBuildMode && !heldSlug){
     const q=tankXY(e);
     let near=null, nd=1e9;
@@ -1769,7 +2001,10 @@ tankCv.addEventListener('pointermove', e=>{
   if(dragFood){                                        // อาหารตามนิ้ว/เมาส์
     const {mx,my}=tankXY(e), f=tankFloorAt(mx,my);
     dragFood.fx=Math.max(1,Math.min(curTank.def.w-1, f.fx));
-    dragFood.fy=Math.max(curTank.def.race?8+Math.max(14,dragFood.spec.cap*1.65)/CM_PER_CELL/2:1,Math.min(curTank.def.h-1, f.fy));
+    const _half=Math.max(14,dragFood.spec.cap*1.65)/CM_PER_CELL/2;
+    /* ตู้แข่งวิ่ง/ชักเย่อ: แถบหน้าตู้เป็นสนาม ห้ามวางอาหาร → หนีบให้อยู่หลังแถบ (ชักเย่อ = หลังเลน TUG_FRONT) */
+    let _ny=Math.max(curTank.def.race?8+_half:curTank.def.tug?TUG_FRONT+_half:1,Math.min(curTank.def.h-1, f.fy));
+    dragFood.fy=_ny;
     dragFoodMoved=true; tankCv.style.cursor='grabbing'; return;
   }
   if(heldSlug){                                        // ทากตามนิ้ว/เมาส์ไปเลย
@@ -1824,9 +2059,9 @@ tankCv.addEventListener('pointerup', e=>{
     if(!canPlaceDecor(selDecorKey,nx,ny,placeFlip,null)){ toast('ตรงนี้วางไม่ได้ — ล้นขอบตู้ หรือทับพื้นที่ของชิ้นอื่น','bad'); return; }
     const _price=decorPrice(selDecorKey);
     let _free=false;
-    if((G.decorCredit||0)>0){ G.decorCredit--; _free=true; }
+    if(((G.decorCredit||{})[selDecorKey]||0)>0){ G.decorCredit[selDecorKey]--; _free=true; }
     else if(G.coin<_price){ toast('เหรียญไม่พอ ('+_price+')','bad'); return; }
-    else G.coin-=_price;
+    else addCoin(-_price);
     toast('วาง'+TANK_DECOR[selDecorKey].name+(_free?' · ใช้เครดิต (ฟรี)':' −'+_price),'good');
     if(typeof syncDecorBar==='function')syncDecorBar();
     if(typeof syncHUD==='function')syncHUD();
@@ -1837,11 +2072,12 @@ tankCv.addEventListener('pointerup', e=>{
        ไม่เด้งไปเลือกชิ้นที่เพิ่งวาง (เดิมทำแบบนั้น กด F เลยไปพลิกก้อนที่วางไปแล้วแทน) */
     selDecor=null; syncDecorBar(); return;
   }
+  if(selSlug&&inGeneCard(mx,my))return;                // ปล่อยนิ้วบนการ์ดยีน = ไม่ใช่การเลือกทากใหม่
   let hit=null, hd=1e9;                                // เลือกทาก
   curTank.slugs.forEach(s=>{ if(s._hit){ const dd=Math.hypot(mx-s._hit.x,my-s._hit.y); if(dd<=s._hit.r && dd<hd){ hd=dd; hit=s; } } });
   selSlug=hit; selDecor=null; syncDecorBar();
 });
-tankCv.addEventListener('pointerleave', ()=>{ decorHover=null; cancelHold(); pendSlug=null; if(heldSlug) dropHeldSlug(); if(dragFood){ if(dragFoodMoved&&typeof saveGame==='function')saveGame(); dragFood=null; dragFoodMoved=false; } });
+tankCv.addEventListener('pointerleave', ()=>{ geneCardBuffHover=false; decorHover=null; cancelHold(); pendSlug=null; if(heldSlug) dropHeldSlug(); if(dragFood){ if(dragFoodMoved&&typeof saveGame==='function')saveGame(); dragFood=null; dragFoodMoved=false; } });
 tankCv.addEventListener('wheel', e=>{
   if(!curTank) return;
   e.preventDefault();

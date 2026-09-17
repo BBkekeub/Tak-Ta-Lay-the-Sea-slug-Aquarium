@@ -62,24 +62,37 @@
  rail.prepend(tabs);rail.prepend(close);
  window.toggleFloorBuildTools=()=>show(active==='build'?'':'build');
  const previous=setMode;setMode=function(mode){previous(mode);show('');};
- const badge=buttons.get('offers');const offers=document.getElementById('tradeOffers');
- new MutationObserver(()=>{const count=typeof TRADE_OFFERS!=='undefined'?TRADE_OFFERS.length:offers.querySelectorAll('select').length;badge.textContent=count?'ข้อเสนอ ('+count+')':'ข้อเสนอ';badge.classList.toggle('has-news',!!count);}).observe(offers,{childList:true,subtree:true});
+ /* ป้ายจำนวน + ไฟเรืองบนปุ่มข้อเสนอ
+    ⚠️ เดิมใช้ MutationObserver จับการเปลี่ยน DOM ของแผง #tradeOffers — ถ้า renderTradeOffers()
+    โยน error กลางทาง (ข้อเสนอรูปแบบใหม่/ข้อมูลไม่ครบ) DOM ไม่ขยับ ป้ายก็ไม่อัปเดต เงียบ ๆ
+    ตอนนี้ห่อฟังก์ชันแล้วซิงก์ใน finally จึงตรงกับ TRADE_OFFERS.length เสมอไม่ว่าจะเกิดอะไรข้างใน */
+ const badge=buttons.get('offers');
+ function syncOffers(){
+  const n=typeof TRADE_OFFERS!=='undefined'?TRADE_OFFERS.length:0;
+  badge.textContent=n?'ข้อเสนอ ('+n+')':'ข้อเสนอ';
+  badge.classList.toggle('has-news',n>0);
+ }
+ if(typeof renderTradeOffers==='function'){
+  const _render=renderTradeOffers;
+  window.renderTradeOffers=function(){try{return _render.apply(this,arguments);}finally{syncOffers();}};
+ }
+ syncOffers();
 
  /* ===== ผังใหม่ 2026-09-13 — แยกของตาม "หน้าที่" ไม่ใช่กองรวมบนหัว =====
       ซ้ายล่าง = ทุกอย่างที่กด (ซูม → โหมด → คลัง) · ขวาล่าง = แจ้งเตือนล้วน · บนขวา = สวิตช์ระดับเกม
     ⚠️ มือถือมีผังของตัวเองใน mobile.css อยู่แล้ว (.context-nav = แถบล่างเต็มความกว้าง) จึงย้ายเฉพาะจอใหญ่
        และย้ายกลับเองเมื่อจอเล็กลง — เงื่อนไขสื่อต้องเป็น "ส่วนเติมเต็ม" ของ mobile.css เป๊ะ */
- const stage=document.querySelector('.stage-wrap'),zoombar=document.querySelector('.zoombar');
+ const zoombar=document.querySelector('.zoombar');
  const dockRow=document.createElement('div');dockRow.className='dock-row';
- const notify=document.createElement('div');notify.id='notifyDock';notify.setAttribute('aria-label','แจ้งเตือน');stage.append(notify);
  const modeseg=document.querySelector('.modeseg');
  const modeSlot=document.createComment('modeseg');top.insertBefore(modeSlot,modeseg);   // จำที่เดิมไว้ ย้ายกลับตอนจอเล็ก
  const big=matchMedia('(min-width:821px) and (min-height:601px),(min-width:1001px)');
  function applyLayout(){
   if(big.matches){
    zoombar.append(dockRow);dockRow.append(modeseg,nav);
-   notify.append(buttons.get('offers'));
-   top.append(buttons.get('settings'),helpButton);
+   /* ข้อเสนอ = ซื้อ-ขายทาก ไม่ใช่ของประดับ ต้องอยู่ที่เดิมที่ตาไปหาตลอด → มุมบนขวา
+      เรืองแสงเองเมื่อมีข้อเสนอค้างอยู่ ผ่านคลาส .has-news ที่ MutationObserver ข้างบนติดให้ */
+   top.append(buttons.get('offers'),buttons.get('settings'),helpButton);
   }else{
    modeSlot.parentNode.insertBefore(modeseg,modeSlot);
    nav.append(buttons.get('inventory'),buttons.get('offers'),buttons.get('settings'));

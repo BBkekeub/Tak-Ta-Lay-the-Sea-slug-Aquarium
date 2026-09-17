@@ -135,17 +135,29 @@ function drawPlayTable(o){
   if(b.foodTray)drawPlayTableFood(o,false);
  }
 }
+/* ⚠️ 2026-09-16 พื้นที่กดต้องเป็น "รูปทรงที่วาดจริง" ไม่ใช่กล่องทึบเต็มช่องสูง 18 หน่วย
+   โต๊ะตัวนี้มีแค่ขา 4 ขา + แผ่นท็อป + ตู้กระจก/ถาดอาหารข้างบน ใต้โต๊ะกับช่องระหว่างขาเป็นที่โล่ง
+   มองทะลุเห็นพื้นร้านและของที่อยู่หลังโต๊ะได้ แต่เดิมช่องโล่งพวกนี้กินคลิกไปหมด
+   คลิกตู้ที่ตั้งอยู่หลังโต๊ะจึงเด้งไปเปิดหน้าต่าง "เล่นกับทาก" แทนที่จะเข้าไปในตู้ (สแกนเจอ ~46% ของพื้นที่กดเป็นที่โล่ง)
+   เช็กทีละกล่องเฉพาะตอนคลิก ไม่ได้อยู่ในลูปวาดทุกเฟรม — กล่องมาไม่ถึง 20 ใบ ถูกกว่าการพลาดคลิกมาก */
+function playTableBoxHit(o,x,y){
+ for(const b of playTableModel(o)){
+  const pts=[];
+  for(const z of [b.z,b.z+b.height])for(const [dx,dy]of [[0,0],[b.w,0],[b.w,b.h],[0,b.h]])pts.push(P(b.x+dx,b.y+dy,z));
+  if(_inConvex(_hull(pts),x,y))return true;
+ }
+ return false;
+}
 function playTableHit(x,y){
  let best=null;
- for(const o of G.objs){if(!o.def.playTable)continue;const w=oW(o),h=oH(o),pts=[];
-  for(const z of [0,18*ZUNIT])for(const [dx,dy]of [[0,0],[w,0],[w,h],[0,h]])pts.push(P(o.cx+dx,o.cy+dy,z));
-  if(_inConvex(_hull(pts),x,y)&&(!best||o.cx+o.cy>best.cx+best.cy))best=o;
+ for(const o of G.objs){if(!o.def.playTable)continue;
+  if(playTableBoxHit(o,x,y)&&(!best||o.cx+o.cy>best.cx+best.cy))best=o;
  }return best;
 }
 
 const PlayTable=(()=>{
  const dialog=document.createElement('dialog');dialog.id='playTableView';dialog.setAttribute('aria-label','เล่นกับทาก');
- dialog.innerHTML='<header><div><small>เวลาอยู่ด้วยกัน</small><h2>โต๊ะเล่นกับทาก</h2></div><button class="tbtn" data-close>กลับหน้าร้าน</button></header><div class="playLayout"><div class="playScene"><canvas aria-label="พื้นที่เล่นกับทาก ใช้ที่คีบอาหารหรือลูบตัว" tabindex="0"></canvas><div class="playGreeting">เลือกทากมาเล่นด้วยกัน</div></div><aside class="playControls"><label>เพื่อนตัวน้อย<select aria-label="เลือกทาก"></select></label><div class="playSat"><span>ความอิ่ม</span><output>0 / 100</output><progress max="100" value="0"></progress></div><p class="playHelp">ลูบตัวน้องได้เลย หรือหยิบเศษฟองน้ำด้านขวามาป้อน</p><div class="playFoodShelf"><span>เศษฟองน้ำ · อิ่ม +3</span><canvas class="playFoodTray" aria-label="ลากเศษฟองน้ำไปให้น้อง"></canvas></div><div class="playAffection"><span>ความพอใจ</span><progress max="1" value="0"></progress></div><p class="playStatus" role="status"></p></aside></div>';
+ dialog.innerHTML='<header><div><small>เวลาอยู่ด้วยกัน</small><h2>โต๊ะเล่นกับทาก</h2></div><button class="tbtn" data-close>กลับหน้าร้าน</button></header><div class="playLayout"><div class="playScene"><canvas aria-label="พื้นที่เล่นกับทาก ใช้ที่คีบอาหารหรือลูบตัว" tabindex="0"></canvas><div class="playGreeting">เลือกทากมาเล่นด้วยกัน</div></div><aside class="playControls"><div class="playPickWrap"><span>เพื่อนตัวน้อย</span><div class="playPicker" role="group" aria-label="เลือกทาก"></div></div><div class="playSat"><span>ความอิ่ม</span><output>0 / 100</output><progress max="100" value="0"></progress></div><p class="playHelp">ลูบตัวน้องได้เลย หรือหยิบเศษฟองน้ำด้านขวามาป้อน</p><div class="playFoodShelf"><span>เศษฟองน้ำ · อิ่ม +3</span><canvas class="playFoodTray" aria-label="ลากเศษฟองน้ำไปให้น้อง"></canvas></div><div class="playAffection"><span>ความพอใจ</span><progress max="1" value="0"></progress></div><p class="playStatus" role="status"></p></aside></div>';
  document.body.append(dialog);
  const style=document.createElement('style');style.textContent=`
  #playTableView{width:min(1140px,96vw);height:min(780px,94dvh);max-width:96vw;max-height:94dvh;padding:0;border:1px solid #b29a69;border-radius:20px;background:#152c30;color:#f0e8d7;overflow:hidden;box-shadow:0 24px 80px #0008}
@@ -153,14 +165,16 @@ const PlayTable=(()=>{
  #playTableView h2{margin:0;font-size:22px;font-weight:600}#playTableView small{color:#c2ac80;font-size:11px}#playTableView .playLayout{display:flex;height:calc(100% - 76px)}
  #playTableView .playScene{position:relative;flex:1;min-width:0;min-height:0;background:#193e43}#playTableView canvas{width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
  #playTableView .playControls{width:230px;box-sizing:border-box;padding:22px 18px;overflow:auto;display:flex;flex-direction:column;gap:22px;background:#142b2e}
- #playTableView label{display:grid;gap:8px;font-size:12px;color:#c6d8ce}#playTableView select{width:100%;padding:10px 8px;border:1px solid #617971;border-radius:8px;color:#f4e6c7;background:#233f40;font:inherit}
+ #playTableView label{display:grid;gap:8px;font-size:12px;color:#c6d8ce}
+ #playTableView .playPickWrap{display:grid;gap:8px;font-size:12px;color:#c6d8ce}
+ #playTableView .playPicker{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));max-height:min(260px,34dvh);margin:0}#playTableView select{width:100%;padding:10px 8px;border:1px solid #617971;border-radius:8px;color:#f4e6c7;background:#233f40;font:inherit}
  #playTableView progress{display:block;width:100%;height:8px;margin-top:10px;accent-color:#8ecea8}#playTableView output{float:right;color:#e9c77d;font-size:12px}.playSat,.playAffection{font-size:12px;color:#cedbd0}
  #playTableView .playToolRow{display:flex;gap:8px}#playTableView .playToolRow button{flex:1;white-space:nowrap;padding:10px 6px}#playTableView button.on{background:#d7ba79;color:#1c302c;border-color:#efd49a}
  #playTableView p{margin:0;font-size:13px;line-height:1.7;color:#afc6be}#playTableView .playStatus{color:#e9c77d;min-height:44px}
  #playTableView .playGreeting{position:absolute;top:24px;left:24px;right:24px;text-align:center;color:#e0f0df;font-size:15px;pointer-events:none}
- @media(max-width:700px){#playTableView{height:94dvh}#playTableView .playLayout{flex-direction:column}#playTableView header{padding:10px 14px}#playTableView h2{font-size:18px}#playTableView .playControls{width:100%;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}#playTableView .playScene{min-height:200px}#playTableView .playHelp,#playTableView .playStatus{font-size:11px}#playTableView .playGreeting{top:12px;font-size:12px}}
+ @media(max-width:700px){#playTableView{height:94dvh}#playTableView .playLayout{flex-direction:column}#playTableView header{padding:10px 14px}#playTableView h2{font-size:18px}#playTableView .playControls{width:100%;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}#playTableView .playScene{min-height:200px}#playTableView .playPickWrap{grid-column:1/-1}#playTableView .playHelp,#playTableView .playStatus{font-size:11px}#playTableView .playGreeting{top:12px;font-size:12px}}
  `;document.head.append(style);
- const canvas=dialog.querySelector('.playScene canvas'),x=canvas.getContext('2d'),picker=dialog.querySelector('select'),output=dialog.querySelector('output'),satBar=dialog.querySelector('.playSat progress'),petBar=dialog.querySelector('.playAffection progress'),status=dialog.querySelector('.playStatus'),greeting=dialog.querySelector('.playGreeting');
+ const canvas=dialog.querySelector('.playScene canvas'),x=canvas.getContext('2d'),picker=dialog.querySelector('.playPicker'),output=dialog.querySelector('output'),satBar=dialog.querySelector('.playSat progress'),petBar=dialog.querySelector('.playAffection progress'),status=dialog.querySelector('.playStatus'),greeting=dialog.querySelector('.playGreeting');
  let table=null,slug=null,session=PlayTableLogic.create(),mode='feed',input={held:false,x:.5,y:.5},pointer=null,lastPoint=null,moved=0,options=[],raf=0,last=0,w=0,h=0,bg=null,sprites=null,animatedParts=null,spriteKey='',headOffset={x:-.3,y:.25},lastUI='',lastSave=0,nextCheck=0;
  const metrics={frames:0,spriteBuilds:0,backgroundBuilds:0};
  const sand=new Image(),foodImage=new Image(),crumbs=[];
@@ -199,20 +213,20 @@ const PlayTable=(()=>{
  function syncPicker(force=false){
   const fresh=SlugBrowser.apply(available(),'play');if(!force&&fresh.length===options.length&&fresh.every((s,i)=>s===options[i]))return;
   SlugBrowser.mount(dialog.querySelector('.playControls'),'play',()=>syncPicker(true));
-  const previous=slug;options=fresh;picker.replaceChildren();
-  if(!options.length){const op=document.createElement('option');op.textContent='ยังไม่มีทากว่าง';picker.append(op);}
-  options.forEach((s,i)=>{const op=document.createElement('option');op.value=i;op.textContent=(s.favorite?'♥ ':'')+SlugBrowser.name(s)+' · อิ่ม '+Math.round(s.satiety??50);picker.append(op);});
-  picker.disabled=!options.length;const index=options.indexOf(previous);picker.value=String(Math.max(0,index));
+  const previous=slug;options=fresh;const index=options.indexOf(previous);pickedIndex=Math.max(0,index);
+  /* การ์ดรูปทาก + แผงยีนตอนชี้/กดค้าง เหมือนหน้าเลือกทากผสมพันธุ์ (slug-hover.js) — แทน <select> เดิม */
+  SlugHover.cards(picker,{slugs:options,selected:options[pickedIndex]?.id,empty:'ยังไม่มีทากว่าง',
+   sub:s=>'อิ่ม '+Math.round(s.satiety??50),onPick:s=>{pickedIndex=options.indexOf(s);pickSlug();}});
   if(force||index<0){pickSlug();updateTool();}else{lastUI='';refresh();}
  }
- let displayOptions=[],displayCheck=0;
+ let displayOptions=[],displayCheck=0,pickedIndex=0;   // pickedIndex = ตำแหน่งการ์ดที่เลือกใน options (แทน select.value เดิม)
  function displaySlug(o){const now=performance.now();if(now>=displayCheck){displayOptions=available();displayCheck=now+1000;}return displayOptions.includes(o._playSlug)?o._playSlug:displayOptions[0]||null;}
- function pickSlug(){const candidate=options[Number(picker.value)];if(candidate&&!available().includes(candidate)){syncPicker(true);return;}slug=candidate||null;if(table)table._playSlug=slug;displayCheck=0;session=PlayTableLogic.create();input.held=false;pointer=null;spriteKey='';releaseSprites();lastUI='';status.textContent='';const label=picker.parentElement;label.querySelectorAll('.slugFavorite').forEach(el=>el.remove());if(slug)SlugBrowser.heart(label,slug,()=>syncPicker(true));refresh();}
+ function pickSlug(){const candidate=options[pickedIndex];if(candidate&&!available().includes(candidate)){syncPicker(true);return;}slug=candidate||null;if(table)table._playSlug=slug;displayCheck=0;session=PlayTableLogic.create();input.held=false;pointer=null;spriteKey='';releaseSprites();lastUI='';status.textContent='';const label=picker.parentElement;label.querySelectorAll('.slugFavorite').forEach(el=>el.remove());if(slug)SlugBrowser.heart(label,slug,()=>syncPicker(true));refresh();}
  function releaseSprites(){if(sprites)for(const c of Object.values(sprites)){c.width=0;c.height=0;}sprites=null;animatedParts=null;}
  function refresh(){
   const sat=Math.min(100,Math.max(0,slug?.satiety??0)),key=[slug?.id,Math.ceil(sat),Math.floor(session.pet*100),mode,session.happy>0].join('|');if(key===lastUI)return;lastUI=key;
   output.textContent=Math.round(sat)+' / 100';satBar.value=sat;petBar.value=session.pet;
-  if(slug&&picker.selectedOptions[0])picker.selectedOptions[0].textContent=(slug.favorite?'♥ ':'')+SlugBrowser.name(slug)+' · อิ่ม '+Math.round(sat);
+  const satLine=picker.querySelector('.slug-pick[aria-pressed=true] small');if(slug&&satLine)satLine.textContent='อิ่ม '+Math.round(sat);
   greeting.textContent=slug?(session.happy>0?'ชอบที่สุดเลย!':sat>=100?'อิ่มแล้ว มาเล่นด้วยกันต่อสิ':SlugBrowser.name(slug)):'เลือกทากมาเล่นด้วยกัน';
   dialog.querySelector('.playAffection').hidden=false;
   for(const b of dialog.querySelectorAll('[data-mode]'))b.classList.toggle('on',b.dataset.mode===mode);
@@ -274,8 +288,7 @@ const PlayTable=(()=>{
  if(mode==='pet'&&input.held&&hit(p)&&hit(lastPoint)&&PlayTableLogic.stroke(session,distance)){status.textContent='น้องพอใจแล้ว!';if(typeof playNotificationSound==='function')playNotificationSound('success');}lastPoint=p;}
  function release(e){if(e&&pointer!==e.pointerId)return;if(mode==='pet'&&input.held&&moved<8&&lastPoint&&hit(lastPoint)){PlayTableLogic.poke(session);status.textContent='จิ้มเบา ๆ…';}input.held=false;pointer=null;lastPoint=null;updateTool();}
  for(const surface of [canvas,tray]){surface.addEventListener('pointermove',move);surface.addEventListener('pointerup',release);for(const event of ['pointercancel','lostpointercapture'])surface.addEventListener(event,()=>{input.held=false;pointer=null;lastPoint=null;updateTool();});}
- picker.onchange=pickSlug;
- function close(){if(!dialog.open)return;input.held=false;pointer=null;cancelAnimationFrame(raf);raf=0;updateTool();saveGame();dialog.close();table=null;slug=null;releaseSprites();bg=null;document.body.classList.remove('playing-slug');last=0;cv.focus();}
+  function close(){if(!dialog.open)return;input.held=false;pointer=null;cancelAnimationFrame(raf);raf=0;updateTool();saveGame();dialog.close();table=null;slug=null;releaseSprites();bg=null;document.body.classList.remove('playing-slug');last=0;cv.focus();}
  dialog.querySelector('[data-close]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
  new ResizeObserver(()=>resizeScene()).observe(canvas);
  document.addEventListener('visibilitychange',()=>{input.held=false;pointer=null;updateTool();if(document.hidden){cancelAnimationFrame(raf);raf=0;if(dialog.open)saveGame();}else if(dialog.open){last=0;resizeScene();raf=requestAnimationFrame(frame);}});

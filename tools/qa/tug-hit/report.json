@@ -1,0 +1,34 @@
+{
+  "targets": {
+    "empty": {
+      "x": 678.894,
+      "y": 246.12700000000007
+    },
+    "person": {
+      "x": 964.894,
+      "y": 400.12700000000007
+    },
+    "tank": {
+      "x": 700.894,
+      "y": 444.12700000000007
+    },
+    "coarseBounds": {
+      "x0": 668.894,
+      "x1": 1289.506,
+      "y0": 184.12700000000007,
+      "y1": 1055.353
+    }
+  },
+  "emptyInsideOldHitbox": true,
+  "tankOpensManagement": true,
+  "transferOutAndBack": true,
+  "personOpensChallenge": true,
+  "dragDoesNotChallenge": true,
+  "buildModeDoesNotChallenge": true,
+  "geometryChecks": {
+    "orientationsAndZooms": 12,
+    "elapsedMs": 110.39999999850988
+  },
+  "passed": true,
+  "errors": []
+}

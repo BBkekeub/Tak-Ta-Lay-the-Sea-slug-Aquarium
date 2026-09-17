@@ -1,0 +1,92 @@
+{
+ "keep": [
+  "DECOR_01_PumiceRound",
+  "DECOR_03_PorousCave",
+  "DECOR_04_PumiceArch",
+  "DECOR_05_LayeredMesa",
+  "DECOR_06_RiverStonePair",
+  "DECOR_07_VolcanicSpire",
+  "DECOR_08_HollowRingRock",
+  "DECOR_09_FlatShelfRock",
+  "DECOR_14_CoralBranchFan",
+  "DECOR_16_PlateCoral",
+  "DECOR_17_SoftAnemone",
+  "DECOR_18_SeaGrassClump",
+  "DECOR_20_SpongeColumn",
+  "DECOR_22_BarnacleRock",
+  "DECOR_23_ShellSpiral",
+  "DECOR_26_DriftwoodFork",
+  "DECOR_29_CeramicPot",
+  "DECOR_31_CeramicTube",
+  "DECOR_32_SandRipple",
+  "DECOR_37_AlgaeRock",
+  "DECOR_38_StoneMushrooms"
+ ],
+ "dups": {
+  "DECOR_01_PumiceRound": [
+   "DECOR_02_PumiceTwin",
+   "DECOR_41_BubbleRock"
+  ],
+  "DECOR_03_PorousCave": [
+   "DECOR_34_CaveStack"
+  ],
+  "DECOR_04_PumiceArch": [
+   "DECOR_10_ErodedBridge",
+   "DECOR_35_RockWindow",
+   "DECOR_42_LayeredArch",
+   "DECOR_50_GrandReefArch"
+  ],
+  "DECOR_05_LayeredMesa": [
+   "DECOR_44_PorousPlate"
+  ],
+  "DECOR_06_RiverStonePair": [
+   "DECOR_11_PebbleCluster",
+   "DECOR_13_SplitBoulder"
+  ],
+  "DECOR_07_VolcanicSpire": [
+   "DECOR_12_StandingMonolith",
+   "DECOR_48_StonePillarPair"
+  ],
+  "DECOR_08_HollowRingRock": [
+   "DECOR_47_TidePoolRock"
+  ],
+  "DECOR_09_FlatShelfRock": [],
+  "DECOR_14_CoralBranchFan": [
+   "DECOR_15_CoralBranchTower",
+   "DECOR_36_CoralGarden",
+   "DECOR_39_CoralCrown",
+   "DECOR_45_MiniReef"
+  ],
+  "DECOR_16_PlateCoral": [],
+  "DECOR_17_SoftAnemone": [],
+  "DECOR_18_SeaGrassClump": [
+   "DECOR_19_SeaGrassArch"
+  ],
+  "DECOR_20_SpongeColumn": [
+   "DECOR_21_SpongeCluster",
+   "DECOR_46_SpongeGate"
+  ],
+  "DECOR_22_BarnacleRock": [],
+  "DECOR_23_ShellSpiral": [
+   "DECOR_24_ShellPair",
+   "DECOR_25_BrokenShell",
+   "DECOR_40_ShellCave"
+  ],
+  "DECOR_26_DriftwoodFork": [
+   "DECOR_27_TwistedRoot",
+   "DECOR_28_SunkenBranch",
+   "DECOR_43_RootShelter"
+  ],
+  "DECOR_29_CeramicPot": [
+   "DECOR_30_BrokenAmphora"
+  ],
+  "DECOR_31_CeramicTube": [],
+  "DECOR_32_SandRipple": [
+   "DECOR_33_SandCastle"
+  ],
+  "DECOR_37_AlgaeRock": [
+   "DECOR_49_SeagrassRock"
+  ],
+  "DECOR_38_StoneMushrooms": []
+ }
+}

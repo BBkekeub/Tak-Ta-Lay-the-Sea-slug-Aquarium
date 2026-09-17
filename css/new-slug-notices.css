@@ -25,7 +25,7 @@ body.mode-build:not(.inside-tank)>#newSlugTray{bottom:calc(var(--mobile-build,22
   animation:newSlugPop .28s cubic-bezier(.2,.9,.3,1.2);
 }
 @keyframes newSlugPop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
-@media(prefers-reduced-motion:reduce){#newSlugCard{animation:none}}
+/* หมายเหตุ: ไม่ดับอนิเมชันตาม prefers-reduced-motion แล้ว — เกมนี้เล่นเอฟเฟคเสมอ (ดู reducedMotion() ใน js/config.js) */
 #newSlugCard::backdrop{background:radial-gradient(ellipse at 50% 20%,#0d3038cc,#020f13e8)}
 
 #newSlugCard>header{
@@ -80,8 +80,6 @@ body.mode-build:not(.inside-tank)>#newSlugTray{bottom:calc(var(--mobile-build,22
 .new-slug-gene-value b{font-size:14.5px;color:#f4edda}
 .new-slug-gene-value small{font-size:10px;color:#7fa39c}
 
-.new-slug-fireworks{position:absolute;inset:0;pointer-events:none}
-.new-slug-fireworks i{position:absolute;width:5px;height:8px;border-radius:2px}
 .new-slug-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 
 @media(max-width:460px){

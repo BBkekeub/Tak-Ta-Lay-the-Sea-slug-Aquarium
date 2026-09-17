@@ -4,3 +4,13 @@
 Claude outputs/
 *.blend1
 _to_delete/
+
+# ⏸ ของตกแต่ง 3D — ปิดไว้ ยังไม่ให้ขึ้น GitHub Pages (PUSH.bat ใช้ git add -A)
+Decor/
+assets/tidal-decor/
+assets/decor3d/
+assets/aquarium_decor_blender/
+assets/pumice-mobile/
+js/tidal-decor-defs.js
+js/reference-decor-defs.js
+js/mobile-pumice-defs.js

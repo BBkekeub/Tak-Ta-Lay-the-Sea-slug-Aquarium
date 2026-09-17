@@ -40,7 +40,7 @@ function commitFloorTiles(tiles){
  if(pending.size)return {ok:false,reason:'ช่องใหม่ต้องเชื่อมกับพื้นที่เดิมทางด้านข้าง'};
  if(!added.length)return {ok:false,reason:'ยังไม่ได้เลือกช่องใหม่'};
  const cost=expandCost(added.length, floorArea());   // ช่องที่ซื้อพร้อมกันคิดราคาไล่ขึ้นทีละช่องif(G.coin<cost)return {ok:false,reason:'เหรียญไม่พอ ('+cost+')'};
- G.coin-=cost;G.floorTiles=[...set].map(k=>k.split(',').map(Number));G.bw=Math.max(...G.floorTiles.map(p=>p[0]))+1;G.bh=Math.max(...G.floorTiles.map(p=>p[1]))+1;floorRevision++;
+ addCoin(-cost);G.floorTiles=[...set].map(k=>k.split(',').map(Number));G.bw=Math.max(...G.floorTiles.map(p=>p[0]))+1;G.bh=Math.max(...G.floorTiles.map(p=>p[1]))+1;floorRevision++;
  return {ok:true,count:added.length,cost};
 }
 /* กุญแจของ "ช่องกำแพง" หนึ่งช่อง — side 0 = ผนังเหนือของช่อง (x,y), 1 = ผนังตะวันตกของช่อง (x,y)
@@ -80,14 +80,49 @@ function drawWallSegment(x,y,side,a,b,tint){
 /* เดิมใช้ได้เฉพาะร้านที่ผ่านระบบขยายแบบ "ทีละช่อง" (G.floorTiles ตั้งค่าแล้ว)
    ตอนนี้ใช้ allFloorTiles() แทน (คืนกริดสี่เหลี่ยมเต็มเมื่อยังไม่เคยขยาย) จึงวาด "ผนังทีละช่อง"
    ได้เสมอไม่ว่าร้านจะยังเป็นสี่เหลี่ยมเดิมหรือขยายมาแล้ว — จำเป็นเพื่อให้ทาสีกำแพงทีละช่องได้ทุกกรณี */
+/* ---- กันรอยต่อทุก 50 ซม. (2026-09-14) ----
+   อาการ: มีเส้นเข้ม ๆ คาดกลางกำแพงเป็นช่วง ๆ ทุก 50 ซม. ทั้งที่ทาวัสดุเดียวกันรวด
+   ต้นเหตุคือการวาด "ทีละช่อง" ทำให้เกิดสองอย่างพร้อมกัน:
+     1) ขอบ quad ที่ติดกันโดน antialias ทั้งคู่ ความทึบรวมกันไม่ถึง 100% พื้นหลังเข้มจึงลอดเป็นเส้น
+        (ยิ่งชัดเพราะ drawWall เทซ้ำหลายชั้น: ลาย → ไล่แสง → tint ขอบเลยโดนกินซ้ำทุกชั้น)
+     2) drawWall ยึดจุดเริ่มลายวัสดุไว้กับมุม a ของ quad ที่กำลังวาด ลายจึงเริ่มนับใหม่ทุกช่อง
+        = รอยต่อของลายตรงตำแหน่งเดียวกันเป๊ะ ซ้ำเข้าไปอีก
+   วิธีแก้: รวมช่องที่ "วัสดุเดียวกันและติดกัน" เป็นแผ่นเดียวก่อนวาด (greedy meshing 2 มิติ
+   ทั้งแนวนอนข้ามช่อง 50 ซม. และแนวตั้งข้ามชั้น 20 ซม.) แล้วค่อยเรียก drawWall ครั้งเดียวต่อแผ่น
+   ⚠️ ระบบทาสีทีละช่อง 50×20 ซม. ไม่ถูกแตะเลย — ยังอ่าน wallMatIdAt() ทีละช่องเหมือนเดิมทุกช่อง
+      แค่ช่องที่ได้วัสดุตรงกันถูกวาดรวมกันทีเดียว (tile-paint.js คำนวณ wallKey เองอยู่แล้ว ไม่เกี่ยวกัน)
+      เหลือรอยต่อเฉพาะตรงที่วัสดุ "เปลี่ยนจริง" ซึ่งตรงนั้นควรเห็นเส้นแบ่งอยู่แล้ว */
+function drawWallRun(side,fixed,run,tint){
+  const n=wallLayerCount(), L=run.length, used=new Uint8Array(L*n);
+  const cellX=i=>side===0?run[i]:fixed, cellY=i=>side===0?fixed:run[i];
+  const matAt=(i,l)=>wallMatIdAt(wallKey(cellX(i),cellY(i),side,l));
+  for(let l=0;l<n;l++)for(let i=0;i<L;i++){
+    if(used[l*L+i])continue;
+    const m=matAt(i,l);
+    let w=1; while(i+w<L && !used[l*L+i+w] && matAt(i+w,l)===m) w++;
+    let h=1;
+    grow: while(l+h<n){
+      for(let j=0;j<w;j++) if(used[(l+h)*L+i+j] || matAt(i+j,l+h)!==m) break grow;
+      h++;
+    }
+    for(let dl=0;dl<h;dl++)for(let j=0;j<w;j++) used[(l+dl)*L+i+j]=1;
+    const t0=run[i], t1=run[i+w-1];
+    /* ทิศ a→b ต้องเหมือนของเดิมเป๊ะ (side0 = +x, side1 = −y) ไม่งั้นลายวัสดุกลับด้าน */
+    const a=side===0?[t0*SUB,fixed*SUB]:[fixed*SUB,(t1+1)*SUB];
+    const b=side===0?[(t1+1)*SUB,fixed*SUB]:[fixed*SUB,t0*SUB];
+    drawWall(a,b,tint,wallKey(cellX(i),cellY(i),side,l),wallLayerZ(l)[0],wallLayerZ(l+h-1)[1]);
+  }
+}
 function drawTileWalls(){
- const ends=[];const north=(x,y)=>ownsTile(x,y)&&!ownsTile(x,y-1),west=(x,y)=>ownsTile(x,y)&&!ownsTile(x-1,y);
+ const north=(x,y)=>ownsTile(x,y)&&!ownsTile(x,y-1),west=(x,y)=>ownsTile(x,y)&&!ownsTile(x-1,y);
+ const thickness=15/CM_PER_CELL, ends=[], caps=[], lines=new Map();
  for(const [x,y] of allFloorTiles()){
   for(const side of [0,1]){
    if(ownsTile(x-(side===1),y-(side===0)))continue;
+   /* จัดช่องกำแพงเข้า "แนว" เดียวกัน: side 0 = แนวนอนของแถว y, side 1 = แนวตั้งของคอลัมน์ x */
+   const key=side+','+(side===0?y:x), arr=lines.get(key);
+   if(arr)arr.push(side===0?x:y); else lines.set(key,[side===0?x:y]);
    const a=side===0?[x*SUB,y*SUB]:[x*SUB,(y+1)*SUB],b=side===0?[(x+1)*SUB,y*SUB]:[x*SUB,y*SUB];
-   drawWallSegment(x,y,side,a,b,side===0?'rgba(255,242,220,0.05)':'rgba(0,0,0,0.20)');
-   const thickness=15/CM_PER_CELL;
    const dx=side===1?-thickness:0,dy=side===0?-thickness:0;
    if(side===0){
     if(!north(x+1,y))ends.push([x,y,side,b,[b[0]+dx,b[1]+dy],'rgba(0,0,0,0.36)']);
@@ -96,9 +131,29 @@ function drawTileWalls(){
     if(!west(x,y+1))ends.push([x,y,side,[a[0]+dx,a[1]+dy],a,'rgba(0,0,0,0.28)']);
     if(!west(x,y-1)&&!north(x,y))ends.push([x,y,side,b,[b[0]+dx,b[1]+dy],'rgba(0,0,0,0.36)']);
    }
-   const points=[a,b,[b[0]+dx,b[1]+dy],[a[0]+dx,a[1]+dy]].map(v=>P(v[0],v[1],ROOM_H));
-   ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fillStyle='#696354';ctx.fill();
+   caps.push([a,b,[b[0]+dx,b[1]+dy],[a[0]+dx,a[1]+dy]]);
+  }
+  /* มุมนอกที่ผนังเหนือกับผนังตะวันตกชนกัน เหลือรูสี่เหลี่ยม 15×15 ซม. ที่ไม่มีฝาใบไหนคลุม
+     (สมัยห้องสี่เหลี่ยม drawWallThickness คลุมให้อยู่ พอเปลี่ยนมาวาดทีละช่องเลยหลุด) */
+  if(north(x,y)&&west(x,y))caps.push([[x*SUB-thickness,y*SUB-thickness],[x*SUB,y*SUB-thickness],[x*SUB,y*SUB],[x*SUB-thickness,y*SUB]]);
+ }
+ /* ย้อมผนังสองด้านให้ต่างกันเล็กน้อย = อ่านออกว่าเป็นคนละมุมของห้อง
+    ⚠️ 2026-09-13 ลดช่องว่างลง: เดิม side0 ขาว 5% / side1 **ดำ 20%** = ต่างกัน 4 เท่า
+    วัสดุเดียวกันเลยออกมาคนละสีจนผู้เล่นทัก (รวมกับไล่เฉดบน-ล่างใน drawWall() อีกชั้น
+    มุมล่างซ้ายกับบนขวาห่างกันเกือบเท่าตัว) ตอนนี้ 3% / 10% — ยังแยกด้านออก แต่สีที่ทาไม่เพี้ยน */
+ for(const [key,arr] of lines){
+  const side=+key.slice(0,key.indexOf(',')), fixed=+key.slice(key.indexOf(',')+1);
+  arr.sort((p,q)=>p-q);
+  for(let s=0;s<arr.length;){                       // หั่นเป็นช่วงที่ช่องติดกันจริง ๆ (ร้านรูปตัว L มีช่องขาด)
+   let e=s; while(e+1<arr.length && arr[e+1]===arr[e]+1) e++;
+   drawWallRun(side,fixed,arr.slice(s,e+1),side===0?'rgba(255,242,220,0.03)':'rgba(0,0,0,0.10)');
+   s=e+1;
   }
  }
+ /* ฝาบนของกำแพงก็เททีเดียวเป็น path เดียว — เทแยกใบต่อใบจะมีรอย antialias ทุก 50 ซม. เหมือนกัน
+    (ฝาทุกใบอยู่นอกแนวผนังของตัวเอง จึงไม่บังหน้าผนังบานไหน วาดหลังทั้งหมดได้ปลอดภัย) */
+ ctx.beginPath();
+ for(const q of caps){const p=q.map(v=>P(v[0],v[1],ROOM_H));p.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));ctx.closePath();}
+ ctx.fillStyle='#696354';ctx.fill();
  for(const [x,y,side,a,b,tint] of ends)drawWallSegment(x,y,side,a,b,tint);
 }

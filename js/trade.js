@@ -28,6 +28,39 @@ function counterFront(c){
     default:return {x:c.cx+5,y:c.cy+c.def.h+g};
   }
 }
+/* ---- คิวหน้าเคาน์เตอร์ (2026-09-14) ----
+   เดิมเคาน์เตอร์ 1 ตัว = 1 ข้อเสนอ และมีที่ยืนจุดเดียว (freeSpot([counterFront(c)],p))
+   ผลคือพอพ่อค้าเร่ยืนอยู่ ลูกค้าซื้อกับพ่อค้ารับเหมาเข้าไม่ได้เลย ทั้งที่คนละประเภทกันสิ้นเชิง
+   ตอนนี้ต่อคิวถอยหลังออกจากหน้าเคาน์เตอร์ได้ COUNTER_QUEUE คน
+   ⚠️ ไม่ต้องเขียนกันคิวขวางประตู/ขวางของเอง — freeSpot() เช็ก inDoorWalkway/personBlocked/spotTaken
+      ให้ทุกจุดอยู่แล้ว จุดไหนยืนไม่ได้มันข้ามเอง (คิวเลยสั้นลงเองในร้านแคบ) */
+const COUNTER_QUEUE=3;
+function counterQueueDir(c){switch(c.rot&3){case 1:return {x:-1,y:0};case 2:return {x:0,y:-1};case 3:return {x:1,y:0};default:return {x:0,y:1};}}
+function counterQueueSpots(c){
+  /* ⚠️ ระยะห่างต้องมากกว่า PERSON_GAP (7.0 = 35 ซม.) พอสมควร — spotTaken() ตีว่าจุดที่ใกล้กว่านั้น "ซ้ำ"
+     ใช้ 6 ไม่ได้ (คิวที่ 2 โดน freeSpot ตีตกทุกครั้ง) และ 7.5 ก็ยังไม่พอ เพราะคนไม่ได้ยืนตรงจุดเป๊ะ ๆ
+     คลาดได้ ~0.6 ช่อง ระยะจริงเลยหล่นต่ำกว่า 7 แล้วคิวถัดไปขยับขึ้นไม่ได้ตลอดกาล → เผื่อเป็น +2 (45 ซม.) */
+  const f=counterFront(c),d=counterQueueDir(c),gap=(typeof PERSON_GAP==='number'?PERSON_GAP:7)+2,out=[];
+  for(let i=0;i<COUNTER_QUEUE;i++)out.push({x:f.x+d.x*gap*i,y:f.y+d.y*gap*i});
+  return out;
+}
+function counterOfferCount(counter,onlyBuyers){
+  return TRADE_OFFERS.filter(o=>o.counter===counter&&(!onlyBuyers||(!o.sell&&!o.wholesale))).length;
+}
+/* คนหน้าคิวออกไปแล้ว คนที่เหลือต้องขยับขึ้นหน้า ไม่งั้นคิวเป็นรูค้างไว้
+   ไม่รีเซ็ต o.arrived — ระหว่างขยับยังกดรับ/ปฏิเสธได้ และนาฬิกาไม่ต้องเริ่มใหม่ */
+function reflowCounterQueue(counter){
+  if(!counter||!G.objs.includes(counter)||counter===moving)return;
+  const spots=counterQueueSpots(counter),waiting=TRADE_OFFERS.filter(o=>o.counter===counter);
+  const near=s=>o=>Math.hypot(o.p.x-s.x,o.p.y-s.y);
+  waiting.sort((a,b)=>near(spots[0])(a)-near(spots[0])(b));   // ใครใกล้เคาน์เตอร์สุด ได้คิวหน้าสุด
+  waiting.forEach((o,i)=>{
+    const s=spots[i];if(!s||near(s)(o)<1)return;
+    if(personBlocked(s.x,s.y)||spotTaken(s.x,s.y,o.p))return;
+    const route=personRoute(o.p,s);if(!route.length)return;
+    o.p.tgt=s;o.p.route=route;o.p.routeGoal=s;o.p.state='walk';o.p.stuck=0;o.p.t=0;
+  });
+}
 function tryCustomerOffer(p,tank){
   if(!p.wantsBuy||p.tradeDone||p.tradeOffer||!tank||tank.type!=='tank')return false;
   p.preferences ||= makeBuyerPreferences();
@@ -39,8 +72,10 @@ function tryCustomerOffer(p,tank){
   }
   if(!best)return false;
   for(const counter of G.objs.filter(c=>c._key==='counter'&&c!==moving)){
-    if(TRADE_OFFERS.some(o=>o.counter===counter))continue;
-    const target=freeSpot([counterFront(counter)],p);if(!target)continue;
+    /* ลูกค้าซื้อกินคิวได้ไม่เกิน COUNTER_QUEUE-1 — กันช่องสุดท้ายไว้ให้พ่อค้าเร่/พ่อค้ารับเหมา
+       ซึ่งมานาน ๆ ครั้ง (8–16 นาที / 10 นาที) ถ้าปล่อยให้ลูกค้าซื้อจองเต็มคิว พวกนี้จะเข้าไม่ได้เลย */
+    if(counterOfferCount(counter,true)>=COUNTER_QUEUE-1||counterOfferCount(counter)>=COUNTER_QUEUE)continue;
+    const target=freeSpot(counterQueueSpots(counter),p);if(!target)continue;
     const route=personRoute(p,target);if(!route.length)continue;
     const offer={id:++tradeSeq,p,tank,counter,...best,arrived:false,age:0,cx:counter.cx,cy:counter.cy,rot:counter.rot};
     TRADE_OFFERS.push(offer);p.tradeOffer=offer;p.tradeDone=true;
@@ -66,23 +101,35 @@ function finishTrade(id,accept=false){
     const bid=priceSlugOffer(o.slug,o.p.preferences);
     if(!bid.price){toast('ทากไม่ตรงเงื่อนไขแล้ว','bad');finishTrade(id);return;}
     if(bid.price!==o.price){o.price=bid.price;o.matched=bid.matched;renderTradeOffers(true);toast('ราคาเปลี่ยน กรุณาตรวจราคาก่อนยืนยัน','bad');return;}
-    o.tank.slugs.splice(o.tank.slugs.indexOf(o.slug),1);G.coin+=o.price;if(G.stats)G.stats.sold=(G.stats.sold||0)+1;
+    o.tank.slugs.splice(o.tank.slugs.indexOf(o.slug),1);addCoin(o.price);if(G.stats)G.stats.sold=(G.stats.sold||0)+1;
     if(typeof selSlug!=='undefined'&&selSlug===o.slug)selSlug=null;
     toast('ขายทาก +'+o.price+' เหรียญ','good');
   }
   TRADE_OFFERS.splice(TRADE_OFFERS.indexOf(o),1);o.p.tradeOffer=null;
   if(o.p.family){o.p.family.visits--;planFamily(o.p.family);}
   else{o.p.visits--;o.p.strolls=0;nextGoal(o.p);}
+  reflowCounterQueue(o.counter);           // คนที่เหลือขยับขึ้นหน้าแทนที่คนที่เพิ่งออกไป
   if(accept){syncHUD();if(typeof saveGame==='function')saveGame();}
   renderTradeOffers();
 }
+const WALK_TTL=60;              // เดินไปเข้าคิวนานเกินนี้ = ตัดทิ้ง (กันเคสติดของ/หาทางไม่เจอแล้วค้างตลอดกาล)
 function stepTradeOffers(dt){
   for(const o of [...TRADE_OFFERS]){
-    o.age+=dt;
+    /* ⚠️ นาฬิกาต้องเดินเฉพาะตอนยืนรออยู่จริง ๆ — เดิม o.age+=dt ตั้งแต่ตอน "สร้าง" ข้อเสนอ
+       คนที่เดินมาจากหลังร้านเลยเสียเวลานับถอยหลังไปฟรีก่อนจะได้ยื่นข้อเสนอด้วยซ้ำ
+       และพอมีคิว คนคิวหลังยิ่งเสียเวลาเดินเยอะกว่าเดิมอีก */
+    if(o.arrived)o.age+=dt;
+    else{ o.walkAge=(o.walkAge||0)+dt; if(o.walkAge>WALK_TTL){finishTrade(o.id);continue;} }
     const gone=(o.sell||o.wholesale)?false:(!G.objs.includes(o.tank)||!o.tank.slugs.includes(o.slug));
     if(!PEOPLE.includes(o.p)||gone||!G.objs.includes(o.counter)||o.counter===moving||o.cx!==o.counter.cx||o.cy!==o.counter.cy||o.rot!==o.counter.rot||o.age>(o.timeout||90))finishTrade(o.id);
   }
-  tradeHudTime+=dt;if(tradeHudTime>1){tradeHudTime=0;renderTradeOffers();}
+  /* เลื่อนคิวซ้ำทุก 1 วินาที ไม่ใช่แค่ตอน finishTrade ครั้งเดียว —
+     ตอนที่คนคิวหน้าเพิ่งตกลง/ปฏิเสธเสร็จ ตัวเขายัง "ยืนอยู่ที่เดิม" อีกหลายวินาทีกว่าจะเดินออก
+     spotTaken() จึงยังตีว่าจุดนั้นไม่ว่าง คนข้างหลังเลยขยับขึ้นไม่ได้ในจังหวะนั้น
+     ปล่อยให้ลองใหม่เรื่อย ๆ แทน (ไม่มีผลข้างเคียง — ใครอยู่ตรงจุดของตัวเองแล้วฟังก์ชันข้ามให้เอง) */
+  tradeHudTime+=dt;if(tradeHudTime>1){tradeHudTime=0;
+    for(const counter of new Set(TRADE_OFFERS.map(o=>o.counter)))reflowCounterQueue(counter);
+    renderTradeOffers();}
 }
 function tradeEscape(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function tradeAlternatives(o){
@@ -106,31 +153,28 @@ function inspectTradeSlug(id){
   const o=TRADE_OFFERS.find(o=>o.id===id);if(!o||!o.tank.slugs.includes(o.slug))return;
   enterTank(o.tank,{fx:o.slug.fx,fy:o.slug.fy});selSlug=o.slug;syncOv();
 }
-function renderTradeOffers(force=false){
-  for(const offer of TRADE_OFFERS)notifyTradeArrival(offer);
-  const el=document.getElementById('tradeOffers');if(!el)return;
-  // Do not replace an open native picker during the one-second countdown update.
-  if(!force&&el.parentElement.contains(document.activeElement)&&document.activeElement.closest('.slugFilters'))return;
-  if(!force&&el.contains(document.activeElement)&&document.activeElement.tagName==='SELECT')return;
-  const html=TRADE_OFFERS.map(o=>{
-    if(o.sell)return typeof sellOfferCard==='function'?sellOfferCard(o):'';
-    if(o.wholesale)return typeof wholesaleOfferCard==='function'?wholesaleOfferCard(o):'';
-    o.requestedId ||= o.slug.id;
-    o.choices=SlugBrowser.apply(tradeAlternatives(o),'trade',c=>c.slug);
-    const name=tradeEscape(SlugBrowser.name(o.slug)),tank=tradeEscape(o.tank.def.name+' '+o.tank.id);
-    return `<div class="trade-offer-card">
-      <div class="trade-offer-heading"><b>${o.price.toLocaleString()} <span>เหรียญ</span></b><span class="trade-status">${o.arrived?'รอคำตอบ':'กำลังเดินมา'}</span></div>
-      <div class="trade-slug-summary"><canvas data-trade-slug="${o.id}" width="120" height="80"></canvas><div class="trade-slug-details"><b>ขายทาก ${name}</b><br><small>${tank}<br>ลูกค้าขอเดิม: ${tradeEscape(o.requestedId)}</small></div></div>
-      <button class="tbtn" onclick="inspectTradeSlug(${o.id})">ดูทาก ${name} ในตู้</button>
-      <label style="display:block;margin:8px 0;font-size:12px">เลือกตัวที่จะขายแทน (ทากในตู้หน้าร้าน)
-      <select style="display:block;width:100%;margin-top:5px;background:#202025;color:#eadcc4;padding:6px" onchange="chooseTradeSlug(${o.id},Number(this.value))">
-      ${o.choices.map((c,i)=>`<option value="${i}" ${c.slug===o.slug?'selected':''}>${c.slug.favorite?'♥ ':''}${tradeEscape(SlugBrowser.name(c.slug))} · ${tradeEscape(c.tank.id)} · ${c.price} เหรียญ · ตรง ${c.matched.length}/${o.p.preferences.length}</option>`).join('')}</select></label>
-      <small class="trade-conditions"><strong>ตรง ${o.matched.length}/${o.p.preferences.length} เงื่อนไข</strong><br>${o.p.preferences.map(c=>`<span class="trade-condition ${o.matched.includes(c)?'matched':'unmatched'}">${o.matched.includes(c)?'✓':'—'} ยีน${TRADE_GENES[c.key]} ${Math.min(c.lo,c.hi)}–${Math.max(c.lo,c.hi)}% · ตัวนี้ ${Number(o.slug.genes[c.key]).toFixed(1)}% (${tradeConditionPrice(c.lo,c.hi)} เหรียญ)</span>`).join('')}<br>แสดงเฉพาะตัวที่ลูกค้ารับซื้อและยังไม่มีข้อเสนออื่นจอง<br>ราคาจากยีนกำเนิด · รออีก ${Math.max(0,Math.ceil(90-o.age))} วินาที</small><br>
-      <div class="trade-actions"><button class="tbtn trade-accept" ${o.arrived?'':'disabled'} onclick="finishTrade(${o.id},true)">ขาย ${name} · ${o.price} เหรียญ</button> <button class="tbtn" onclick="finishTrade(${o.id})">ปฏิเสธ</button></div></div>`;
-  }).join('')||'<p style="font-size:12px">ยังไม่มีข้อเสนอ · เว้นทางเดินหน้าเคาน์เตอร์อย่างน้อย 1 ช่องใหญ่</p>';
-  if(!force&&el.innerHTML===html)return;
-  el.innerHTML=html;SlugBrowser.mount(el.parentElement,'trade',()=>renderTradeOffers(true));
-  for(const canvas of el.querySelectorAll('canvas[data-trade-slug]')){
+/* ⚠️ 2026-09-16 แก้ "ข้อเสนอค้าง ขายไม่ได้" ตอนลูกค้าหลายคน
+   เดิม: ถ้าโฟกัสค้างอยู่ใน <select> ของแผงนี้ (แค่เคยกด dropdown "เลือกตัวที่จะขายแทน" ครั้งเดียว โฟกัสก็ค้างต่อ)
+   ทั้งแผงหยุดอัปเดตไปเลย — ลูกค้าที่เดินมาถึงแล้วยังขึ้น "กำลังเดินมา" นับถอยหลังหยุด ปุ่มขายเทาค้าง
+   และทุก 1 วิแผงเขียน innerHTML ทับทั้งก้อน (เพราะเลขนับถอยหลังเปลี่ยน) ปุ่มถูกสร้างใหม่ตลอด คลิกที่กดคาจังหวะนั้นหาย
+   ตอนนี้: ข้อความที่เปลี่ยนทุกวินาทีติด data-live → แก้แค่ข้อความ + สถานะปุ่ม (disabled) ในการ์ดเดิม
+   สร้างการ์ดใหม่เฉพาะตอนเนื้อหาจริงเปลี่ยน · การ์ดที่ <select> โฟกัสอยู่ แก้เฉพาะส่วน live (สร้างใหม่ = dropdown ที่เปิดอยู่หุบ) */
+function tradeCardSignature(card){
+  const copy=card.cloneNode(true);
+  for(const live of copy.querySelectorAll('[data-live]'))live.textContent='';
+  for(const button of copy.querySelectorAll('button.trade-accept'))button.removeAttribute('disabled');
+  return copy.innerHTML;
+}
+function patchTradeCard(card,fresh){
+  for(const live of fresh.querySelectorAll('[data-live]')){
+    const old=card.querySelector('[data-live="'+live.dataset.live+'"]');
+    if(old&&old.textContent!==live.textContent)old.textContent=live.textContent;
+  }
+  const button=card.querySelector('button.trade-accept'),next=fresh.querySelector('button.trade-accept');
+  if(button&&next){button.disabled=next.disabled;if(button.textContent!==next.textContent)button.textContent=next.textContent;}
+}
+function paintTradeCard(card){
+  for(const canvas of card.querySelectorAll('canvas[data-trade-slug]')){
     const o=TRADE_OFFERS.find(o=>o.id===Number(canvas.dataset.tradeSlug));if(!o)continue;
     const controls=document.createElement('div');controls.className='trade-slug-controls';
     canvas.parentElement.after(controls);
@@ -139,6 +183,59 @@ function renderTradeOffers(force=false){
     const ratio=Math.min(112/sprite.c.width,72/sprite.c.height),w=sprite.c.width*ratio,h=sprite.c.height*ratio;
     canvas.getContext('2d').drawImage(sprite.c,(120-w)/2,(80-h)/2,w,h);
   }
+}
+const TRADE_EMPTY='<p style="font-size:12px">ยังไม่มีข้อเสนอ · เว้นทางเดินหน้าเคาน์เตอร์อย่างน้อย 1 ช่องใหญ่</p>';
+function renderTradeOffers(force=false){
+  for(const offer of TRADE_OFFERS)notifyTradeArrival(offer);
+  const el=document.getElementById('tradeOffers');if(!el)return;
+  /* หลายข้อเสนอพร้อมกันได้ การ์ดกางเต็มทุกใบใน rail กว้าง 310px = เลื่อนยาวมาก จึงยุบเป็น <details> เปิดทีละใบ
+     ใบที่เคยอยู่ในแผงแล้ว = ใช้สถานะเปิด/พับเดิมเป๊ะ ๆ (ผู้เล่นพับหมดก็ต้องพับหมด ห้ามเด้งเปิดเอง)
+     ใบใหม่ = เปิดให้เฉพาะใบแรกตอนแผงเพิ่งว่างเปล่า · ที่เหลือปล่อยพับไว้ ปุ่มข้อเสนอเรืองแสงบอกอยู่แล้ว */
+  const cards=new Map([...el.children].filter(n=>n.matches('details.trade-offer')).map(n=>[n.dataset.offer,n]));
+  const wasEmpty=!cards.size,focus=document.activeElement,template=document.createElement('template'),nodes=[];
+  for(const o of TRADE_OFFERS){
+    const body=offerCardBody(o);if(!body)continue;
+    const id=String(o.id),old=cards.get(id);
+    template.innerHTML='<details class="trade-offer" data-offer="'+id+'"><summary>'+offerSummary(o)+'</summary>'+body+'</details>';
+    const fresh=template.content.firstElementChild,sig=tradeCardSignature(fresh);
+    const picking=old&&focus?.tagName==='SELECT'&&old.contains(focus);
+    if(old&&!force&&(old._sig===sig||picking)){patchTradeCard(old,fresh);nodes.push(old);continue;}
+    fresh.open=old?old.open:(wasEmpty&&!nodes.length);
+    fresh._sig=sig;paintTradeCard(fresh);nodes.push(fresh);
+  }
+  if(!nodes.length){if(el.innerHTML!==TRADE_EMPTY)el.innerHTML=TRADE_EMPTY;return;}
+  // ย้ายเฉพาะโหนดที่ผิดตำแหน่ง — การ์ดที่ไม่เปลี่ยนต้องอยู่กับที่ ไม่งั้นโฟกัส/คลิกที่กดค้างอยู่หลุด
+  nodes.forEach((node,i)=>{if(el.children[i]!==node)el.insertBefore(node,el.children[i]||null);});
+  while(el.children.length>nodes.length)el.lastElementChild.remove();
+}
+/* ⚠️ 2026-09-14 เอาแผง "กรอง / เรียงทาก" (SlugBrowser.mount) ออกจากหัวแผงข้อเสนอ
+   แผงนี้กรองแค่ dropdown "เลือกตัวที่จะขายแทน" ในการ์ดเดียว แต่กินที่บนสุดตลอดเวลา
+   และงงกับปุ่มกรองของคลังทากที่หน้าตาเหมือนกัน · ยังใช้อยู่ในแผงคลังทากตามเดิม */
+/* หัวการ์ดแบบย่อ (บรรทัดเดียว) — อ่านออกว่าข้อเสนอไหนเป็นอะไร ราคาเท่าไหร่ เหลือเวลาเท่าไหร่ โดยไม่ต้องกาง */
+function offerSummary(o){
+  const left=Math.max(0,Math.ceil((o.timeout||90)-(o.age||0)));
+  const status=o.arrived?left+' วิ':'กำลังเดินมา';
+  const head=o.sell?'🧳 พ่อค้าเร่ขาย · จ่าย '+Number(o.price).toLocaleString()
+            :o.wholesale?'📦 รับเหมาซื้อ · ตัวละ '+Number(o.price).toLocaleString()
+            :'💰 ลูกค้าขอซื้อ · '+Number(o.price).toLocaleString();
+  return '<span>'+head+'</span><span class="trade-status" data-live="status">'+status+'</span>';
+}
+function offerCardBody(o){
+    if(o.sell)return typeof sellOfferCard==='function'?sellOfferCard(o):'';
+    if(o.wholesale)return typeof wholesaleOfferCard==='function'?wholesaleOfferCard(o):'';
+    o.requestedId ||= o.slug.id;
+    o.choices=tradeAlternatives(o);          // ไม่ผ่าน SlugBrowser.apply แล้ว — แผงกรองของหน้านี้ถูกถอดออก
+                                             // (ถ้ายังเรียก apply ค้างไว้ ตัวกรองที่เคยตั้งไว้จะยังกรองอยู่โดยไม่มี UI ให้ล้าง)
+    const name=tradeEscape(SlugBrowser.name(o.slug)),tank=tradeEscape(o.tank.def.name+' '+o.tank.id);
+    return `<div class="trade-offer-card">
+      <div class="trade-offer-heading"><b>${o.price.toLocaleString()} <span>เหรียญ</span></b><span class="trade-status" data-live="card-status">${o.arrived?'รอคำตอบ':'กำลังเดินมา'}</span></div>
+      <div class="trade-slug-summary"><canvas data-trade-slug="${o.id}" width="120" height="80"></canvas><div class="trade-slug-details"><b>ขายทาก ${name}</b><br><small>${tank}<br>ลูกค้าขอเดิม: ${tradeEscape(o.requestedId)}</small></div></div>
+      <button class="tbtn" onclick="inspectTradeSlug(${o.id})">ดูทาก ${name} ในตู้</button>
+      <label style="display:block;margin:8px 0;font-size:12px">เลือกตัวที่จะขายแทน (ทากในตู้หน้าร้าน)
+      <select style="display:block;width:100%;margin-top:5px;background:#202025;color:#eadcc4;padding:6px" onchange="chooseTradeSlug(${o.id},Number(this.value))">
+      ${o.choices.map((c,i)=>`<option value="${i}" ${c.slug===o.slug?'selected':''}>${c.slug.favorite?'♥ ':''}${tradeEscape(SlugBrowser.name(c.slug))} · ${tradeEscape(c.tank.id)} · ${c.price} เหรียญ · ตรง ${c.matched.length}/${o.p.preferences.length}</option>`).join('')}</select></label>
+      <small class="trade-conditions"><strong>ตรง ${o.matched.length}/${o.p.preferences.length} เงื่อนไข</strong><br>${o.p.preferences.map(c=>`<span class="trade-condition ${o.matched.includes(c)?'matched':'unmatched'}">${o.matched.includes(c)?'✓':'—'} ยีน${TRADE_GENES[c.key]} ${Math.min(c.lo,c.hi)}–${Math.max(c.lo,c.hi)}% · ตัวนี้ ${Number(o.slug.genes[c.key]).toFixed(1)}% (${tradeConditionPrice(c.lo,c.hi)} เหรียญ)</span>`).join('')}<br>แสดงเฉพาะตัวที่ลูกค้ารับซื้อและยังไม่มีข้อเสนออื่นจอง<br>ราคาจากยีนกำเนิด · รออีก <span data-live="left">${Math.max(0,Math.ceil((o.timeout||90)-(o.age||0)))}</span> วินาที</small><br>
+      <div class="trade-actions"><button class="tbtn trade-accept" ${o.arrived?'':'disabled'} onclick="finishTrade(${o.id},true)">ขาย ${name} · ${o.price} เหรียญ</button> <button class="tbtn" onclick="finishTrade(${o.id})">ปฏิเสธ</button></div></div>`;
 }
 
 function placeTradeCounter(){setMode('build');buyKey='counter';buyRot=0;setTool('place');buildShop();toast('เคาน์เตอร์แมวตัว L · 100×100 ซม. · หมุนได้เหมือนตู้ · เว้นทางด้านหน้า');}
@@ -168,7 +265,9 @@ const NOTIFICATION_TONES={
  quest:[[0,523],[.12,659],[.24,784],[.4,1047]],
  success:[[0,698],[.14,932]],
  warning:[[0,392],[.22,330]],
- notice:[[0,740]]
+ notice:[[0,740]],
+ tugWin:[[0,523],[.1,659],[.2,784],[.3,1047],[.46,1319]],     // เมเจอร์ไล่ขึ้น จบสูง = ดีใจ
+ tugLose:[[0,466],[.16,392],[.34,311],[.56,262]]              // ไมเนอร์ไล่ลงช้า ๆ = เศร้า
 };
 function unlockTradeAudio(){
  try{const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;

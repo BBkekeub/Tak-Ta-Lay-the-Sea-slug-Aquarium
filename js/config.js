@@ -133,6 +133,7 @@ const TANK_GLASS_COLOR='#9fd0f0';                  // ทุกขนาดใ�
 const CATALOG = {
   tank_showcase:{kind:'tank',name:'ตู้โชว์',icon:'🔎',price:500,w:SUB,h:SUB,glass:TANK_GLASS_COLOR,foodMax:8,maxSlugs:1,shopSlugScale:7.2,decorScale:1.3},
   tank_race:{kind:'tank',name:'ตู้แข่งทากทะเล',icon:'🏁',price:2500,w:4*SUB,h:2*SUB,glass:TANK_GLASS_COLOR,race:true,foodMax:24},
+  tank_tug:{kind:'tank',name:'ตู้ชักเย่อ',icon:'🪢',price:2500,w:2*SUB,h:SUB,glass:TANK_GLASS_COLOR,tug:true,foodMax:12},
   play_table:{kind:'deco',name:'โต๊ะเล่นกับทาก',icon:'',price:500,w:SUB,h:SUB,col:'#98744b',playTable:true},
   tank_breed:{kind:'tank',name:'ตู้เพาะพันธุ์ 3 ส่วน',icon:'🥚',price:2000,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,breeder:true,foodMax:10},
   counter: {kind:'deco',name:'เคาน์เตอร์แมวขายทาก',icon:'🐱',price:0,w:2*SUB,h:2*SUB,col:'#826448'},
@@ -144,6 +145,17 @@ const CATALOG = {
   plant:   {kind:'deco', name:'สาหร่าย',   icon:'🌿', price:24, w:1, h:1, col:'#3f8f5e', attr:2},
   sign:    {kind:'deco', name:'ป้ายร้าน',  icon:'🪧', price:40, w:2, h:1, col:'#9a7b45', attr:5},
 };
+/* เลนเชือกตู้ชักเย่อ = แถบ "หน้าสุด" ของตู้ แบบเดียวกับแถบสนามของตู้แข่งวิ่ง
+   (หน่วยช่อง · ตู้ลึก 10 ช่อง · fy น้อย = ด้านหน้า ใกล้กล้อง)
+   ⚠️ เดิมเลนอยู่กลางตู้ [3.5,6.5] ห้ามวางแค่ทับเลน → วางของไว้ "หน้าเลน" ได้ แล้วของบังการแข่งทั้งแมตช์
+      ตอนนี้ห้ามวางของ/อาหารตั้งแต่ขอบหน้าตู้จนถึงหลังเลน (TUG_FRONT) — ไม่มีอะไรมาขวางระหว่างกล้องกับเชือกได้อีก
+   ทากยังเดินผ่านได้ตามปกติตอนไม่มีแมตช์ · คนดูไปยืนแถวหลังเลน (slug-tug.js rimSpot)
+   ทุกจุดที่บังคับกฎนี้เรียกผ่าน tugLaneBlocked() ตัวเดียวกันหมด (tank-view.js · feeding.js) จะได้ไม่หลุดกันเองทีหลัง */
+const TUG_LANE=[1,4];
+const TUG_LANE_MID=(TUG_LANE[0]+TUG_LANE[1])/2;
+const TUG_FRONT=TUG_LANE[1];                 // เขตห้ามวาง: ขอบหน้าตู้ (0) → หลังเลน
+const tugLaneBlocked=(def,top,bottom)=>!!def&&!!def.tug&&top<TUG_FRONT;
+
 /* ความจุตู้: พื้นที่ตู้ (ตร.ซม.) ÷ พื้นที่ต่อตัว (400) */
 function tankCap(def){
   if(Number.isInteger(def.maxSlugs)&&def.maxSlugs>0) return def.maxSlugs;
@@ -165,6 +177,13 @@ const G = {
   inv: [],                      // ทากในคลัง (ยังไม่ลงตู้)
   seq: 1,
 };
+/* ⚠️ 2026-09-16 เกมนี้ "เล่นเอฟเฟคเสมอ" ไม่อ่าน prefers-reduced-motion ของระบบ
+   เครื่องที่ปิด Animation effects ของ Windows (MinAnimate=0) Chrome จะรายงาน reduce มา
+   แล้วเอฟเฟคทุกตัวข้ามหมด: ไฟชาร์จชักเย่อ · พลุชนะ · พลุทากใหม่/ของขวัญ/กล่องสุ่ม · พลุแข่ง · หินหล่นตอนแพ้ · จอสั่น
+   ผู้เล่นจึงไม่เห็นเอฟเฟคสักอย่างโดยไม่รู้สาเหตุ · อยากกลับไปเคารพค่าระบบเมื่อไหร่ แก้ที่ฟังก์ชันนี้ที่เดียว
+   (ฝั่ง CSS: บล็อก @media(prefers-reduced-motion) ที่เคยดับอนิเมชันถูกถอดออกด้วยเหตุผลเดียวกัน) */
+function reducedMotion(){return false;}
+
 const cam = { x:0, y:0, zoom:1 };          // กล้อง: x,y = จุดโลกกลางจอ
 const cellsW = () => G.bw * SUB;           // ช่องเล็กแนวกว้างทั้งหมด
 const cellsH = () => G.bh * SUB;
@@ -217,13 +236,20 @@ function slugSprite(s){
 const TANK_DECOR_LEGACY = {};
 /* decor-defs.js ทับของเก่าเสมอ — คีย์ซ้ำ ให้ไฟล์จากเครื่องมือชนะ */
 const TANK_DECOR = Object.assign({}, TANK_DECOR_LEGACY,
-  (typeof DECOR_DEFS !== 'undefined' ? DECOR_DEFS : {}));
+  (typeof DECOR_DEFS !== 'undefined' ? DECOR_DEFS : {}),
+  /* ชุด 3 มิติที่อบเป็น PNG แล้ว (js/decor3d-defs.js) — ใช้ฟอร์แมตเดียวกับ Dec grid ทุกอย่าง
+     ต่างแค่ src ชี้ไป assets/decor3d/png/ และมี cat/priceCm/sizeCm เพิ่ม */
+  (typeof DECOR3D_DEFS !== 'undefined' ? DECOR3D_DEFS : {}));
 
 /* ราคาของตกแต่งในตู้ — คิดจากความกว้างจริงของชิ้นนั้น */
-function decorPrice(key){ const d=TANK_DECOR[key]; return Math.max(20, Math.round((d&&d.wCm||20)*DECOR_COST_PER_CM)); }
+/* ราคาคิดจากความกว้าง "จริง" ของชิ้นงาน — ของชุด 3 มิติ wCm เป็นความกว้างบนจอ (รวมการเยื้อง
+   ของแกนลึกในภาพเฉียง) ซึ่งกว้างกว่าก้อนจริงราว 1.5 เท่า ถ้าใช้ wCm จะแพงเกินจริงทั้งชุด */
+function decorPrice(key){ const d=TANK_DECOR[key]; return Math.max(20, Math.round(((d&&(d.priceCm||d.wCm))||20)*DECOR_COST_PER_CM)); }
 
 const _decorImg = {};
 function decorImg(key){
+  // GLB props never enter the legacy PNG cache, including during save preload.
+  if(TANK_DECOR[key]?.model) return {img:null,ok:false};
   let e=_decorImg[key];
   if(!e){ e={img:new Image(), ok:false}; e.img.onload=()=>{ e.ok=true; };
     e.img.onerror=()=>{ console.warn('[decor] โหลดรูปไม่ได้:', key, '→', TANK_DECOR[key].src,

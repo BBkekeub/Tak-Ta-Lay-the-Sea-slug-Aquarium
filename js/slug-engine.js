@@ -1183,6 +1183,9 @@ function drawSlug(ctx, P, cx, cy, flip, phase, scale, detail, moving, pose){
   const charge = Math.max(0,Math.min(1,pose.charge||0));
   const retract = Math.max(Math.max(0,Math.min(1,pose.startle||0)),charge*0.78);
   const look = Math.max(0,Math.min(1,pose.look||0));
+  /* ชักเย่อ: +1 = หงอน/หนวดสะบัดไปทางหาง (กด F) · −1 = ไปทางหัว (กด K) — ทุกพุ่มพร้อมกัน
+     สไปรต์หันซ้ายเป็นค่าเริ่มต้น หมุนบวก (ตามเข็ม) ปลายจึงไปทางขวา = ทางหาง พอดี */
+  const lean = Math.max(-1,Math.min(1,pose.tugLean||0));
   const bob   = (ANIM && !pose.noBob && !asleep) ? Math.sin(t/900)*9 : 0;
   const creep = (ANIM && mv) ? Math.sin(Number.isFinite(pose.creepT) ? pose.creepT : t/700) : 0; // คืบ = ยืด-หด เฉพาะตอนเดิน · pose.creepT = ผูกจังหวะกับระยะทางที่เดินจริง (ไม่ส่งมา = ใช้นาฬิกาเหมือนเดิม)
   const breathe = asleep ? Math.sin(t/1250)*0.018 : 0;
@@ -1204,7 +1207,8 @@ function drawSlug(ctx, P, cx, cy, flip, phase, scale, detail, moving, pose){
     const normal=Math.sin(t/560+i)*3.4;
     /* ตอนตื่นให้พุ่มเหงือกและ pilum สะบัดเป็นคลื่นไล่กัน ไม่กระดิกพร้อมกันทั้งพุ่ม */
     const wakeFlutter=wakeEnvelope*Math.sin(t/155+i*0.92)*6.8;
-    return (normal*(asleep?0.20:1)+wakeFlutter)*Math.PI/180;
+    /* 28° — พุ่มหงอน 2D สั้นและกว้าง ถ้าเอียงน้อยกว่านี้ขนาดในตู้แทบมองไม่ออก (15° เทสต์แล้วไม่เห็น) */
+    return (normal*(asleep?0.20:1)+wakeFlutter+lean*28+Math.abs(lean)*Math.sin(t/55+i*0.5)*4)*Math.PI/180;
   };
   const swayR = i => {
     if(!ANIM) return 0;
@@ -1214,7 +1218,7 @@ function drawSlug(ctx, P, cx, cy, flip, phase, scale, detail, moving, pose){
     const sniff=pose.state==='inspect' ? Math.sin(t/220+i*2.1)*5.2 : 0;
     const curious=look*Math.sin(t/270+i*1.7)*4.0;
     const sneeze=pose.state==='sneeze' ? Math.sin(t/105+i*2.2)*7.5 : 0;
-    return (normal*(asleep?0.18:1)+droop+shake+sniff+curious+sneeze)*Math.PI/180;
+    return (normal*(asleep?0.18:1)+droop+shake+sniff+curious+sneeze+lean*16)*Math.PI/180;
   };
 
   const _dispK = P.s*(scale||1);            // ตัวคูณขนาดจริงบนจอ

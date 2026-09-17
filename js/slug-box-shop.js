@@ -46,7 +46,7 @@ function orderSlugBox(i){
  if(s.n<1){toast('กล่องหมดสต็อก · '+slugBoxWaitText(),'bad');return false;}
  if(G.coin<box.price){toast('เหรียญไม่พอ','bad');return false;}
  if(s.n>=SLUG_BOX_MAX)s.at=Date.now();
- s.n-=1;G.coin-=box.price;
+ s.n-=1;addCoin(-box.price);
  slugDeliveries().push({id:'d'+Date.now()+'_'+Math.floor(Math.random()*10000),boxIndex:i,name:box.name,readyAt:Date.now()+SLUG_DELIVERY_MS,genes:rollBoxGenes(box),alerted:false});
  if(typeof saveGame==='function')saveGame();if(typeof syncHUD==='function')syncHUD();
  toast('สั่งกล่อง'+box.name+' · จะส่งถึงเคาน์เตอร์ในอีก ~1 นาที','good');

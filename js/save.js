@@ -5,6 +5,7 @@
      หลุดเข้าไปในการฉายภาพ (ไม่งั้น createLinearGradient จะ throw ทั้งเฟรม = จอค้าง)
    ============================================================ */
 const SAVE_KEY = 'taktale_shop_save_v1';
+const SAVE_SIG_KEY = SAVE_KEY+'_sig';   // ลายเซ็นกันแก้ไฟล์เซฟ (coin-guard.js)
 let _saveOK = true;               // ถ้า localStorage ใช้ไม่ได้ (เช่นโหมดส่วนตัว) จะปิดเงียบ ๆ
 
 const _NUM = (v, d)=>{ const n=+v; return Number.isFinite(n) ? n : d; };
@@ -37,13 +38,16 @@ function saveGame(){
   if(!_saveOK) return;
   try{
     const data={
-      v:1, racing:G.racing||null, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||0, floorTiles:G.floorTiles||null, floorPaint:G.floorPaint||{}, wallPaint:G.wallPaint||{}, coin:G.coin, boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, orders:G.orders||[], nextOrderAt:G.nextOrderAt||0, orderSeq:G.orderSeq||0, nextPeddlerAt:G.nextPeddlerAt||0, nextWholesalerAt:G.nextWholesalerAt||0, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
+      v:1, racing:G.racing||null, tug:G.tug||null, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||{}, floorTiles:G.floorTiles||null, floorPaint:G.floorPaint||{}, wallPaint:G.wallPaint||{}, coin:G.coin, ck:CoinGuard.ck(), boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, orders:G.orders||[], nextOrderAt:G.nextOrderAt||0, orderSeq:G.orderSeq||0, nextPeddlerAt:G.nextPeddlerAt||0, nextWholesalerAt:G.nextWholesalerAt||0, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
       newSlugNotices:G.newSlugNotices||[],
       objs:(G.objs||[]).map(_saveObj),
       shelter:(G.shelter||[]).map(_saveObj),
       inv:(G.inv||[]).map(_saveSlug)
     };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    /* ลายเซ็นคิดจากสตริงที่เขียนลงไปจริงทั้งก้อน — แก้ตัวอักษรไหนในเซฟก็ไม่ตรง (ดู coin-guard.js) */
+    const raw=JSON.stringify(data);
+    localStorage.setItem(SAVE_KEY, raw);
+    localStorage.setItem(SAVE_SIG_KEY, CoinGuard.sign(raw));
   }catch(e){
     /* เซฟพังเงียบ ๆ = อาการปลายทางคือ "จดหมายครั้งเดียวกลับมาอีก / เงินได้ซ้ำ" เพราะ ledger ไม่ถูกบันทึก
        ต้องบอกผู้เล่นครั้งเดียว ไม่ใช่ปิดเงียบ */
@@ -109,6 +113,13 @@ function _loadObj(o){
     if(isBreeder(t)){t.breeding=loadBreeder(o.breeding);if(t.breeding)t.breeding.parents=t.breeding.parents.map(p=>{let existing=t.slugs.find(s=>s.id===p.id);if(!existing){existing=p;t.slugs.push(existing);}existing.breedZone=true;return existing;});}
     t.decor=(o.decor||[])
       .filter(d=>d && d.key)
+      /* ของตกแต่งที่ไม่มีนิยามในเกมตอนนี้ (เช่น ชุด 3D ที่ปิดไว้ 2026-09-17) — ถ้าปล่อยไว้ในตู้ โค้ดวาด/ชนจะอ่าน TANK_DECOR[key] เป็น undefined แล้วพัง
+         ยกออกจากตู้แล้วคืนเป็นเครดิตชนิดเดียวกัน (decorCredit ถูกโหลดก่อน objs ใน loadGame) · เปิดชุดกลับมาเมื่อไหร่ก็วางคืนได้ฟรี ไม่มีอะไรหาย */
+      .filter(d=>{
+        if(typeof TANK_DECOR==='undefined' || TANK_DECOR[d.key]) return true;
+        G.decorCredit=G.decorCredit||{}; G.decorCredit[d.key]=(G.decorCredit[d.key]||0)+1;
+        return false;
+      })
       .map(d=>({ key:d.key, fx:_NUM(d.fx,0.5), fy:_NUM(d.fy,0.5), flip:(_NUM(d.flip,0)|0) }));
     t.foods=(o.foods||[]).map(f=>{
       if(!f) return null;
@@ -135,8 +146,14 @@ function loadGame(){
       .map(m=>({id:m.id,type:'log',title:m.title,body:String(m.body||''),at:_NUM(m.at,Date.now()),read:!!m.read}))
       .slice(-_LOGMAX);
     G.market=(d.market&&typeof d.market==='object')?d.market:null;
-    G.decorCredit=_NUM(d.decorCredit,0)|0;
-    G.coin=_NUM(d.coin, G.coin);
+    /* เดิมเป็นตัวเลขรวมชิ้นเดียวใช้ได้กับของทุกชนิด (บั๊ก — เก็บของถูกแล้วเอาไปแลกของแพงฟรีได้)
+       ตอนนี้เป็น {decorKey: count} เซฟเก่าที่ยังเป็นตัวเลขล้วนทิ้งไปเลย ระบุไม่ได้ว่าเป็นเครดิตของชนิดไหน */
+    G.decorCredit=(d.decorCredit&&typeof d.decorCredit==='object'&&!Array.isArray(d.decorCredit))
+      ?Object.fromEntries(Object.entries(d.decorCredit).filter(([k,v])=>typeof k==='string'&&Number.isFinite(v)&&v>0).map(([k,v])=>[k,Math.floor(v)]))
+      :{};
+    /* ตรวจลายเซ็นเซฟก่อนเชื่อจำนวนเงิน — ถูกแก้นอกเกม = ย้อนเงินกลับค่าที่เกมเซฟไว้จริง (coin-guard.js) */
+    let sig=null; try{ sig=localStorage.getItem(SAVE_SIG_KEY); }catch(e){}
+    CoinGuard.load(raw, d, sig);
     if(d.stats&&Number.isFinite(d.stats.sec))G.stats={earned:_NUM(d.stats.earned,0),spent:_NUM(d.stats.spent,0),sec:_NUM(d.stats.sec,0),sold:_NUM(d.stats.sold,0),fed:_NUM(d.stats.fed,0),cleaned:_NUM(d.stats.cleaned,0),bred:_NUM(d.stats.bred,0),ordered:_NUM(d.stats.ordered,0)};
     G.questOrderVersion=_NUM(d.questOrderVersion,0); G.questCompleted=Array.isArray(d.questCompleted)?d.questCompleted.filter(id=>typeof id==='string'):[];
     G.rep=_NUM(d.rep,0); G.questIndex=Math.max(0,_NUM(d.questIndex,0)|0); G.questDone=!!d.questDone; G.questBase=(d.questBase&&typeof d.questBase==='object')?d.questBase:null;
@@ -159,6 +176,7 @@ function loadGame(){
     G.nextOrderAt=_NUM(d.nextOrderAt,0); G.orderSeq=_NUM(d.orderSeq,0)|0;
     G.newSlugNotices=Array.isArray(d.newSlugNotices)?d.newSlugNotices.slice(-5):[];
     G.racing=(d.racing&&typeof d.racing==='object')?d.racing:null;
+    G.tug=(d.tug&&typeof d.tug==='object')?d.tug:null;   /* รูปร่างสเตทถูกตรวจซ้ำตอนโหลด slug-tug.js */
     G.nextPeddlerAt=_NUM(d.nextPeddlerAt,0);   /* คิวพ่อค้าเร่ (slug-peddler.js) เป็นเวลาจริง เดินต่อแม้ปิดเกม */
     G.nextWholesalerAt=_NUM(d.nextWholesalerAt,0);   /* คิวพ่อค้ารับเหมา (slug-wholesaler.js) เป็นเวลาจริงเช่นกัน */
     G.larvaDeaths=_NUM(d.larvaDeaths,0)|0; G.rivalDeathMailSent=!!d.rivalDeathMailSent; G.rival100MailSent=!!d.rival100MailSent;
@@ -197,7 +215,7 @@ function loadGame(){
 /* ล้างเซฟแล้วเริ่มใหม่ (เรียกจากคอนโซล: resetGame()) */
 window.resetGame = function(){
  for(const question of ['ยืนยันรีเซตร้าน? (1/3)','ทาก ตู้ ของ เหรียญ และพื้นที่ร้านจะกลับไปเริ่มต้น ยืนยัน? (2/3)','ยืนยันครั้งสุดท้าย ล้างเซฟร้านนี้และเริ่มใหม่ทันที? (3/3)'])if(!confirm(question))return false;
- try{resettingShop=true;localStorage.removeItem(SAVE_KEY);}catch(e){resettingShop=false;toast('ล้างเซฟไม่สำเร็จ','bad');return false;}
+ try{resettingShop=true;localStorage.removeItem(SAVE_KEY);localStorage.removeItem(SAVE_SIG_KEY);}catch(e){resettingShop=false;toast('ล้างเซฟไม่สำเร็จ','bad');return false;}
  location.reload();return true;
 };
 
@@ -205,6 +223,7 @@ window.resetGame = function(){
 (function(){
   let ok=false;
   try{ ok=loadGame(); }catch(e){ console.warn('[load] ล้มเหลว เริ่มใหม่', e); ok=false; }
+  CoinGuard.lock();                      // ปิดช่องตั้งค่าเงินจากเซฟ — หลังบูตเรียกซ้ำจากคอนโซลไม่ได้แล้ว
   if(ok){
     if(typeof syncHUD==='function') syncHUD();
     if(typeof fitCamera==='function') fitCamera();

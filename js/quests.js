@@ -68,7 +68,7 @@
   {t:'ตกแต่งภายในตู้เลี้ยง', h:'คลิกเข้าตู้ → เปิด 🔧 จัดของ แล้ววางของตกแต่งในตู้สัก 1 ชิ้น', cond:b=>tankDecorated(), reward:{coin:120, rep:1, txt:'ตู้สวยขึ้น น่าดูขึ้น'}, btn:['#ovBuild','canvas:anytank']},
   {t:'ย้ายทากข้ามตู้', h:'เข้าตู้ → ปุ่ม "จัดการทาก" เลือกทากแล้วย้ายเข้า/ออกระหว่างตู้กับคลัง', cond:b=>S().transferred>b.transferred, reward:{coin:120, rep:1, txt:'จัดกลุ่มทากได้ตามใจ'}, btn:['#ovAdd','canvas:anytank']},
   {t:'วางโต๊ะเล่นแล้วเล่นกับทาก', h:'กด 🔧 ก่อสร้าง → แท็บ "อุปกรณ์สำคัญ" → ซื้อ "โต๊ะเล่นกับทาก" มาวาง แล้วคลิกที่โต๊ะ (ตามลูกศร) เพื่อเล่น', cond:b=>S().played>b.played, reward:{coin:120, rep:1, txt:'เล่นกับทากให้มันมีความสุข'}, btn:['canvas:playtable','#shop .item[data-k="play_table"]','#floorBuildDock .decorTabs [data-cat="อุปกรณ์สำคัญ"]','#mBuild']},
-  {t:'ค้าขายกับพ่อค้าเร่/คนรับเหมา', h:'บางครั้งพ่อค้าเร่จะเอาทากมาขาย หรือคนรับเหมามารับซื้อทากทีละเยอะ ๆ — กดปุ่ม "ข้อเสนอ" ที่ถาดแจ้งเตือนมุมขวาล่าง แล้วลองซื้อหรือขายสักครั้ง', cond:b=>S().sellerTrade>b.sellerTrade, reward:{coin:150, rep:2, txt:'ช่องทางซื้อ-ขายนอกหน้าร้าน'}, btn:'#navOffers'},
+  {t:'ค้าขายกับพ่อค้าเร่/คนรับเหมา', h:'บางครั้งพ่อค้าเร่จะเอาทากมาขาย หรือคนรับเหมามารับซื้อทากทีละเยอะ ๆ — กดปุ่ม "ข้อเสนอ" มุมขวาบน (เรืองแสงเองทุกครั้งที่มีข้อเสนอเข้ามา) แล้วลองซื้อหรือขายสักครั้ง', cond:b=>S().sellerTrade>b.sellerTrade, reward:{coin:150, rep:2, txt:'ช่องทางซื้อ-ขายนอกหน้าร้าน'}, btn:'#navOffers'},
   {t:'ลองแข่งทากทะเล', h:'กด 🔧 ก่อสร้าง → แท็บ "ตู้เลี้ยง" → ซื้อ "ตู้แข่งทากทะเล" มาวาง เดี๋ยวจะมีคนมาท้าแข่ง — กดรับคำท้าแล้วลุยเลย!', cond:b=>!!(G.racing&&G.racing.purchased), reward:{coin:200, rep:2, txt:'ชนะแล้วมีรางวัลด้วยนะ'}, btn:['#shop .item[data-k="tank_race"]','#floorBuildDock .decorTabs [data-cat="ตู้เลี้ยง"]','#mBuild'],
    force:()=>{ try{ if(G.racing&&G.racing.purchased&&!G.racing.offer&&!G.racing.active) G.racing.nextAt=Date.now(); }catch(e){} }},
 
@@ -241,7 +241,7 @@
  function grantReward(q){
   const r=q.reward||{};
   if(r.tank){const def=CATALOG[r.tank];G.shelter.push({id:'o'+(G.seq++),type:def.kind,_key:r.tank,cx:0,cy:0,def,rot:0,slugs:[]});}
-  if(r.coin) G.coin=(G.coin||0)+r.coin;
+  if(r.coin) addCoin(r.coin);
   if(r.rep)  G.rep =(G.rep||0)+r.rep;
   if(Number.isFinite(r.box)&&typeof SLUG_BOXES!=='undefined'&&typeof rollBoxGenes==='function'){const _bx=SLUG_BOXES[r.box];if(_bx){const _has=(G.objs||[]).some(o=>o&&o._key==='counter');if(_has&&typeof slugDeliveries==='function')slugDeliveries().push({id:'quest-'+q.id+'-box',boxIndex:r.box,name:_bx.name,readyAt:Date.now()+1500,genes:rollBoxGenes(_bx),alerted:false});else if(Array.isArray(G.inv)&&typeof makeSlug==='function')G.inv.push(makeSlug(rollBoxGenes(_bx)));}}
   const parts=[]; if(r.tank)parts.push('ตู้เพาะพันธุ์ฟรี 1 ตู้'); if(r.coin)parts.push('+'+r.coin+' เหรียญ'); if(r.rep)parts.push('+'+r.rep+' ชื่อเสียง');

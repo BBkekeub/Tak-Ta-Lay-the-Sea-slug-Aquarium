@@ -262,7 +262,7 @@
     const L = m.listings[i];
     if (!L.soldAt) return false;
     m.listings.splice(i, 1);
-    G.coin += L.soldPrice;
+    addCoin(L.soldPrice);
     if (G.stats) G.stats.sold = (G.stats.sold || 0) + 1;
     say('รับเงินขายทาก ' + L.id + ' +' + L.soldPrice.toLocaleString() + ' เหรียญ', 'good');
     persist(); if (typeof syncShelfPanel === 'function') syncShelfPanel();
@@ -499,11 +499,12 @@
           : '<p style="font-size:12px;opacity:.7;padding:8px">ไม่มีทากที่ลงขายได้ (ตัวที่กำลังผสม/ถือ/มีข้อเสนอ จะลงไม่ได้)</p>'}</div>`;
 
     SlugBrowser.mount(marketDialog,'market',()=>renderMarket(true));
+    SlugHover.attach(marketDialog);   // ชี้/กดค้างแถวทาก = แผงยีน (slug-hover.js) · ผูกครั้งเดียว เรียกซ้ำไม่ซ้อน
     showcase.forEach((c, i) => paint(marketDialog.querySelector(`[data-mk-show="${i}"]`), 'show' + i + t.refreshAt, c.genes));
     showcase.forEach((c, i) => { const cv = marketDialog.querySelector(`[data-mk-show="${i}"]`); if (cv) cv.onclick = () => openZoom(c.genes, c.value); });
     startAnim();
     for (const L of listings) paint(marketDialog.querySelector(`[data-mk-list="${CSS.escape(L.key)}"]`), L.key, L.genes);
-    _avail.forEach((e, i) => { const cv = marketDialog.querySelector(`[data-mk-avail="${i}"]`); if (cv) { try { drawSlugPortrait(cv, e.slug); SlugBrowser.heart(cv.parentElement,e.slug,()=>renderMarket(true),'market'); } catch (err) {} } });
+    _avail.forEach((e, i) => { const cv = marketDialog.querySelector(`[data-mk-avail="${i}"]`); if (cv) { try { drawSlugPortrait(cv, e.slug); SlugHover.mark(cv.parentElement.parentElement, e.slug); SlugBrowser.heart(cv.parentElement,e.slug,()=>renderMarket(true),'market'); } catch (err) {} } });
 
     marketDialog.querySelector('[data-close]').onclick = () => marketDialog.close();
     bindListingButtons();

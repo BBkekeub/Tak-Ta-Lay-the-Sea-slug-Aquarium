@@ -1,0 +1,121 @@
+<!doctype html><meta charset="utf-8"><title>bake decor3d</title>
+<script type="importmap">{"imports":{"three":"../vendor/build/three.module.js","three/addons/":"../vendor/jsm/"}}</script>
+<body style="margin:0;background:#123"><canvas id="cv"></canvas>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+
+/* ---- ภาพเฉียงของตู้ (ต้องตรงกับ tank-view.js เป๊ะ) ----
+   CELLW 40 / DEPX 19 / DEPY 21 / ZH 30 px ต่อ 1 ช่อง · 1 ช่อง = CM_PER_CELL 5 ซม.
+   u = X*8 − Z*3.8   (px แนวนอน · +Z ของโมเดลหันเข้าหาคนดู ความลึกจึงเป็น −Z)
+   v = Y*6 − Z*4.2   (px แนวตั้ง ขึ้นเป็นบวก)
+   w = Z             (ยิ่งมากยิ่งใกล้คนดู → ใช้เป็นความลึกของ z-buffer)
+   จุดสำคัญ: หลังเฉือนแล้ว "แนวสายตา" กลายเป็นแกน Z ของโมเดลพอดี z-buffer จึงถูกต้อง */
+const KX=8, KZX=3.8, KY=6, KZY=4.2, PAD=3, SS=2, OUT=2;   // OUT = px ภาพต่อ px เกม (เผื่อซูม)
+/* ⚠️ README บอกว่าโมเดลเป็นเซนติเมตร แต่ข้อมูลจริงคือ 1 หน่วย = 10 ซม.
+   (ก้อนหินใหญ่สุด 2.66 หน่วย = 26.6 ซม. ตรงกับ pumice เดิมที่ wCm 25 พอดี)
+   และ accessor min/max ใน GLB เขียนมั่วเป็น ±100 ทุกไฟล์ ห้ามเชื่อ — ต้องวัดจากเวอร์เท็กซ์เอง */
+const SCALE=10;
+
+const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('cv'),alpha:true,antialias:true,preserveDrawingBuffer:true});
+renderer.setClearColor(0x000000,0);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=0.72;   // ต่ำ ๆ ไว้ ไม่งั้นหินสี 0.55–0.68 กลายเป็นขาวโพลนหมดรายละเอียด
+const pmrem=new THREE.PMREMGenerator(renderer);
+const envTex=pmrem.fromScene(new RoomEnvironment(),0.04).texture;
+const loader=new GLTFLoader();
+const out=document.createElement('canvas'), octx=out.getContext('2d');
+
+function light(scene){
+  scene.environment=envTex; scene.environmentIntensity=0.30;
+  const key=new THREE.DirectionalLight(0xfff3e0,1.45); key.position.set(-0.55,1,0.75); scene.add(key);
+  const rim=new THREE.DirectionalLight(0x9fd8ff,0.55); rim.position.set(0.7,0.45,-0.8); scene.add(rim);
+  scene.add(new THREE.AmbientLight(0x8fb6c4,0.22));
+}
+/* ชิ้นที่มีรู/ซุ้ม ถ้าเรนเดอร์หน้าเดียวจะเห็นทะลุเป็นรูโปร่งใส ต้องวาดสองหน้า
+   และล้าง flatShading ให้เป็นทรงเหลี่ยมชัด ๆ ตามสไตล์โลว์โพลีของชุดนี้ */
+function prep(root){
+  root.traverse(o=>{ if(!o.isMesh)return;
+    for(const m of (Array.isArray(o.material)?o.material:[o.material])){
+      if(!m)continue; m.side=THREE.DoubleSide; m.flatShading=true; m.needsUpdate=true;
+    }
+  });
+}
+/* ช่องพื้นที่โมเดลกินจริง — แรสเตอร์สามเหลี่ยมลงกริด 2.5 ซม. บนระนาบ XZ
+   maxY = เอาเฉพาะส่วนที่ต่ำกว่านี้ (ทากลอดใต้ซุ้มได้) · null = ทุกความสูง */
+function cells(root,maxY){
+  const STEP=2.5, set=new Set(), a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();
+  root.updateMatrixWorld(true);
+  root.traverse(o=>{
+    if(!o.isMesh)return;
+    const g=o.geometry, pos=g.attributes.position, idx=g.index;
+    const n=idx?idx.count:pos.count;
+    for(let i=0;i<n;i+=3){
+      const i0=idx?idx.getX(i):i, i1=idx?idx.getX(i+1):i+1, i2=idx?idx.getX(i+2):i+2;
+      a.fromBufferAttribute(pos,i0).applyMatrix4(o.matrixWorld);
+      b.fromBufferAttribute(pos,i1).applyMatrix4(o.matrixWorld);
+      c.fromBufferAttribute(pos,i2).applyMatrix4(o.matrixWorld);
+      if(maxY!=null&&Math.min(a.y,b.y,c.y)>maxY)continue;
+      /* ชิ้นบาง ๆ (สาหร่าย กิ่งไม้ ปะการังก้าน) สามเหลี่ยมเล็กกว่าช่อง 2.5 ซม. จนจุดกึ่งกลางช่อง
+         ไม่เคยตกในสามเหลี่ยมเลย → ได้ 0 ช่อง วางทับอะไรก็ได้ · จึงนับช่องของทุกเวอร์เท็กซ์ไว้ก่อนเสมอ */
+      for(const v of [a,b,c]) set.add((Math.floor(v.x/STEP)*STEP/5).toFixed(1)+','+(-(Math.floor(v.z/STEP)*STEP+STEP)/5).toFixed(1));
+      const x0=Math.min(a.x,b.x,c.x),x1=Math.max(a.x,b.x,c.x),z0=Math.min(a.z,b.z,c.z),z1=Math.max(a.z,b.z,c.z);
+      for(let x=Math.floor(x0/STEP)*STEP;x<=x1;x+=STEP)for(let z=Math.floor(z0/STEP)*STEP;z<=z1;z+=STEP){
+        // จุดกึ่งกลางช่องอยู่ในสามเหลี่ยมไหม (พิกัดบารีเซนตริกบนระนาบ XZ)
+        const px=x+STEP/2, pz=z+STEP/2;
+        const d=(b.z-c.z)*(a.x-c.x)+(c.x-b.x)*(a.z-c.z); if(Math.abs(d)<1e-9)continue;
+        const l1=((b.z-c.z)*(px-c.x)+(c.x-b.x)*(pz-c.z))/d;
+        const l2=((c.z-a.z)*(px-c.x)+(a.x-c.x)*(pz-c.z))/d;
+        if(l1<-0.02||l2<-0.02||l1+l2>1.02)continue;
+        /* cx = X ซม. → ช่องเล็ก (5 ซม.) · cy = ความลึก "ออกจากคนดู" = −Z */
+        set.add((x/5).toFixed(1)+','+(-(z+STEP)/5).toFixed(1));
+      }
+    }
+  });
+  return [...set].map(k=>k.split(',').map(Number));
+}
+window.bake=async function(file){
+  const gltf=await loader.loadAsync('../assets/decor3d/'+file);
+  const root=gltf.scene;
+  root.traverse(o=>{if(o.isMesh)o.geometry.computeBoundingBox();});
+  root.scale.setScalar(SCALE); root.updateMatrixWorld(true);
+  const box=new THREE.Box3().setFromObject(root,true);      // precise=true = ไล่เวอร์เท็กซ์จริง
+  root.position.y-=box.min.y; root.updateMatrixWorld(true); // วางให้ก้นแตะทรายเสมอ (บางชิ้นลอย 5.8 ซม.)
+  box.setFromObject(root,true);
+  // มุมกล่องทั้ง 8 → หาขอบภาพหลังเฉือน
+  let u0=1e9,u1=-1e9,v0=1e9,v1=-1e9,w0=1e9,w1=-1e9;
+  for(const X of [box.min.x,box.max.x])for(const Y of [box.min.y,box.max.y])for(const Z of [box.min.z,box.max.z]){
+    const u=X*KX-Z*KZX, v=Y*KY-Z*KZY;
+    u0=Math.min(u0,u);u1=Math.max(u1,u);v0=Math.min(v0,v);v1=Math.max(v1,v);w0=Math.min(w0,Z);w1=Math.max(w1,Z);
+  }
+  u0-=PAD;u1+=PAD;v0-=PAD;v1+=PAD;
+  if(w1-w0<1e-6){w0-=1;w1+=1;}
+  const W=Math.max(8,Math.round((u1-u0)*OUT)), H=Math.max(8,Math.round((v1-v0)*OUT));
+  prep(root);
+  const scene=new THREE.Scene(); scene.add(root); light(scene);
+  const sx=2/(u1-u0), tx=-(u1+u0)/(u1-u0), sy=2/(v1-v0), ty=-(v1+v0)/(v1-v0),
+        sz=-2/(w1-w0)*1.2, tz=(w1+w0)/(w1-w0)*1.2;
+  const cam=new THREE.Camera(); cam.matrixAutoUpdate=false; cam.matrixWorld.identity();
+  cam.projectionMatrix.set(KX*sx,0,-KZX*sx,tx, 0,KY*sy,-KZY*sy,ty, 0,0,sz,tz, 0,0,0,1);
+  cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
+  renderer.setPixelRatio(1); renderer.setSize(W*SS,H*SS,false);
+  renderer.render(scene,cam);
+  out.width=W; out.height=H; octx.clearRect(0,0,W,H);
+  octx.imageSmoothingQuality='high'; octx.drawImage(renderer.domElement,0,0,W*SS,H*SS,0,0,W,H);
+  const res={
+    file, W, H,
+    wCm:+((u1-u0)/KX).toFixed(3), hCm:+((v1-v0)/KY).toFixed(3),
+    sizeCm:[+(box.max.x-box.min.x).toFixed(1),+(box.max.y-box.min.y).toFixed(1),+(box.max.z-box.min.z).toFixed(1)],
+    /* จุดยึด = ตำแหน่งของ origin โมเดล (u=0,v=0) ในภาพ · y วัดจากขอบบน */
+    anchor:{x:+((0-u0)/(u1-u0)).toFixed(4), y:+((v1-0)/(v1-v0)).toFixed(4)},
+    solid:cells(root,8), place:cells(root,null),
+    png:out.toDataURL('image/png')
+  };
+  scene.remove(root);
+  root.traverse(o=>{if(o.isMesh){o.geometry.dispose();}});
+  return res;
+};
+window.bakeReady=true;
+</script>

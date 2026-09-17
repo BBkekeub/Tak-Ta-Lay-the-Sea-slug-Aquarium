@@ -1,0 +1,348 @@
+/* ชักเย่อ — ใช้ธีมโมดอล .slug-race-dialog ร่วมกับตู้แข่ง (ธีมกลางของเกม)
+   ไฟล์นี้มีเฉพาะของที่เป็นของชักเย่อจริง ๆ */
+
+body.tug-in-tank{overflow:hidden}
+.tug-in-tank #ov{position:fixed!important;inset:0!important;z-index:50;padding:env(safe-area-inset-top) 0 0!important;box-sizing:border-box}
+.tug-in-tank #ov .ov-top{flex:0 0 auto;min-height:38px!important;padding:6px 14px!important}
+.tug-in-tank #ov .ov-title{font-size:15px!important}
+.tug-in-tank #ov .ov-body{padding:0!important;overflow:hidden}
+.tug-in-tank #ovBack,.tug-in-tank #ov .ov-top .stat,.tug-in-tank #ov .tank-side,.tug-in-tank #ov .ov-decor,
+.tug-in-tank #ov .mobileTankBar,.tug-in-tank #ov .mobileTankZoom,.tug-in-tank #tankDecorDock,.tug-in-tank #newSlugTray,
+.tug-in-tank #decorGLBStatus,.tug-in-tank #decorOrbit{display:none!important}
+.tug-in-tank #tankCv{pointer-events:none;touch-action:none}
+
+#tugTankHUD{position:absolute;inset:0;z-index:15;pointer-events:none;overflow:hidden}
+
+/* ---- ป้ายบนจอ (ตัวที่โดนหินทุบตอนแพ้) ---- */
+.tug-banner{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:min(440px,calc(100% - 24px));
+ box-sizing:border-box;padding:9px 18px 11px;background:#2a1f10e8;border:1px solid #b69c66;border-radius:12px;
+ text-align:center;color:#f3e8ca;box-shadow:0 4px 16px #0005}
+.tug-count{font-size:20px;line-height:1.25;font-weight:bold;color:#ffe19b;font-variant-numeric:tabular-nums}
+.tug-count.is-countdown{font-size:26px;color:#fff3d0}
+.tug-names{display:block;margin-top:4px;font-size:11px;color:#c9bda2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ชื่อสองข้างแถบ สีตรงกับเส้นชนะ/แพ้บนพื้นทราย = อ่านครั้งเดียวก็รู้ว่าฝั่งไหนของเรา */
+.tug-ends{display:flex;justify-content:space-between;gap:8px;margin-top:3px;font-size:11px;line-height:1.3}
+.tug-ends span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tug-end-me{color:#8fe3bb;font-weight:bold}
+.tug-end-foe{color:#f0a49c}
+.tug-score{display:block;margin-top:3px;font-size:12px;color:#ffdf9b;font-variant-numeric:tabular-nums}
+.tug-score.is-urgent{color:#ff9d90;animation:tugUrgent .8s ease-in-out infinite}
+@keyframes tugUrgent{50%{opacity:.45}}
+
+/* ---- แถบเชือก: ผ้าอยู่ตรงไหนเทียบเส้นแพ้/ชนะ ---- */
+.tug-rope-bar{position:relative;height:12px;margin:7px 0 2px;border-radius:7px;
+ background:linear-gradient(90deg,#3e7f68 0 6%,#20343a 6% 94%,#8d4a45 94% 100%);border:1px solid #6d5f42}
+.tug-bar-mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:2px;margin-left:-1px;background:#ffeec2a6;border-radius:2px}
+.tug-bar-marker{position:absolute;top:50%;left:50%;width:15px;height:15px;margin:-7.5px 0 0 -7.5px;border-radius:4px;
+ background:#e2564b;border:1px solid #ffd9c9;box-shadow:0 1px 5px #0007;transition:left .08s linear}
+
+/* ---- แถวปุ่มล่าง: กองไฟเป็นฉากหลัง · ปุ่ม A · ปุ่ม Enter (โผล่ตอนไฟเต็ม) · ปุ่ม D ----
+   ขนาดปุ่มเก็บไว้เป็นตัวแปรที่เดียว เพราะกองไฟต้องวางให้ตรงใต้ปุ่ม A/D เป๊ะ ๆ
+   (--key-x = ระยะจากกึ่งกลางแถวไปถึงกึ่งกลางปุ่ม A/D) ถ้าแก้ขนาดปุ่มแล้วไม่แก้ตรงนี้ ไฟจะเยื้องออกจากปุ่ม */
+.tug-controls{--key-w:clamp(96px,26vw,132px);--enter-w:clamp(96px,24vw,120px);--gap:clamp(10px,3vw,26px);
+ --key-x:calc(var(--enter-w)/2 + var(--gap) + var(--key-w)/2);
+ position:absolute;bottom:calc(8px + env(safe-area-inset-bottom));left:16px;right:16px;
+ height:140px;display:flex;align-items:flex-end;justify-content:center}
+/* ยกแถวปุ่มลอยขึ้นจากขอบล่าง เพื่อให้ "โคนกองไฟ" โผล่ใต้ปุ่มตลอด — ไม่งั้นตอนไฟยังเล็ก
+   มันจะหลบอยู่หลังปุ่มทั้งก้อน ผู้เล่นไม่เห็นว่าไฟกำลังโตขึ้นเรื่อย ๆ */
+.tug-row{position:relative;z-index:2;margin-bottom:30px;
+ display:flex;align-items:flex-end;justify-content:center;gap:var(--gap)}
+.tug-controls button{pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none}
+
+/* ปุ่มที่ "ถึงคิว" สว่างขึ้นมาเอง ผู้เล่นจึงกดตามไฟได้โดยไม่ต้องจำว่ากดอะไรไปแล้ว */
+.tug-key{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+ width:var(--key-w);height:84px;border:1px solid #6d7f7d;border-bottom:4px solid #2b3a3d;
+ border-radius:16px;background:linear-gradient(#2c4a50,#18292d);color:#cfe3e0;box-shadow:0 5px 18px #0006}
+.tug-key b{font:bold 30px/1 "IBM Plex Mono",monospace}
+.tug-key-arrow{font-size:14px;opacity:.7}
+.tug-key.next{border-color:#ffe19b;background:linear-gradient(#6d5526,#3d3016);color:#ffeec2;
+ box-shadow:0 0 0 3px #ffde8833,0 5px 18px #0006}
+.tug-key:disabled{opacity:.45;box-shadow:none}
+
+/* ---- ไฟชาร์จ: แคนวาสอนุภาค (วาดใน slug-tug.js → stepFire) ----
+   ปูเต็มกล่องปุ่มแล้วยื่นขึ้นไปเหนือปุ่ม 140px ให้ปลายเปลวเลียพ้นปุ่มได้โดยไม่โดนตัดหัวแบน
+   ขอบล่างยื่นลงไปถึงขอบจอ (-8px = ระยะที่ .tug-controls ลอยจากขอบล่าง) โคนไฟที่ล้นแคนวาสจึงถูกตัดที่ขอบจอพอดี
+   ไม่เป็นเส้นตรงแข็ง ๆ ลอยอยู่ใต้ปุ่ม
+   อยู่ใต้แถวปุ่ม (z-index 1 < .tug-row 2) ไฟจึงลุกอยู่ "หลัง" ปุ่ม ไม่บังตัวอักษร */
+.tug-fire-cv{position:absolute;z-index:1;left:0;bottom:-8px;width:100%;height:calc(100% + 148px);pointer-events:none}
+
+/* ---- ปุ่มท่าไม้ตาย: โผล่เฉพาะตอนไฟเต็ม แล้วกะพริบชวนให้กดย้ำ ---- */
+.tug-enter{width:var(--enter-w);height:84px;display:flex;flex-direction:column;align-items:center;
+ justify-content:center;gap:3px;border-radius:16px;border:2px solid #ffc760;
+ background:linear-gradient(#b8500f,#7c2a08);color:#fff3d0;box-shadow:0 0 22px #ff9d3c80,0 5px 18px #0006;
+ opacity:0;visibility:hidden;transform:scale(.8);transition:opacity .18s,transform .18s}
+.tug-enter b{font:bold 21px/1 "IBM Plex Mono",monospace}
+.tug-enter-sub{font-size:11px;opacity:.85}
+.tug-enter.ready{opacity:1;visibility:visible;transform:scale(1);animation:tugPulse .62s ease-in-out infinite}
+.tug-enter[data-count]:not([data-count=""])::after{content:attr(data-count);position:absolute;margin:-58px 0 0 74px;
+ font:bold 12px sans-serif;color:#2a1f10;background:#ffd98a;border-radius:8px;padding:0 5px}
+@keyframes tugPulse{50%{transform:scale(1.07)}}
+
+/* ---- เดโมระหว่างนับถอยหลัง: ปุ่ม F กับ K "โดนกด" สลับกันเอง ให้เห็นก่อนเลยว่าต้องทำอะไร ----
+   ท่ายุบ+สว่างวาบเดียวกับตอนกดจริง (press() ใน slug-tug.js) · K ช้ากว่า F ครึ่งรอบ = สลับซ้ายขวา */
+.tug-controls.is-demo .tug-key{animation:tugDemoTap .7s ease-out infinite}
+.tug-controls.is-demo .tug-key[data-key="k"]{animation-delay:.35s}
+@keyframes tugDemoTap{0%,34%,100%{transform:none;filter:none}
+ 6%,18%{transform:translateY(5px) scale(.93);filter:brightness(1.5)}}
+
+/* ---- เลขนับถอยหลังตัวใหญ่กลางจอ 3 2 1 → ดึง! ---- */
+.tug-bigcount{position:absolute;inset:0;z-index:16;display:grid;place-items:center;pointer-events:none;
+ font:600 clamp(120px,32vmin,300px)/1 "IBM Plex Sans Thai",system-ui,sans-serif;color:#ffd23f;
+ -webkit-text-stroke:7px #3a2606;paint-order:stroke fill;
+ text-shadow:0 8px 0 #7a4506,0 0 44px #ffc83d99;font-variant-numeric:tabular-nums}
+.tug-bigcount.is-go{font-size:clamp(84px,22vmin,210px);color:#fff1a0}
+/* เด้งจากใหญ่ลงมาขนาดจริง ค้างไว้ แล้วหดหายก่อนเลขถัดไปจะมา (1 รอบ = 1 วินาทีพอดี) */
+.tug-bigcount.pop{animation:tugCountPop 1s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes tugCountPop{0%{transform:scale(2.3);opacity:0}16%{transform:scale(1);opacity:1}
+ 78%{transform:scale(1);opacity:1}100%{transform:scale(.8);opacity:0}}
+/* หมายเหตุ: ไม่ดับอนิเมชันตาม prefers-reduced-motion แล้ว — เกมนี้เล่นเอฟเฟคเสมอ (ดู reducedMotion() ใน js/config.js) */
+
+/* ---- คัทซีนท่าไม้ตาย: ภาพทากตัวใหญ่สไลด์เข้าข้างจอ ----
+   สูงเต็มจอ กว้างราวหนึ่งในสาม เหลือกลางจอให้ยังเห็นเชือกกับแถบแต้มอยู่
+   แสงฉากหลังใช้สีหงอนของตัวที่ปล่อยท่า (--cut ส่งมาจาก showCutscene) */
+/* ฉากขาวดำแบบการ์ตูน — เส้นสปีดพุ่งออกจากหลังตัวทาก (manga focus lines)
+   จงใจไม่ย้อมสีตามยีน: ย้อมสีแล้วมันกลืนกับฉากในตู้ที่สีจัดอยู่แล้ว อ่านไม่ออกว่าเป็นคัทซีน
+   ขาวดำตัดกับฉากใต้น้ำชัดกว่า และเป็นภาษาภาพมาตรฐานของ "ออกท่าไม้ตาย" อยู่แล้ว */
+.tug-cut{position:absolute;top:0;bottom:0;width:min(34%,300px);z-index:17;pointer-events:none;
+ display:flex;align-items:center;justify-content:center;overflow:hidden;
+ background:radial-gradient(ellipse at center,#fbfbfa 0%,#eceeef 46%,#c9ced2 100%)}
+.tug-cut.from-left{left:0;animation:tugCutInL .9s cubic-bezier(.16,.9,.3,1) both}
+.tug-cut.from-right{right:0;animation:tugCutInR .9s cubic-bezier(.16,.9,.3,1) both}
+/* เส้นแฉกหมุนช้า ๆ + mask เจาะกลางให้โล่ง ตัวทากจึงเด่นอยู่ในวงว่าง ไม่โดนเส้นลายพาดหน้า */
+.tug-cut::before{content:'';position:absolute;inset:-35%;
+ background:repeating-conic-gradient(from 0deg at 50% 50%,#1b1f22 0deg 1.5deg,transparent 1.5deg 5.2deg);
+ -webkit-mask:radial-gradient(circle at 50% 50%,transparent 0 24%,#000 48%);
+ mask:radial-gradient(circle at 50% 50%,transparent 0 24%,#000 48%);
+ animation:tugCutSpin 2.4s linear infinite}
+/* เส้นริ้วแนวเฉียงซ้อนอีกชั้น = ความรู้สึก "พุ่ง" ตามแนวที่ทากถูกลาก */
+.tug-cut::after{content:'';position:absolute;inset:0;opacity:.5;
+ background:repeating-linear-gradient(112deg,#20262a 0 2px,transparent 2px 13px);
+ animation:tugCutStreak .5s linear infinite}
+.tug-cut-art{position:relative;z-index:2;filter:drop-shadow(0 5px 14px #0006)}
+@keyframes tugCutInL{0%{transform:translateX(-100%);opacity:0}18%,82%{transform:translateX(0);opacity:1}
+ 100%{transform:translateX(-100%);opacity:0}}
+@keyframes tugCutInR{0%{transform:translateX(100%);opacity:0}18%,82%{transform:translateX(0);opacity:1}
+ 100%{transform:translateX(100%);opacity:0}}
+@keyframes tugCutSpin{to{transform:rotate(360deg)}}
+@keyframes tugCutStreak{to{background-position:-13px 0}}
+/* หมายเหตุ: ไม่ดับอนิเมชันตาม prefers-reduced-motion แล้ว — เกมนี้เล่นเอฟเฟคเสมอ (ดู reducedMotion() ใน js/config.js) */
+
+/* ---- ท่าไม้ตาย: จอสั่น ---- */
+.tug-shake{animation:tugShake .6s cubic-bezier(.36,.07,.19,.97) both}
+@keyframes tugShake{10%,90%{transform:translate(-2px,1px)}20%,80%{transform:translate(4px,-2px)}
+ 30%,50%,70%{transform:translate(-7px,3px)}40%,60%{transform:translate(7px,-3px)}}
+
+/* ---- แพ้: หินหล่นใส่ป้าย ---- */
+.tug-rock{position:absolute;top:10px;left:50%;font-size:46px;line-height:1;z-index:16;pointer-events:none;filter:drop-shadow(0 4px 6px #0007)}
+
+/* ---- ชนะ: พลุ ---- */
+
+/* ---- โมดอลผล ---- */
+.slug-tug-dialog .tug-foe-stat{color:#e6c89a;font-size:13px;margin:2px 0 0}
+.slug-tug-dialog .tug-hint{color:#a9c0bb;font-size:12px}
+.slug-tug-dialog .tug-verdict{margin:6px 0 0;font-size:13px;color:#ffdf9b}
+.tug-result{text-align:center;width:min(500px,94vw)}
+.tug-result-caption{margin:4px 0 10px;color:#c9ddd1}
+.tug-result-row{display:flex;gap:10px;justify-content:center;margin:10px 0 14px}
+.tug-result-cell{flex:1;min-width:0;padding:8px 4px;border:1px solid #ffffff1f;border-radius:10px;background:#0f2b3240}
+.tug-result-cell.is-player{border-color:#ffdf8b66;background:#3a2f1340}
+.tug-result-name{display:block;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tug-result-cell.is-player .tug-result-name{font-weight:bold;color:#ffdf8b}
+.tug-result-cell canvas{display:block;width:100%;height:auto;max-height:76px;object-fit:contain}
+.tug-result-score{font-size:15px;color:#ffe0a0}
+.tug-result>.tbtn{width:100%;margin:0;background:#d5b260;color:#192928;border-color:#ffe2a0;font-weight:bold}
+
+@media(max-width:420px){
+ .tug-banner{padding:7px 12px 9px}.tug-count{font-size:17px}.tug-count.is-countdown{font-size:21px}
+ .tug-key,.tug-enter{height:72px}.tug-key b{font-size:26px}.tug-enter b{font-size:18px}
+}
+@media(max-height:500px){
+ .tug-banner{top:6px;padding:5px 12px 7px}.tug-count{font-size:15px}.tug-count.is-countdown{font-size:19px}
+ .tug-rope-bar{height:9px;margin:5px 0 1px}.tug-ends,.tug-score{font-size:10px}
+ .tug-controls{height:86px}
+ .tug-key,.tug-enter{height:56px}.tug-key b{font-size:22px}.tug-key-arrow{display:none}
+ .tug-enter b{font-size:16px}.tug-enter-sub{display:none}
+ .tug-result-cell canvas{max-height:52px}
+}
+
+/* ---- หน้ารับคำท้า: การ์ดเลือกทาก 4 คอลัมน์ × 3 แถว = 12 ตัว (ความจุตู้ชักเย่อพอดี) ไม่ต้องเลื่อน ----
+   กว้างกว่าโมดอลตู้แข่งวิ่ง (520px) และรูปทากเตี้ยลง ไม่งั้น 3 แถวล้นจอจนต้องเลื่อนทั้งหน้า
+   ⚠️ ใช้ .slug-race-dialog.slug-tug-dialog (สองคลาส) — ความกว้างเดิมมาจาก slug-race.css ต้องชนะให้ได้ทุกลำดับไฟล์ */
+.slug-race-dialog.slug-tug-dialog{width:min(640px,94vw)}
+.slug-tug-dialog .tug-pick{grid-template-columns:repeat(4,minmax(0,1fr));max-height:none;overflow:visible;gap:7px;margin:6px 0 10px}
+.slug-tug-dialog .tug-pick .slug-pick{padding:5px 4px;gap:1px}
+.slug-tug-dialog .tug-pick canvas{width:100%;height:64px;aspect-ratio:auto;object-fit:contain}
+.slug-tug-dialog .tug-pick small{font-size:10.5px;line-height:1.25}
+.slug-tug-dialog p{margin:6px 0}
+
+
+/* ================= หน้ารับคำท้า (จัดใหม่รอบสอง 2026-09-17) =================
+   ผู้เล่นขอ: ของเด่นอยู่กลาง ตัวใหญ่ตามความสำคัญ · แผง VS ใหญ่ สมดุลซ้าย-ขวา · การ์ดเลือกทากเล็กลง · ปุ่มต้องดูเป็นปุ่ม
+   ขนาดตัวอักษรไล่ตามความสำคัญ: หัว 28 → VS 34 → ชื่อทีม 18 → ต้องกด X 20 → พลังรวม 15 → ที่เหลือ 12–13
+   สีสถานะชุดเดียว: เขียว = สบาย · ทอง = พอไหว/ต้องทำต่อ · แดง = หนัก/ติดขัด */
+.slug-race-dialog.slug-tug-dialog.tug-ask{width:min(720px,95vw);padding:22px 24px 20px;text-align:center}
+.tug-ask h2{margin:0;font-size:28px;line-height:1.25;letter-spacing:.01em}
+.tug-ask .tug-sub{display:flex;align-items:center;justify-content:center;gap:8px;margin:6px 0 16px;font-size:15px;color:#d8e6e1}
+.tug-ask .tug-chip{font-size:14px;font-weight:700;color:#1d2f31;background:#e7c67b;border-radius:999px;padding:3px 12px}
+
+/* แผง VS: ซ้าย-ขวากว้างเท่ากัน เนื้อหาจัดกลางฝั่งตัวเอง VS วงกลมใหญ่ตรงกลาง */
+.tug-ask .tug-vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;padding:16px 14px 18px;border-radius:16px;background:#0f2b2fd9;border:1px solid #bfa26855}
+.tug-ask .tug-side{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.tug-ask .tug-side h3{margin:0;font-size:18px;font-weight:700;letter-spacing:.01em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tug-ask .tug-side.is-me h3{color:#9fe0c0}.tug-ask .tug-side.is-foe h3{color:#f3b3a4}
+.tug-ask .tug-power{margin:0;font-size:15px;color:#cfe0da;font-variant-numeric:tabular-nums}
+.tug-ask .tug-power b{font-size:17px;color:#fff3cf}
+.tug-ask .tug-vs-mark{display:grid;place-items:center;width:78px;height:78px;border-radius:50%;font-size:34px;font-weight:900;color:#1d2f31;letter-spacing:.02em;
+ background:radial-gradient(circle at 35% 30%,#fff0bf,#e7c67b 55%,#b98d3e);box-shadow:0 0 0 4px #0f2b2f,0 0 0 6px #e7c67b88,0 8px 22px #0008}
+.tug-ask .tug-slots{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:4px}
+.tug-ask .tug-slot{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:104px;height:78px;padding:0;border-radius:12px;background:#1c4045;border:1px solid #50696a;color:inherit;font:inherit}
+.tug-ask button.tug-slot{cursor:pointer}.tug-ask button.tug-slot:hover{border-color:#e7c67b}
+.tug-ask .tug-slot canvas{width:100%;height:100%;object-fit:contain}
+.tug-ask .tug-slot b{position:absolute;top:4px;left:6px;font-size:12px;color:#1d2f31;background:#e7c67b;border-radius:999px;min-width:18px;line-height:18px;text-align:center}
+.tug-ask .tug-slot.is-empty{border:2px dashed #7fa39c;background:transparent}
+.tug-ask .tug-slot.is-empty b{background:#7fa39c}
+.tug-ask .tug-slot.is-empty span{font-size:13px;color:#9db8b2}
+
+/* ผลประเมิน/คำเตือน: กลาง ตัวเลขใหญ่ */
+.tug-ask .tug-verdict-box{display:flex;align-items:baseline;justify-content:center;gap:10px;flex-wrap:wrap;margin:14px 0 14px;padding:10px 14px;border-radius:12px;border:1px solid #e7c67b66;background:#e7c67b1a}
+.tug-ask .tug-verdict-box b{font-size:20px;color:#ffe1a0}
+.tug-ask .tug-verdict-box span{font-size:14px;color:#e6e0d2}
+.tug-ask .tug-verdict-box.is-easy{border-color:#8fbf9a88;background:#8fbf9a1f}.tug-ask .tug-verdict-box.is-easy b{color:#b9e6c3}
+.tug-ask .tug-verdict-box.is-hard,.tug-ask .tug-verdict-box.is-block{border-color:#e07a6688;background:#e07a661f}
+.tug-ask .tug-verdict-box.is-hard b,.tug-ask .tug-verdict-box.is-block b{color:#ffb4a4}
+
+/* เลือกทาก: การ์ดเล็ก หลายคอลัมน์ ไม่แย่งความสนใจจากแผง VS */
+.tug-ask .tug-pick-head{text-align:left}
+.tug-ask .tug-pick-head h3{margin:0;font-size:13px;font-weight:600;color:#cfe0da}
+.slug-tug-dialog.tug-ask .tug-pick{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px;margin:6px 0 16px}
+.slug-tug-dialog.tug-ask .tug-pick .slug-pick{padding:4px 3px;border-radius:10px;gap:0}
+.slug-tug-dialog.tug-ask .tug-pick canvas{height:40px}
+.slug-tug-dialog.tug-ask .tug-pick b{font-size:11.5px}
+.slug-tug-dialog.tug-ask .tug-pick small{font-size:10px;line-height:1.2}
+
+/* ปุ่ม: เรียงกลาง ขนาดเท่ากัน มีพื้น/ขอบ/เงา เห็นชัดว่ากดได้ · ทองทึบ = ปุ่มหลักปุ่มเดียว */
+.tug-ask .tug-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;padding-top:14px;border-top:1px solid #bfa26840}
+.slug-race-dialog.tug-ask .tug-actions .tbtn{margin:0;min-width:150px;min-height:48px;padding:10px 18px;border-radius:12px;font-size:15px;font-weight:700;
+ color:#eaf3ef;background:linear-gradient(180deg,#3d6b70,#244a4f);border:1px solid #7fa39c;box-shadow:0 3px 0 #0f2b2f,0 6px 14px #0006}
+.slug-race-dialog.tug-ask .tug-actions .tbtn:hover{filter:brightness(1.12)}
+.slug-race-dialog.tug-ask .tug-actions .tbtn:active{transform:translateY(2px);box-shadow:0 1px 0 #0f2b2f,0 3px 8px #0006}
+.slug-race-dialog.tug-ask .tug-actions .tbtn.tug-quiet{color:#ffd0c6;background:linear-gradient(180deg,#5a3a36,#3f2926);border-color:#b8766a}
+.slug-race-dialog.tug-ask .tug-actions .tbtn.tug-primary{color:#1d2f31;background:linear-gradient(180deg,#f6dc98,#d6ae5c);border-color:#f6dc98;box-shadow:0 3px 0 #8a6a2c,0 6px 16px #0007}
+.slug-race-dialog.tug-ask .tug-actions .tbtn:disabled{opacity:.45;filter:none;transform:none}
+
+@media(max-width:600px){
+ .slug-race-dialog.slug-tug-dialog.tug-ask{padding:18px 14px}
+ .tug-ask h2{font-size:23px}
+ .tug-ask .tug-vs{grid-template-columns:1fr;gap:8px;padding:12px 10px}
+ .tug-ask .tug-side h3{font-size:16px}.tug-ask .tug-power{font-size:13px}.tug-ask .tug-power b{font-size:15px}
+ .tug-ask .tug-verdict-box{margin:10px 0}.tug-ask .tug-verdict-box b{font-size:17px}
+ .tug-ask .tug-vs-mark{justify-self:center;width:46px;height:46px;font-size:19px;margin:4px 0}
+ .tug-ask .tug-slot{width:78px;height:56px}
+ .slug-race-dialog.tug-ask .tug-actions .tbtn{flex:1 1 40%;min-width:0}
+ .slug-race-dialog.tug-ask .tug-actions .tbtn.tug-primary{order:-1;flex-basis:100%}
+}
+
+/* ================= ทัวร์นาเมนต์ชักเย่อ ================= */
+/* แถบสถานะหน้าร้าน: กลางบนจอ ใต้แถบบน · เวลานับถอยหลังตัวใหญ่ */
+.tug-tour-bar{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:45;display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;
+ max-width:min(760px,94vw);padding:10px 16px;border-radius:14px;background:linear-gradient(145deg,#365e62f2,#193b40f2);border:1px solid #e7c67b;color:#f2eee3;box-shadow:0 10px 30px #0008;font-size:14px}
+.tug-tour-bar b{color:#ffe1a0;font-size:15px}
+.tug-tour-bar .tug-tour-time{font-size:20px;font-weight:800;color:#fff3cf;font-variant-numeric:tabular-nums}
+.tug-tour-bar .is-warn{color:#ffb4a4;font-weight:600}
+.tug-tour-bar .tbtn{min-height:38px;padding:8px 14px;border-radius:10px;font-weight:700;color:#1d2f31;background:linear-gradient(180deg,#f6dc98,#d6ae5c);border-color:#f6dc98}
+/* ปุ่มข้ามคู่บอท ระหว่างดูแข่ง */
+.tug-skip{position:absolute;right:16px;bottom:18px;z-index:13;pointer-events:auto;min-height:48px;padding:10px 18px;border-radius:12px;font:inherit;font-size:15px;font-weight:700;cursor:pointer;
+ color:#1d2f31;background:linear-gradient(180deg,#f6dc98,#d6ae5c);border:1px solid #f6dc98;box-shadow:0 3px 0 #8a6a2c,0 6px 16px #0007}
+.tug-skip:active{transform:translateY(2px)}
+/* ผังสายแข่งย่อ: 3 คอลัมน์ 8 → 4 → 2 */
+.tug-ask .tug-br{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 16px;text-align:left}
+.tug-ask .tug-br-col{display:flex;flex-direction:column;justify-content:space-around;gap:6px}
+.tug-ask .tug-br-col h4{margin:0 0 2px;font-size:12px;color:#9db8b2;text-align:center}
+.tug-ask .tug-br-pair{border:1px solid #50696a;border-radius:8px;overflow:hidden;background:#0f2b2f99}
+.tug-ask .tug-br-pair.is-next{border-color:#e7c67b;box-shadow:0 0 0 2px #e7c67b55}
+.tug-ask .tug-br-team{padding:3px 8px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#d8e6e1}
+.tug-ask .tug-br-team+.tug-br-team{border-top:1px solid #50696a}
+.tug-ask .tug-br-team.is-me{color:#9fe0c0;font-weight:700}
+.tug-ask .tug-br-team.is-win{background:#8fbf9a33;font-weight:700}
+.tug-ask .tug-br-team.is-out{opacity:.45;text-decoration:line-through}
+.tug-ask .tug-verdict-box.is-todo{border-color:#9db8b266;background:#9db8b21a}.tug-ask .tug-verdict-box.is-todo b{color:#e6e0d2}
+.tug-ask .tug-tour-place{margin:10px 0 4px;font-size:40px;font-weight:900;color:#ffe1a0}
+@media(max-width:600px){.tug-ask .tug-br{grid-template-columns:1fr}.tug-tour-bar{top:56px;font-size:13px}}
+/* สายแข่ง: ทีมละ 3 ตัวต้องอยู่แถวเดียว (กว้าง 104 × 3 ล้นครึ่งแผงจนตกบรรทัด) */
+.tug-ask.tug-bracket .tug-slots{flex-wrap:nowrap;gap:6px}
+.tug-ask.tug-bracket .tug-slot{width:auto;flex:1 1 0;min-width:0;max-width:96px;height:64px}
+
+/* ---- หน้าสายแข่ง: จัดสองคอลัมน์ให้พอดีจอ ไม่ต้องเลื่อน (2026-09-17 ผู้เล่นขอ) ----
+   ซ้าย = คู่ถัดไป (VS) + สถานะ + ปุ่ม · ขวา = ผังสายแข่ง · จอแคบเรียงลงมาแบบย่อทุกส่วน */
+.slug-race-dialog.slug-tug-dialog.tug-ask.tug-bracket{width:min(1040px,96vw);padding:16px 20px}
+.tug-ask.tug-bracket h2{font-size:24px}
+.tug-ask.tug-bracket .tug-sub{margin:2px 0 12px}
+.tug-ask .tug-br-main{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;align-items:stretch;text-align:left}
+.tug-ask .tug-br-left{display:flex;flex-direction:column;gap:10px;min-width:0}
+.tug-ask.tug-bracket .tug-vs{padding:12px 10px}
+.tug-ask.tug-bracket .tug-side h3{font-size:16px}
+.tug-ask.tug-bracket .tug-power{font-size:13px}.tug-ask.tug-bracket .tug-power b{font-size:15px}
+.tug-ask.tug-bracket .tug-vs-mark{width:60px;height:60px;font-size:26px}
+.tug-ask.tug-bracket .tug-slot{height:56px;max-width:84px}
+.tug-ask.tug-bracket .tug-verdict-box{margin:0;padding:8px 12px;text-align:center}
+.tug-ask.tug-bracket .tug-verdict-box b{font-size:17px}
+.tug-ask.tug-bracket .tug-actions{margin-top:auto;padding-top:10px}
+.tug-ask.tug-bracket .tug-br{margin:0;padding:10px;border-radius:14px;background:#0f2b2f99;border:1px solid #bfa26840;align-content:stretch}
+.tug-ask.tug-bracket .tug-br-col{justify-content:space-around;gap:8px}
+.tug-ask.tug-bracket .tug-br-team{padding:4px 8px}
+@media(max-width:860px){
+ .tug-ask .tug-br-main{grid-template-columns:1fr;gap:10px}
+ .tug-ask.tug-bracket .tug-br{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:8px}
+ .tug-ask.tug-bracket .tug-br-team{padding:2px 5px;font-size:11px}
+ .tug-ask.tug-bracket .tug-br-col h4{font-size:11px}
+}
+@media(max-width:600px){
+ .tug-ask.tug-bracket .tug-vs{grid-template-columns:1fr auto 1fr;gap:6px;padding:8px 6px}
+ .tug-ask.tug-bracket .tug-vs-mark{width:40px;height:40px;font-size:16px;margin:0}
+ .tug-ask.tug-bracket .tug-side h3{font-size:13px}.tug-ask.tug-bracket .tug-power{font-size:11px}.tug-ask.tug-bracket .tug-power b{font-size:12px}
+ .tug-ask.tug-bracket .tug-slots{flex-direction:column;align-items:center;gap:4px}
+ .tug-ask.tug-bracket .tug-slot{width:64px;height:40px;flex:none}
+}
+@media(max-height:760px){
+ .tug-ask.tug-bracket h2{font-size:20px}.tug-ask.tug-bracket .tug-sub{margin:0 0 8px}
+ .tug-ask.tug-bracket .tug-slot{height:46px}
+ .tug-ask.tug-bracket .tug-vs-mark{width:48px;height:48px;font-size:20px}
+}
+
+/* ---- หน้ารับคำท้า/เลือกทีม: ทีม 3 ตัวต้องไม่ดันหน้าต่างจนเลื่อน (2026-09-17 ผู้เล่นขอ) ----
+   ช่องทากในแผง VS เรียงแถวเดียวเสมอ (เดิม 104px × 3 ล้นครึ่งแผงจนตกบรรทัด = สูงขึ้นอีกแถว)
+   การ์ดเลือกทากย่อลงให้ 12 ตัว (ความจุตู้) อยู่ได้ 2 แถว · จอเตี้ยย่อทุกส่วนลงอีกขั้น */
+.slug-race-dialog.slug-tug-dialog.tug-ask:not(.tug-bracket){width:min(860px,95vw);padding:16px 20px}
+.tug-ask:not(.tug-bracket) h2{font-size:24px}
+.tug-ask:not(.tug-bracket) .tug-sub{margin:2px 0 10px}
+.tug-ask:not(.tug-bracket) .tug-vs{padding:10px}
+.tug-ask:not(.tug-bracket) .tug-side h3{font-size:16px}
+.tug-ask:not(.tug-bracket) .tug-power{font-size:13px}.tug-ask:not(.tug-bracket) .tug-power b{font-size:15px}
+.tug-ask:not(.tug-bracket) .tug-vs-mark{width:64px;height:64px;font-size:27px}
+.tug-ask:not(.tug-bracket) .tug-slots{flex-wrap:nowrap;gap:6px}
+.tug-ask:not(.tug-bracket) .tug-slot{width:auto;flex:1 1 0;min-width:0;max-width:96px;height:60px}
+.tug-ask:not(.tug-bracket) .tug-verdict-box{margin:10px 0;padding:8px 12px}
+.tug-ask:not(.tug-bracket) .tug-verdict-box b{font-size:18px}
+.slug-tug-dialog.tug-ask:not(.tug-bracket) .tug-pick{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;margin:6px 0 12px}
+.slug-tug-dialog.tug-ask:not(.tug-bracket) .tug-pick .slug-pick{padding:3px 3px 4px}
+.slug-tug-dialog.tug-ask:not(.tug-bracket) .tug-pick canvas{height:32px}
+.tug-ask:not(.tug-bracket) .tug-actions{padding-top:10px}
+@media(max-height:760px){
+ .tug-ask:not(.tug-bracket) h2{font-size:20px}
+ .tug-ask:not(.tug-bracket) .tug-slot{height:48px}
+ .tug-ask:not(.tug-bracket) .tug-vs-mark{width:48px;height:48px;font-size:20px}
+ .slug-tug-dialog.tug-ask:not(.tug-bracket) .tug-pick canvas{height:26px}
+}
+@media(max-width:600px){
+ .tug-ask:not(.tug-bracket) .tug-vs{grid-template-columns:1fr auto 1fr;gap:6px;padding:8px 6px}
+ .tug-ask:not(.tug-bracket) .tug-vs-mark{width:40px;height:40px;font-size:16px}
+ .tug-ask:not(.tug-bracket) .tug-side h3{font-size:13px}.tug-ask:not(.tug-bracket) .tug-power{font-size:11px}.tug-ask:not(.tug-bracket) .tug-power b{font-size:12px}
+ .tug-ask:not(.tug-bracket) .tug-slots{flex-direction:column;align-items:center;gap:4px}
+ .tug-ask:not(.tug-bracket) .tug-slot{width:64px;height:40px;flex:none}
+ .slug-tug-dialog.tug-ask:not(.tug-bracket) .tug-pick{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:600px){ /* มือถือ 12 ตัว: เก็บอีกนิดให้ไม่ต้องเลื่อน */
+ .slug-race-dialog.slug-tug-dialog.tug-ask:not(.tug-bracket){padding:12px 12px 14px}
+ .tug-ask:not(.tug-bracket) .tug-slot{height:34px}
+ .tug-ask:not(.tug-bracket) .tug-verdict-box{margin:8px 0;padding:6px 10px}
+}

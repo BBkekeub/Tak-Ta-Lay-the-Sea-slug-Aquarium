@@ -18,20 +18,21 @@
 .dock-row .tbtn{background:rgba(14,14,17,.88);backdrop-filter:blur(6px)}
 .dock-row .modeseg{background:rgba(14,14,17,.92);backdrop-filter:blur(6px)}
 .dock-row .context-nav{gap:6px}
-/* ขวาล่าง: วางเหนือ #newSlugTray (ถาดทากใหม่ จองมุมนี้ที่ right:12px;bottom:12px อยู่ก่อนแล้ว) */
-#notifyDock{position:absolute;right:16px;bottom:calc(72px + var(--mobile-nav,0px));z-index:6;
-  display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-#notifyDock:empty{display:none}
-#notifyDock .tbtn{background:rgba(14,14,17,.88);backdrop-filter:blur(6px)}
-#notifyDock .tbtn.has-news{border-color:#b49e66;color:#ffe1a0;background:#20464bec}
+/* ปุ่มข้อเสนออยู่มุมบนขวา และเรืองแสงเองเมื่อมีข้อเสนอค้าง (.has-news ติดโดย MutationObserver ใน context-ui.js)
+   ⚠️ ใส่เงา inset ควบคู่เงาวงนอกเสมอ — บทเรียนจากไฟกะพริบเควส: กล่องที่มี overflow:hidden จะตัดเงาวงนอกทิ้งหมด */
+@keyframes offerPulse{
+  0%,100%{box-shadow:inset 0 0 0 1px rgba(241,198,109,.5), 0 0 0 0 rgba(241,198,109,.4)}
+  50%    {box-shadow:inset 0 0 0 2px rgba(241,198,109,1), 0 0 14px 3px rgba(241,198,109,.55)}
+}
+#navOffers.has-news{animation:offerPulse 1.15s ease-in-out infinite;border-color:#f1c66d;color:#ffe1a0}
+/* หมายเหตุ: ไม่ดับอนิเมชันตาม prefers-reduced-motion แล้ว — เกมนี้เล่นเอฟเฟคเสมอ (ดู reducedMotion() ใน js/config.js) */
 /* อยู่ในตู้แล้วห้ามโผล่: .zoombar ถูกโอเวอร์เลย์ (z-index 8) ทับอยู่แล้ว แต่สองตัวนี้อยู่นอกเงาของมัน */
-.inside-tank #notifyDock,.inside-tank #navSettings{display:none!important}
+.inside-tank #navOffers,.inside-tank #navSettings{display:none!important}
 /* ⚠️ #floorBuildDock เป็น absolute เต็มความกว้างขอบล่าง สูง 250px · z-index:8 — สูงกว่า .zoombar (6)
    ถ้าไม่ยกขึ้น พอกดก่อสร้าง ปุ่มโหมดจะจมใต้แผง = กดกลับมาโหมดดู/เล่นไม่ได้เลย
    (มือถือมีกฎนี้อยู่แล้วใน mobile.css ผ่าน --mobile-build · ฝั่งเดสก์ท็อปเพิ่งมีรอบนี้ ปุ่มซูมก็เคยจมมาตลอด) */
 @media(min-width:821px) and (min-height:601px),(min-width:1001px){
   body.mode-build:not(.inside-tank) .zoombar{bottom:262px}
-  body.mode-build:not(.inside-tank) #notifyDock{bottom:322px}
 }
 /* แท็บในแผงคลัง */
 .rail-tabs{display:flex;gap:6px;padding:0 10px 10px}

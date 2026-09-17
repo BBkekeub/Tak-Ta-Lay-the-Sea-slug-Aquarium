@@ -104,6 +104,11 @@ function foodStep(s,dt,fw,fh,obstacles,sharedSolid){
   if(d<=Math.max(v,0.12))m.path.shift();
  }else{
   s.state='eat';s.flip=m.food.fx>s.fx;s.ph=(s.ph||0)+dt*0.5;m.eat+=dt;
+  /* ⚠️ 2026-09-17 โมเดล 3D หันตาม s.dir (tank-view ตั้ง _motionHeading=s.dir ตอนกิน) ไม่ใช่ s.flip
+     เดิม s.dir ค้างเป็นทิศก้าวสุดท้ายตอนเดินเข้าจุดกินรอบอาหาร → ตัวที่เดินอ้อมมาจากอีกฝั่งกินโดยหันหลังให้อาหาร (ผู้เล่นทัก)
+     foodStep คืน true ก่อนถึงโค้ดเลี้ยวของ stepTankSlugs จึงต้องเลี้ยวเข้าหาอาหารเองตรงนี้ (นุ่มเท่าการเลี้ยวปกติ) */
+  const want=Math.atan2(m.food.fy-s.fy,m.food.fx-s.fx),turn=((want-s.dir+Math.PI*3)%(Math.PI*2))-Math.PI;
+  s.turn=want;s.dir+=turn*Math.min(1,dt*(typeof SLUG_TURN==='number'?SLUG_TURN:3));
   if(m.eat>=4.5){applyFood(s,m.food);delete m.food.reserved[s.id];
    if(s._meal===m){s._meal=null;s.state='rest';s.stt=3;s._mealCooldown=Date.now()+8000;}} // กันค้าง eat ถ้าโควตาเต็มพอดี
  }
@@ -195,6 +200,8 @@ function foodCanPlace(type,level,fx,fy){
  if(fx<1||fy<1||fx>tank.def.w-1||fy>tank.def.h-1||solid.has(ptKey(fx,fy))) return {ok:false,why:'วางอาหารบนพื้นที่ว่างในตู้ครับ'};
  /* จำนวนอาหารสูงสุดต่อตู้ ไม่เท่ากันตามขนาด (foodMax ใน CATALOG) — ตู้เก่าที่ไม่มีค่านี้ใช้ 8 เหมือนเดิม */
  if(tank.def.race&&fy-Math.max(14,spec.cap*1.65)/CM_PER_CELL/2<8)return {ok:false,why:'แถบสนามด้านหน้า 40 ซม. ห้ามวางอาหารและของตกแต่ง'};
+ {const half=Math.max(14,spec.cap*1.65)/CM_PER_CELL/2;
+  if(tugLaneBlocked(tank.def,fy-half,fy+half))return {ok:false,why:'แถบเลนเชือกด้านหน้าตู้ต้องโล่ง ห้ามวางอาหารและของตกแต่ง'};}
  const foodMax=Number.isFinite(tank.def.foodMax)?tank.def.foodMax:8;
  if((tank.foods||[]).length>=foodMax) return {ok:false,why:'ตู้นี้วางอาหารพร้อมกันได้ไม่เกิน '+foodMax+' ชิ้น'};
  if(G.coin<spec.cost) return {ok:false,why:'เหรียญไม่พอ ('+spec.cost+')'};
@@ -210,7 +217,7 @@ function foodPlace(type,level,fx,fy){
  const spec=FOOD_TYPES[type].levels[level-1],tank=curTank;
  const chk=foodCanPlace(type,level,fx,fy);
  if(!chk.ok){toast(chk.why,'bad');return false;}
- G.coin-=spec.cost;toast('วาง'+FOOD_TYPES[type].name+' −'+spec.cost,'good');if(typeof syncHUD==='function')syncHUD();
+ addCoin(-spec.cost);toast('วาง'+FOOD_TYPES[type].name+' −'+spec.cost,'good');if(typeof syncHUD==='function')syncHUD();
  (tank.foods||(tank.foods=[])).push({id:'food'+Date.now()+'-'+foodSeq++,type,level,spec,fx,fy,eaten:[],reserved:{}});return true;
 }
 function foodUI(){

@@ -38,8 +38,9 @@
   var counters=(G.objs||[]).filter(function(c){return c._key==='counter'&&c!==moving;});
   for(var i=0;i<counters.length;i++){
    var counter=counters[i];
-   if(TRADE_OFFERS.some(function(o){return o.counter===counter;})) continue;
-   var target=freeSpot([counterFront(counter)],p); if(!target) continue;
+   /* เข้าคิวหน้าเคาน์เตอร์ได้แล้ว (trade.js) ไม่ต้องรอให้เคาน์เตอร์ว่างเปล่าเหมือนเดิม */
+   if(counterOfferCount(counter)>=COUNTER_QUEUE) continue;
+   var target=freeSpot(counterQueueSpots(counter),p); if(!target) continue;
    var route=personRoute(p,target); if(!route.length) continue;
    var offer={id:++tradeSeq, p:p, counter:counter, wholesale:true, price:WHOLESALE_PRICE, max:WHOLESALE_MAX,
               picks:[], matched:[], slug:null, tank:null, timeout:WHOLESALE_TTL, arrived:false, age:0,
@@ -96,7 +97,7 @@
    if(typeof selSlug!=='undefined'&&selSlug===s) selSlug=null;
    if(typeof heldSlug!=='undefined'&&heldSlug===s) heldSlug=null;
   }
-  G.coin+=total;
+  addCoin(total);
   if(G.stats) G.stats.sold=(G.stats.sold||0)+picks.length;
   if(typeof toast==='function') toast('ขายส่ง '+picks.length+' ตัว +'+total.toLocaleString()+' เหรียญ','good');
   return true;
@@ -117,7 +118,7 @@
     +'<span>'+SlugBrowser.htmlName(s)+'</span></label>';
   }).join('');
   return '<div class="trade-offer-card">'
-   +'<div class="trade-offer-heading"><b>รับเหมาซื้อทาก</b><span class="trade-status">'+(o.arrived?'รอคำตอบ · '+remaining+' วิ':'กำลังเดินมา')+'</span></div>'
+   +'<div class="trade-offer-heading"><b>รับเหมาซื้อทาก</b><span class="trade-status" data-live="card-status">'+(o.arrived?'รอคำตอบ · '+remaining+' วิ':'กำลังเดินมา')+'</span></div>'
    +'<p style="font-size:12px;margin:0 0 8px">รับซื้อจากคลังทาก ตัวละ <b>'+o.price+'</b> เหรียญ ไม่ดูยีน · เลือกได้สูงสุด '+(o.max||WHOLESALE_MAX)+' ตัว/ครั้ง</p>'
    +(avail.length
      ? '<div class="wholesale-actions"><button type="button" class="tbtn" onclick="wholesalePickAll('+o.id+')">เลือกสูงสุด</button><button type="button" class="tbtn" onclick="wholesalePickNone('+o.id+')">ล้างที่เลือก</button></div>'
@@ -139,13 +140,14 @@
  function paintWholesaleCanvases(){
   document.querySelectorAll('canvas[data-wholesale-slug]').forEach(function(c){
    var s=(G.inv||[]).find(function(s){return s.id===c.dataset.wholesaleSlug;});
-   if(s&&typeof drawSlugPortrait==='function') drawSlugPortrait(c,s);
+   if(s&&typeof drawSlugPortrait==='function'){ drawSlugPortrait(c,s); SlugHover.mark(c.closest('.wholesale-slug'),s); }
   });
  }
  document.addEventListener('DOMContentLoaded',bindTradeOffersList);
  if(document.readyState!=='loading') bindTradeOffersList();
  function bindTradeOffersList(){
   var el=document.getElementById('tradeOffers'); if(!el||el._wholesaleBound) return; el._wholesaleBound=true;
+  SlugHover.attach(el);   // ชี้/กดค้างการ์ดทากที่จะขาย = แผงยีน (slug-hover.js)
   el.addEventListener('change',function(e){
    var input=e.target.closest('[data-wholesale-pick]'); if(!input) return;
    var o=TRADE_OFFERS.find(function(o){return o.id===Number(input.dataset.wholesalePick);}); if(!o||!o.wholesale) return;

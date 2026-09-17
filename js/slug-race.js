@@ -27,10 +27,17 @@
  function purchased(){
    if(!state.purchased){state.purchased=true;state.nextAt=Date.now()+5*MINUTE;saveGame();}
  }
+ /* ความเร็วกดของบอท (ครั้ง/วิ) — ⚠️ 2026-09-17 เดิม 2.5–4.5 ครั้ง/วิ แต่คนกด A/D สลับได้ 8–12 ครั้ง/วิ
+    = ผู้เล่นเร็วกว่า 2–4 เท่า ส่งทากตัวไหนลงก็ชนะเฉย ๆ (ผู้เล่นบ่น) · ตอนนี้บอทกดเร็วใกล้คน
+    แพ้ชนะจึงขึ้นกับ "ก้าวต่อครั้ง" จากยีน (stride) + ความเร็วนิ้วจริง · ช่วงเดียวกับบอทชักเย่อ (slug-tug.js botCps) */
+ const PACE_MIN=6,PACE_MAX=14;          // ผู้เล่นกำหนด 2026-09-17: 6–14 ครั้ง/วิ (เท่ากับบอทชักเย่อ)
+ const botPace=()=>PACE_MIN+Math.random()*(PACE_MAX-PACE_MIN);
  function makeOffer(){
    const choices=names.slice().sort(()=>Math.random()-.5);
-   return {rivals:[0,1].map(i=>({name:choices[i],genes:SlugEngine.randGene(),pace:2.5+Math.random()*2}))};
+   return {rivals:[0,1].map(i=>({name:choices[i],genes:SlugEngine.randGene(),pace:botPace()}))};
  }
+ /* คำท้าค้างในเซฟจากก่อนแก้ยังเป็นบอทช้า — สุ่มความเร็วใหม่ตอนโหลด */
+ if(state.offer?.rivals)for(const r of state.offer.rivals)if(!(r.pace>=PACE_MIN))r.pace=botPace();
  function leave(){
    for(const p of visitors){
      p.raceChallenger=false;p.family=null;p.tradeDone=true;p.visits=0;p.strolls=0;
@@ -40,7 +47,7 @@
  }
  function goal(p){
    const t=tank();
-   if(!t||!state.offer){p.raceChallenger=false;p.visits=0;p.strolls=0;return false;}
+   if(!t||!(state.offer||(p.raceTour&&tourOn()))){p.raceChallenger=false;p.raceTour=false;p.visits=0;p.strolls=0;return false;}
    const spot=freeSpot(lookSpots(t),p);
    if(spot){p.focus=t;p.tgt=spot;p.state='walk';p.route=[];p.routeGoal=null;p.stuck=0;return true;}
    p.focus=null;p.tgt=strollSpot(p);p.state='walk';return true;
@@ -56,6 +63,7 @@
    visitors.forEach((p,i)=>{
      p.family=null;p.raceChallenger=true;p.wantsBuy=false;p.wantsSell=false;p.tradeDone=true;
      p.carryTank=true;p.carryColor='#267b86';p.carryAccent=slugBaseHex(state.offer.rivals[i].genes);
+     if(typeof makeSlug==='function')p.carrySlug=makeSlug(state.offer.rivals[i].genes);   // ทากคู่แข่งตัวจริงในตู้
      p.bagged=false;p.accessory='none';p.visits=1;p.strolls=0;goal(p);
    });
    offerDeadline=Date.now()+5*MINUTE;
@@ -64,6 +72,7 @@
  function dismiss(){state.offer=null;leave();close();saveGame();}
  function tick(){
    if(owned())purchased();
+   if(!window.BOOTING)tourTick();
    if(state.active){
      if(resumeReady&&!modal&&!raceUI&&!window.BOOTING)openRace();
      return;
@@ -72,6 +81,7 @@
      if(state.offer){state.offer=null;leave();if(modal)close();saveGame();}
      return;
    }
+   if(tourOn()){if(state.offer){state.offer=null;leave();saveGame();}return;}   // ทัวร์นาเมนต์อยู่ = ไม่มีคำท้าปกติ
    if(visitors.length&&!visitors.every(p=>PEOPLE.includes(p))){leave();}
    if(offerDeadline&&Date.now()>offerDeadline&&!modal){dismiss();return;}
    if(state.purchased&&Date.now()>=state.nextAt||state.offer)spawn();
@@ -79,7 +89,10 @@
  function element(tag,text,parent){const e=document.createElement(tag);if(text!=null)e.textContent=text;if(parent)parent.append(e);return e;}
  function dialog(title){
    modal=element('dialog');modal.className='slug-race-dialog';modal.setAttribute('aria-label',title);
-   modal.addEventListener('cancel',e=>{e.preventDefault();if(!state.active)dismiss();});
+   modal.addEventListener('cancel',e=>{e.preventDefault();if(modal?.dataset.tour)return;if(!state.active)dismiss();});
+   /* กดนอกกรอบ (dialog-dismiss.js) ตอนเป็นหน้ารับคำท้า = "กลับไปเตรียมทาก" ไม่ใช่ไล่ผู้ท้ากลับเหมือน Esc
+      หน้าผลแข่ง (state.active) ปล่อยให้ไปทาง cancel → complete() ตามเดิม */
+   modal.addEventListener('lightdismiss',e=>{if(modal?.dataset.tour){e.preventDefault();return;}if(!state.active){e.preventDefault();close();}});
    element('h2',title,modal);document.body.append(modal);modal.showModal();return modal;
  }
  function close(){
@@ -94,16 +107,40 @@
    const d=dialog('🏁 มาแข่งทากกันไหม?'),t=tank();
    element('p',state.offer.rivals.map(r=>r.name).join(' และ ')+' ขอท้าประลอง ระยะทาง 160 ซม.',d);
    element('p','ที่ 1 ได้เพิ่ม 2 เท่าของเดิมพัน · ที่ 2 เงินเท่าเดิม · ที่ 3 เสียตามเดิมพัน',d);
-   const label=element('label','เลือกทากในตู้แข่ง',d),select=element('select',null,label);
-   for(const s of t.slugs){const op=element('option',slugNick(s)+' · '+s.id,select);op.value=s.id;}
+   /* เลือกทากเป็นการ์ดรูปทาก + แผงยีนตอนชี้/กดค้าง เหมือนหน้าเลือกทากผสมพันธุ์ (slug-hover.js) */
+   element('p','เลือกทากในตู้แข่ง',d);
+   let picked=t.slugs[0]?.id||null;
+   const stepOf=s=>stride(foodGenes(s)).step;
+   SlugHover.cards(element('div',null,d),{slugs:t.slugs,selected:picked,empty:'ยังไม่มีทากในตู้แข่ง',
+     sub:s=>'ก้าวละ '+stepOf(s).toFixed(1)+' ซม.',onPick:s=>{picked=s.id;rate();}});
+   /* บอกตรง ๆ ว่าทากตัวที่เลือกต้องกดกี่ครั้ง/วิ ถึงจะแซงคู่แข่งที่เร็วที่สุด — ก้าวยาว = กดน้อยลง
+      (แบบเดียวกับบรรทัดประเมินของชักเย่อ) ทำให้การเลือกทากมีผลจริง ไม่ใช่กดรัวอย่างเดียว */
+   const verdict=element('p','',d);verdict.className='race-verdict';
+   const rate=()=>{
+     const s=t.slugs.find(x=>x.id===picked);if(!s){verdict.textContent='';return;}
+     const fastest=Math.max(...state.offer.rivals.map(r=>stride(r.genes).step*r.pace)),need=fastest/stepOf(s);
+     verdict.textContent='คู่แข่งที่เร็วสุดวิ่ง '+fastest.toFixed(0)+' ซม./วิ → ทากตัวนี้ต้องกด '+need.toFixed(1)+' ครั้ง/วิ ถึงจะชนะ'
+       +(need<=7?' (สบาย)':need<=11?' (พอไหว)':' (หนักมาก — ลองตัวที่ก้าวยาวกว่านี้)');
+   };
+   rate();
    const betLabel=element('label','เดิมพัน (ทอง) — ยังไม่หักตอนเริ่ม',d),bet=element('input',null,betLabel);
-   bet.type='number';bet.min='0';bet.max=String(Math.min(1000,Math.floor(G.coin)));bet.step='1';bet.value='0';
-   element('p','เดิมพันได้ 0–'+bet.max+' ทอง • กด A / D สลับกัน หรือแตะปุ่มซ้าย / ขวา',d);
+   const maxBet=Math.max(0,Math.min(1000,Math.floor(G.coin)));
+   bet.type='number';bet.min='0';bet.max=String(maxBet);bet.step='1';bet.value='0';
+   /* ปุ่มเลือกเดิมพันด่วน — "สูงสุด" = 1,000 ถ้ามีทองเกิน ไม่งั้นเท่าที่มี · ปุ่มที่เกินทองที่มีกดไม่ได้ */
+   const quick=element('div',null,d);quick.className='race-bet-quick';
+   const pickBet=v=>{bet.value=String(v);for(const b of quick.children)b.setAttribute('aria-pressed',String(+b.dataset.v===v));};
+   const presets=[['ไม่เดิมพัน',0],...[100,300,500].filter(v=>v<maxBet).map(v=>[String(v),v])];   // ต่ำกว่าสูงสุดเท่านั้น ไม่ซ้ำปุ่มสูงสุด
+   if(maxBet>0)presets.push(['สูงสุด '+maxBet.toLocaleString(),maxBet]);
+   for(const [label,v] of presets){
+     const b=element('button',label,quick);b.type='button';b.className='tbtn';b.dataset.v=String(v);b.setAttribute('aria-pressed',String(v===0));b.onclick=()=>pickBet(v);
+   }
+   bet.addEventListener('input',()=>{for(const b of quick.children)b.setAttribute('aria-pressed',String(+b.dataset.v===+bet.value));});
+   element('p','เดิมพันได้ 0–'+maxBet.toLocaleString()+' ทอง • กด A / D สลับกัน หรือแตะปุ่มซ้าย / ขวา',d);
    const error=element('p','',d);error.setAttribute('role','alert');
    const start=element('button','เริ่มแข่ง',d);start.className='tbtn';start.disabled=!t.slugs.length;
    if(!t.slugs.length)error.textContent='ยังไม่มีทากในตู้แข่ง ย้ายทากเข้าตู้ก่อนรับคำท้า';
    start.onclick=()=>{
-     const wager=Number(bet.value),s=t.slugs.find(x=>x.id===select.value);
+     const wager=Number(bet.value),s=t.slugs.find(x=>x.id===picked);
      if(!s||!G.objs.includes(t)||!Number.isInteger(wager)||wager<0||wager>Math.min(1000,G.coin)){
        error.textContent='เลือกทากในตู้ และใส่เดิมพันเป็นจำนวนเต็มไม่เกิน 1,000 หรือทองที่มี';return;
      }
@@ -156,58 +193,57 @@
    });
    ctx.restore();
  }
+ /* ⚠️ 2026-09-17 ผู้เล่น: "ต้องกดที่ผู้เข้าแข่งเท่านั้น" — เดิมใช้ personScreenBounds ซึ่งเป็นกรอบตัดจอหยาบ ๆ
+    (เผื่อท่าแขนทุกท่า ซูมใกล้แล้วคลุมตู้ข้าง ๆ/พื้นว่างกว้างมาก) กดตู้แข่งหรือพื้นแถวนั้นก็เด้งหน้าท้าแข่ง
+    ตอนนี้นับเฉพาะ "ตัวคนจริง" (personHitTest ตัวเดียวกับชักเย่อ) หรือป้าย "คลิกเพื่อแข่ง" เหนือหัว */
  function hit(e){
-   if(tankMode||modal||!state.offer)return false;
+   if(tankMode||modal||!state.offer||appMode!=='view'||moving||buyKey)return false;
    const {sx,sy}=screenXY(e);
-   return visitors.some(p=>{const b=personScreenBounds(p),h=p._raceHit;return personOnScreen(p)&&
-     ((sx>=b.x0&&sx<=b.x1&&sy>=b.y0&&sy<=b.y1)||(h&&sx>=h.x0&&sx<=h.x1&&sy>=h.y0&&sy<=h.y1));});
+   return visitors.some(p=>{const h=p._raceHit;return personOnScreen(p)&&
+     (personHitTest(p,sx,sy)||(h&&sx>=h.x0&&sx<=h.x1&&sy>=h.y0&&sy<=h.y1));});
  }
  let pressedVisitor=false;
  cv.addEventListener('pointerdown',e=>{if(hit(e)){pressedVisitor=true;e.preventDefault();e.stopImmediatePropagation();}},true);
  cv.addEventListener('pointerup',e=>{if(pressedVisitor){pressedVisitor=false;e.preventDefault();e.stopImmediatePropagation();if(hit(e))ask();}},true);
  cv.addEventListener('pointercancel',()=>{pressedVisitor=false;},true);
  function finish(r,time){if(r.head>=FINISH&&r.finished===null){r.head=FINISH;r.finished=time;}}
+ /* ⚠️ 2026-09-17 ผู้เล่นขอ: "รอให้เข้าครบก่อน" — เดิมตัดจบทันทีที่เราเข้าเส้นชัย หรือทันทีที่คู่แข่งสองตัวเข้าหมด
+    ตอนนี้จบเมื่อทุกตัวเข้าเส้นชัยจริง · กันค้าง: บอทเข้าครบแล้วเราไม่กดต่อ รอ RACE_GRACE วิ ก่อนนับว่าเราไม่ถึงเส้น */
+ const RACE_GRACE=25;
  function advance(dt){
    const a=state.active;if(!a||a.settled)return;
    if(a.countdown>0){a.countdown=Math.max(0,a.countdown-dt);return;}
    a.elapsed+=dt;
-   for(let i=1;i<3;i++){
+   for(let i=a.botOnly?0:1;i<a.entrants.length;i++){
      const r=a.entrants[i];
      while(r.finished===null&&r.next<=a.elapsed){r.head+=r.step;finish(r,r.next);r.next+=1/r.pace;}
    }
-   if(a.entrants.every(r=>r.finished!==null))settle();
-   // Once both opponents finish, the player's last place is certain.
-   else if(a.entrants[1].finished!==null&&a.entrants[2].finished!==null&&a.entrants[0].finished===null){
-     a.entrants[0].finished=Infinity;settle();
+   if(a.entrants.every(r=>r.finished!==null)){settleSoon();return;}
+   const bots=a.botOnly?a.entrants:a.entrants.slice(1);
+   if(!a.botOnly&&bots.every(r=>r.finished!==null)&&a.entrants[0].finished===null&&a.elapsed-Math.max(...bots.map(r=>r.finished))>RACE_GRACE){
+     a.entrants[0].finished=Infinity;settleSoon();
    }
  }
+ /* เว้นจังหวะให้เห็นตัวสุดท้ายแตะเส้นก่อนเด้งกล่องผล */
+ function settleSoon(){const a=state.active;if(!a||a.settled||a._settleAt)return;a._settleAt=a.elapsed+.9;}
  function press(key){
-   const a=state.active;if(!a||a.settled||a.countdown>0||document.hidden||lastKey===key||a.entrants[0].finished!==null)return;
-   lastKey=key;a.lastKey=key;const r=a.entrants[0];r.head+=r.step;finish(r,a.elapsed);
+   const a=state.active;if(!a||a.botOnly||a.settled||a.countdown>0||document.hidden||lastKey===key||a.entrants[0].finished!==null)return;
+   lastKey=key;a.lastKey=key;const r=a.entrants[0];r.head+=r.step;finish(r,a.elapsed);   // เข้าเส้นชัยแล้วไม่จบทันที รอตัวอื่น (advance)
    buttons.forEach((b,i)=>{b.classList.toggle('next',(key==='a'?1:0)===i);});
    const b=buttons[key==='a'?0:1];b?.animate([{transform:'scale(.9)',background:'#f4cc68'},{transform:'scale(1)',background:'#296875'}],{duration:150});
-   if(r.finished!==null)settle();
  }
  function settle(){
    const a=state.active;if(!a||a.settled)return;
+   if(a.tour){a.settled=true;saveGame();tourHeatDone();return;}
    a.rank=1+a.entrants.slice(1).filter(r=>r.finished!==null&&r.finished<=a.entrants[0].finished).length;
    a.delta=a.rank===1?a.wager*2:a.rank===3?-a.wager:0;
-   G.coin+=a.delta;a.settled=true;saveGame();syncHUD();showResult();
+   addCoin(a.delta);a.settled=true;saveGame();syncHUD();showResult();
  }
  function complete(){
    state.active=null;state.offer=null;leave();close();exitTank();saveGame();
  }
- function resultFireworks(host){
-   if(document.hidden||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-   const layer=element('div',null,host);layer.className='race-result-fireworks';layer.setAttribute('aria-hidden','true');
-   for(let burst=0;burst<3;burst++)for(let i=0;i<10;i++){
-     const spark=element('i',null,layer),angle=i*Math.PI/5,reach=35+Math.random()*50;
-     spark.style.left=(20+burst*30)+'%';spark.style.top=(burst===1?20:36)+'%';spark.style.background=['#efcd72','#85d5c5','#eaa3aa'][i%3];
-     const animation=spark.animate([{transform:'translate(0,0) scale(.1)',opacity:0},{offset:.12,opacity:1},{transform:'translate('+Math.cos(angle)*reach+'px,'+(Math.sin(angle)*reach+25)+'px) scale(.2)',opacity:0}],{duration:950,delay:burst*110,fill:'both',easing:'ease-out'});
-     burstAnimations.push(animation);
-   }
-   Promise.all(burstAnimations.map(a=>a.finished.catch(()=>{}))).then(()=>layer.remove());
- }
+ /* พลุเต็มจอ (js/fireworks.js) — เรียกหลังเปิดกล่องผล พลุจึงอยู่เหนือกล่องใน top layer */
+ function resultFireworks(){if(window.Fireworks)Fireworks.play({count:10,duration:3000});}
  function showResult(){
    const a=state.active;if(!a?.settled||modal)return;
    buttons.forEach(b=>b.disabled=true);
@@ -232,7 +268,7 @@
    const done=element('button','รับทราบ · กลับร้าน',d);done.className='tbtn';done.onclick=complete;done.focus();resultFireworks(d);
  }
  function isRacing(t){return !!raceUI&&!!state.active&&(!t||t.id===state.active.tankId);}
- function normalSlugs(t){return t.slugs.filter(s=>s.id!==state.active.entrants[0].id);}
+ function normalSlugs(t){const id=state.active.botOnly?null:state.active.entrants[0].id;return t.slugs.filter(s=>s.id!==id);}
  function stepNormal(slugs,dt){
    const t=G.objs.find(o=>o.id===state.active.tankId);if(!t)return;
    stepTankSlugs(slugs,t.def.w,t.def.h,dt,true,t.decor,t.def);
@@ -242,6 +278,10 @@
    if(!isRacing(curTank)||document.hidden||!countNode||!raceUI.querySelector('.race-controls'))return;
    const dt=Math.min(.05,(now-(lastFrame||now))/1000);lastFrame=now;advance(dt);
    const a=state.active,r=a.entrants[0];
+   /* ⚠️ settle() ของทัวร์นาเมนต์ปิด HUD + ล้าง sprites ทันที (tourHeatDone) ต้องหยุดเฟรมนี้ตรงนี้
+      ไม่งั้นโค้ดข้างล่างอ่าน sprites[i] ที่ว่างแล้วพัง → ลูปวาดตู้ (drawTank) ตายทั้งลูป เที่ยวถัดไปค้างที่นับถอยหลัง */
+   if(a._settleAt!=null&&!a.settled&&a.elapsed>=a._settleAt){settle();if(state.active!==a||!raceUI)return;}
+   if(a._settleAt!=null&&!a.settled)a.elapsed+=dt;               // นับเวลาต่อระหว่างเว้นจังหวะ (advance หยุดนับเมื่อทุกตัวเข้าเส้นแล้ว)
    a.entrants.forEach((r,i)=>{
      const s=sprites[i],old=s.viewHead??r.head;
      s.viewHead=r.finished!==null?r.head:old+(r.head-old)*(1-Math.exp(-dt*18));
@@ -251,13 +291,18 @@
    });
    const top=60,bottom=raceBottom,usable=Math.max(90,TCH-top-bottom);
    const key=TCW+'|'+TCH+'|'+bottom;
+   const lead=a.botOnly?sprites.reduce((m,x)=>Math.max(m,x.viewHead??START),START):sprites[0].viewHead;
    if(cameraKey!==key){cameraKey=key;tankCam.zoom=Math.max(.25,Math.min(1.6,(TCW-32)/(CELLW*(TCW<600?12:18)+DEPX*6),usable/(DEPY*8+80)));}
    const desiredX=TCW*.46,desiredY=top+usable*.74,z=tankCam.zoom;
-   tankCam.ox=desiredX-((sprites[0].viewHead/CM_PER_CELL-curTank.def.w/2)*CELLW+(3-curTank.def.h/2)*DEPX)*z;
+   tankCam.ox=desiredX-((lead/CM_PER_CELL-curTank.def.w/2)*CELLW+(3-curTank.def.h/2)*DEPX)*z;
    tankCam.oy=desiredY+(3-curTank.def.h/2)*DEPY*z+SAND_CELLS*ZH*z;tankNeedFit=false;
-   const message=a.countdown>0?String(Math.ceil(a.countdown)):a.settled?'จบการแข่งขัน':lastKey?'กด '+(lastKey==='a'?'D / ขวา':'A / ซ้าย'):'เริ่ม! กด A / D สลับกัน';
+   const message=a.countdown>0?String(Math.ceil(a.countdown)):a.settled||a._settleAt!=null?'จบการแข่งขัน'
+     :a.botOnly?'กำลังแข่ง'
+     :r.finished!==null?'เข้าเส้นชัยแล้ว! รอตัวอื่น…'
+     :lastKey?'กด '+(lastKey==='a'?'D / ขวา':'A / ซ้าย'):'เริ่ม! กด A / D สลับกัน';
    if(countNode.textContent!==message)countNode.textContent=message;
-   const distance=Math.min(160,Math.max(0,r.head-START)).toFixed(0)+' / 160 ซม.';
+   const distance=a.botOnly?a.entrants.map(x=>x.name+' '+Math.min(160,Math.max(0,x.head-START)).toFixed(0)).join(' · ')+' / 160 ซม.'
+     :Math.min(160,Math.max(0,r.head-START)).toFixed(0)+' / 160 ซม.';
    if(raceProgress.textContent!==distance)raceProgress.textContent=distance;
    if(now-lastSave>1000){saveGame();lastSave=now;}
  }
@@ -270,32 +315,352 @@
    const centerX=p.x-((parts.L+parts.R)/2-parts.bw/2*(1-stretch))*parts.s*scale,cy=p.y-h*.44;
    drawTankSlug(s,parts,scale,centerX,cy,false);
    drawDefaultEyes(parts,centerX,cy,true,parts.s*scale);
-   if(i===0){tctx.save();tctx.font='bold 12px sans-serif';tctx.textAlign='center';tctx.fillStyle='#153c42';tctx.fillRect(p.x-r.length*depthPxPerCm()/2-20,p.y+8,40,19);tctx.fillStyle='#ffe3a0';tctx.fillText('คุณ',p.x-r.length*depthPxPerCm()/2,p.y+22);tctx.restore();}
+   const tag=state.active.tour?(i===0&&!state.active.botOnly?'ทีมเรา':r.name):i===0?'คุณ':null;
+   if(tag){tctx.save();tctx.font='bold 12px sans-serif';tctx.textAlign='center';const tw=Math.max(40,tctx.measureText(tag).width+14),mine=i===0&&!state.active.botOnly;
+     tctx.fillStyle=mine?'#153c42':'#3c1a18';tctx.fillRect(p.x-r.length*depthPxPerCm()/2-tw/2,p.y+8,tw,19);tctx.fillStyle=mine?'#ffe3a0':'#ffc9b6';tctx.fillText(tag,p.x-r.length*depthPxPerCm()/2,p.y+22);tctx.restore();}
  }
  function openRace(){
    const a=state.active,t=G.objs.find(o=>o.id===a?.tankId);if(!a||modal||raceUI||!t)return;
-   spawn();sprites=a.entrants.map(r=>({genes:r.genes,viewHead:r.head,flip:true,state:'rest',ph:0,noBob:true,creepT:0}));lastKey=a.lastKey;
+   if(!a.tour)spawn();sprites=a.entrants.map(r=>({genes:r.genes,viewHead:r.head,flip:true,state:'rest',ph:0,noBob:true,creepT:0}));lastKey=a.lastKey;
    // Reuse the existing aquarium canvas, furniture, water, lighting and camera.
    raceUI=element('div');raceUI.id='raceTankHUD';document.body.classList.add('race-in-tank');
-   enterTank(t);ov.querySelector('.ov-body').append(raceUI);document.getElementById('ovTitle').textContent='🏁 ตู้แข่งทากทะเล';
+   enterTank(t);ov.querySelector('.ov-body').append(raceUI);document.getElementById('ovTitle').textContent=a.tour?'🏆 ทัวร์นาเมนต์วิ่ง · '+TOUR_ROUNDS[a.tour.round]+' · เที่ยวที่ '+(a.tour.heat+1):'🏁 ตู้แข่งทากทะเล';
    const banner=element('div',null,raceUI);banner.className='race-tank-banner';countNode=element('div','3',banner);countNode.className='race-count';countNode.setAttribute('role','status');raceProgress=element('small','0 / 160 ซม.',banner);
    const controls=element('div',null,raceUI);controls.className='race-controls';
+   if(a.botOnly){
+     const skip=element('button','⏭ ข้ามไปดูผล',controls);skip.type='button';skip.className='race-skip';
+     skip.onclick=()=>{const x=state.active;if(!x||x.settled||x._settleAt!=null)return;const w=simulateHeat(x.entrants[0],x.entrants[1]);
+       x.entrants.forEach((r,i)=>{r.head=FINISH;r.finished=i===w?x.elapsed:x.elapsed+.01;});settleSoon();};
+     buttons=[];
+   }else
    for(const [key,label] of [['a','A · ซ้าย'],['d','D · ขวา']]){
      const b=element('button',label,controls);b.type='button';b.setAttribute('aria-label','กระดึ๊บฝั่ง'+(key==='a'?'ซ้าย':'ขวา'));
      b.onpointerdown=e=>{e.preventDefault();press(key);};b.onclick=e=>{if(e.detail===0)press(key);};buttons.push(b);
    }
    raceBottom=Math.max(88,controls.offsetHeight+22);
    raceResize=new ResizeObserver(entries=>{raceBottom=Math.max(88,entries[0].contentRect.height+22);cameraKey='';});raceResize.observe(controls);
-   resizeTank();lastFrame=0;cameraKey='';if(a.settled)showResult();
+   resizeTank();lastFrame=0;cameraKey='';if(a.settled){if(a.tour)tourHeatDone();else showResult();}
  }
+
+ /* ================= ทัวร์นาเมนต์วิ่ง (สเปกผู้เล่น 2026-09-17) =================
+    โครงเดียวกับทัวร์นาเมนต์ชักเย่อ (slug-tug.js): จดหมายเชิญ → สมัคร 1,000 → เตรียมตัว 1 นาที → เลือกทีม 3 ตัว
+    → สายแข่ง 8 ทีม สุ่มลำดับ 1v2 · 3v4 · 5v6 · 7v8 → รองชนะเลิศ → ชิงชนะเลิศ · รางวัล 3,000 / 2,000 / 1,000 (ที่ 3–4)
+    ต่างกัน: แต่ละคู่แข่ง "ชนะ 2 ใน 3 เที่ยว" · เที่ยวละ 1 ต่อ 1 · เราเลือกว่าจะส่งตัวไหนก่อนทุกเที่ยว
+    ตัวที่วิ่งไปแล้วความสมบูรณ์ −10 นาน 1 ชั่วโมง (ทากเรา = บัฟ raceFatigue ใน foodBuffs · ทีมบอท = นับรอบวิ่งตลอดทัวร์นาเมนต์)
+    สถานะอยู่ใน G.racing.tour (เซฟ/โหลดต่อได้ทุกขั้น รวมกลางคู่) · ใช้หน้าตาหน้าต่างชุดเดียวกับชักเย่อ (css/slug-tug.css) */
+ const TOUR_TEST=true;                       // ⚙️ ทดสอบ: จดหมายทุก 10 นาที · ใช้จริง: วันละฉบับ (ตั้ง false)
+ const TOUR_GAP=TOUR_TEST?10*MINUTE:24*60*MINUTE;
+ const TOUR_ENTRY=1000,TOUR_PREP_MS=MINUTE,TOUR_PRIZE={1:3000,2:2000,3:1000},FATIGUE_VIGOR=10,FATIGUE_MS=60*MINUTE;
+ const TOUR_ROUNDS=['รอบ 8 ทีม','รอบรองชนะเลิศ','รอบชิงชนะเลิศ'];
+ const TOUR_NAMES=['ม้าน้ำสายฟ้า','ปลาบินฟ้า','กุ้งเดินเร็ว','หอยพายุ','ทากสปรินต์','ปูวิ่งข้าง','ดาวตก','ปลากระเบนราบ','หมึกพ่นควัน','ฉลามครีบเงิน','คลื่นลม','เต่าเทอร์โบ'];
+ let tourPeople=[],tourBar=null;
+ const tourOn=()=>!!state.tour&&['prep','bracket'].includes(state.tour.status);
+ const otherTourOn=()=>{const x=window.SlugTug?.tour?.();return !!x&&['prep','bracket'].includes(x.status);};
+ function tourElement(tag,cls,text,parent){const e=element(tag,text,parent);if(cls)e.className=cls;return e;}
+ function applyFatigue(s){
+   /* บัฟติดลบ ใช้ช่องเดียวกับบัฟอาหาร → foodGenes()/stride()/การ์ดยีน เห็นผลทันที · วิ่งหลายเที่ยว = ซ้อนกันได้ (แต่ละอันนับ 1 ชม. ของตัวเอง) */
+   if(!s)return;if(!Array.isArray(s.foodBuffs))s.foodBuffs=[];
+   s.foodBuffs.push({type:'raceFatigue',level:1,delta:{vigor:-FATIGUE_VIGOR},until:Date.now()+FATIGUE_MS});
+ }
+ const botGenes=m=>({...m.genes,vigor:Math.max(0,(m.genes.vigor??50)-FATIGUE_VIGOR*(m.runs|0))});
+ function tourMembers(T){
+   if(!T.player)return T.members.map(m=>({genes:botGenes(m),pace:m.pace,member:m}));
+   const t=tank();return (T.ids||[]).map(id=>t?.slugs.find(s=>s.id===id)).filter(Boolean).map(s=>({id:s.id,slug:s,genes:{...foodGenes(s)}}));
+ }
+ const avgStep=list=>list.length?list.reduce((n,m)=>n+stride(m.genes).step,0)/list.length:0;
+ function simulateHeat(a,b){
+   const rate=r=>r.step*(r.pace||botPace())*(.85+Math.random()*.3);
+   return rate(a)>=rate(b)?0:1;
+ }
+ function tourNext(tr){
+   for(let i=0;i<4;i++)if(tr.qf[i]==null)return {round:0,slot:i,a:i*2,b:i*2+1};
+   for(let i=0;i<2;i++)if(tr.sf[i]==null)return {round:1,slot:i,a:tr.qf[i*2],b:tr.qf[i*2+1]};
+   if(tr.final==null)return {round:2,slot:0,a:tr.sf[0],b:tr.sf[1]};
+   return null;
+ }
+ const tourPlace=(tr,i)=>tr.final===i?1:tr.sf.includes(i)?2:tr.qf.includes(i)?3:5;
+ const playerIdx=tr=>tr.teams.findIndex(T=>T.player);
+ function recordTour(round,slot,winner){const tr=state.tour;if(round===0)tr.qf[slot]=winner;else if(round===1)tr.sf[slot]=winner;else tr.final=winner;tr.match=null;saveGame();}
+
+ /* ---- จดหมายเชิญ ---- */
+ function tourMail(){
+   if(typeof receiveComputerMessage!=='function'||!tank()||tourOn()||state.active)return;
+   if(!Number.isFinite(state.tourNextAt))state.tourNextAt=Date.now()+(TOUR_TEST?MINUTE:TOUR_GAP);
+   if(Date.now()<state.tourNextAt)return;
+   state.tourSeq=(state.tourSeq|0)+1;const id='race-tour-'+state.tourSeq;
+   const ok=receiveComputerMessage({id,type:'online',repeating:true,title:'🏆 เชิญร่วมทัวร์นาเมนต์วิ่งทาก',
+     body:'ทัวร์นาเมนต์วิ่ง ทีมละ 3 ตัว · 8 ทีม · แพ้คัดออก\nแต่ละคู่แข่งเที่ยวละ 1 ต่อ 1 ใครชนะ 2 ใน 3 เที่ยวผ่านรอบ\nตัวที่วิ่งแล้วความสมบูรณ์ −10 นาน 1 ชั่วโมง\nค่าสมัคร '+TOUR_ENTRY.toLocaleString()+' ทอง\n\nรางวัล\n  ที่ 1 — 3,000 ทอง\n  ที่ 2 — 2,000 ทอง\n  ที่ 3–4 — 1,000 ทอง\n\nสมัครแล้วมีเวลา 1 นาทีให้ย้ายทาก 3 ตัวลงตู้แข่งวิ่ง แล้วทีมอื่นจะทยอยมาถึงร้าน'});
+   state.tourNextAt=Date.now()+TOUR_GAP;
+   if(ok){state.tourInvite=id;toast('📨 จดหมายเชิญทัวร์นาเมนต์วิ่งมาแล้ว! เปิดดูที่คอมพิวเตอร์','good');}
+   saveGame();
+ }
+ const prevDecorate=window.decorateInboxCard;
+ window.decorateInboxCard=function(card,m){
+   if(typeof prevDecorate==='function')prevDecorate(card,m);
+   if(!m||typeof m.id!=='string'||!m.id.startsWith('race-tour-'))return;
+   const b=element('button','',card);b.className='tbtn';b.style.cssText='display:block;margin-top:10px;font-weight:700';
+   const why=state.tour?.mailId===m.id?'สมัครแล้ว ✓'
+     :m.id!==state.tourInvite?'หมดเขตสมัครแล้ว'
+     :tourOn()||state.active||otherTourOn()?'มีการแข่งค้างอยู่ รอให้จบก่อน'
+     :!tank()?'ต้องวางตู้แข่งวิ่งในร้านก่อน'
+     :G.coin<TOUR_ENTRY?'ทองไม่พอ (ต้องมี '+TOUR_ENTRY.toLocaleString()+')':'';
+   b.textContent=why||'สมัคร '+TOUR_ENTRY.toLocaleString()+' ทอง';b.disabled=!!why;
+   b.onclick=e=>{e.preventDefault();e.stopPropagation();if(tourRegister(m.id)){b.textContent='สมัครแล้ว ✓';b.disabled=true;try{computerDialog?.close();}catch(_){}}};
+ };
+ function tourRegister(mailId){
+   if(tourOn()||state.active||otherTourOn()||!tank()||G.coin<TOUR_ENTRY||mailId!==state.tourInvite)return false;
+   addCoin(-TOUR_ENTRY);
+   if(state.offer){state.offer=null;leave();if(modal)close();}
+   const pool=TOUR_NAMES.slice().sort(()=>Math.random()-.5);
+   const teams=pool.slice(0,7).map(name=>({name,members:[0,1,2].map(()=>({genes:SlugEngine.randGene(),pace:botPace(),runs:0}))}));
+   teams.splice((Math.random()*8)|0,0,{name:'ทีมเรา',player:true,ids:null});
+   state.tour={mailId,status:'prep',prepUntil:Date.now()+TOUR_PREP_MS,teams,qf:[null,null,null,null],sf:[null,null],final:null,match:null};
+   saveGame();syncHUD();tourPeople=[];
+   toast('🏆 สมัครแล้ว! มีเวลา 1 นาที ย้ายทาก 3 ตัวลงตู้แข่งวิ่ง','good');
+   renderTourBar();return true;
+ }
+
+ /* ---- คนของทีมอื่นทยอยเข้าร้าน ---- */
+ function tourSpawn(){
+   const tr=state.tour;if(!tourOn())return;
+   tourPeople=tourPeople.filter(p=>PEOPLE.includes(p));
+   if(tourPeople.length>=7||!peopleOn||tankMode||document.hidden||window.BOOTING||!tank())return;
+   const capacity=visitorCapacity()-PEOPLE.length;if(capacity<1)return;
+   const previous=new Set(PEOPLE);
+   if(!spawnVisitors(capacity,'race',[{kid:false,gender:Math.random()<.5?'female':'male'}]))return;
+   const bots=tr.teams.filter(T=>!T.player),T=bots[tourPeople.length%bots.length];
+   for(const p of PEOPLE.filter(q=>!previous.has(q))){
+     p.family=null;p.raceChallenger=true;p.raceTour=true;p.wantsBuy=false;p.wantsSell=false;p.tradeDone=true;
+     p.carryTank=true;p.carryColor='#267b86';p.carryAccent=slugBaseHex(T.members[0].genes);
+     if(typeof makeSlug==='function')p.carrySlug=makeSlug(T.members[0].genes);
+     p.bagged=false;p.accessory='none';p.visits=1;p.strolls=0;goal(p);tourPeople.push(p);
+   }
+ }
+ function tourLeave(){
+   for(const p of tourPeople){p.raceChallenger=false;p.raceTour=false;p.family=null;p.tradeDone=true;p.visits=0;p.strolls=0;
+     p.focus=null;p.route=[];p.routeGoal=null;p.tgt=doorSpot();p.state='leave';p.stuck=0;}
+   tourPeople=[];
+ }
+
+ /* ---- แถบสถานะหน้าร้าน ---- */
+ function renderTourBar(){
+   const tr=state.tour,show=tourOn()&&!raceUI&&!modal;
+   if(!show){if(tourBar)tourBar.hidden=true;return;}
+   if(!tourBar){tourBar=element('div',null,document.body);tourBar.className='tug-tour-bar race-tour-bar';tourBar.setAttribute('role','status');}
+   tourBar.hidden=false;tourBar.replaceChildren();
+   const t=tank(),n=t?t.slugs.length:0;
+   element('b','🏆 ทัวร์นาเมนต์วิ่ง',tourBar);
+   if(tr.status==='prep'){
+     const left=Math.max(0,Math.ceil((tr.prepUntil-Date.now())/1000));
+     tourElement('span','tug-tour-time',left>0?'เริ่มใน '+Math.floor(left/60)+':'+String(left%60).padStart(2,'0'):'ถึงเวลาแล้ว',tourBar);
+     tourElement('span',n<3?'is-warn':'','ทากในตู้แข่งวิ่ง '+Math.min(n,3)+'/3'+(n<3?' — ย้ายลงตู้ให้ครบ':''),tourBar);
+     const b=element('button','เลือกทีม & เริ่ม',tourBar);b.type='button';b.className='tbtn';b.disabled=n<3;b.onclick=tourPick;
+   }else{
+     element('span','กำลังแข่งอยู่',tourBar);
+     const b=element('button','ไปที่ตู้แข่ง',tourBar);b.type='button';b.className='tbtn';b.onclick=()=>{if(t){enterTank(t);showRaceBracket();}};
+   }
+ }
+
+ /* ---- หน้าต่างชุดทัวร์นาเมนต์ (Esc/คลิกนอกกรอบปิดไม่ได้ ใช้หน้าตาชุดเดียวกับชักเย่อ) ---- */
+ function tourDialog(title,extra=''){
+   const d=dialog(title);d.dataset.tour='1';d.classList.add('slug-tug-dialog','tug-ask');if(extra)d.classList.add(...extra.split(' '));
+   d.addEventListener('cancel',e=>{e.preventDefault();e.stopImmediatePropagation();},true);
+   d.addEventListener('lightdismiss',e=>{e.preventDefault();e.stopImmediatePropagation();},true);
+   return d;
+ }
+ function sub(d,text,chip){const p=tourElement('p','tug-sub',null,d);element('span',text,p);if(chip)tourElement('span','tug-chip',chip,p);return p;}
+ function note(host,kind,big,small){const n=tourElement('div','tug-verdict-box is-'+kind,null,host);element('b',big,n);if(small)element('span',small,n);return n;}
+ function portrait(host,genes,label){const b=tourElement('div','tug-slot',null,host);const c=element('canvas',null,b);c.width=180;c.height=112;c.setAttribute('aria-hidden','true');try{drawSlugPortrait(c,{genes});}catch(e){}if(label)element('b',label,b);return b;}
+
+ /* ---- เลือกทีม 3 ตัว ---- */
+ function tourPick(){
+   const tr=state.tour,t=tank();if(!tr||tr.status!=='prep'||!t||modal||raceUI)return;
+   const d=tourDialog('เลือกทีมลงทัวร์นาเมนต์วิ่ง');d.querySelector('h2').textContent='🏆 เลือกทีมลงทัวร์นาเมนต์วิ่ง';
+   sub(d,'ทีมละ 3 ตัว ใช้ทีมนี้ทั้งทัวร์นาเมนต์','3 ตัว');
+   const verdict=tourElement('div','tug-verdict-box',null,d);
+   const head=tourElement('div','tug-pick-head',null,d),title=element('h3','',head);
+   const grid=tourElement('div','tug-pick',null,d);
+   let picked=t.slugs.slice(0,3).map(s=>s.id);
+   const actions=tourElement('div','tug-actions',null,d);
+   const later=element('button','ไว้ก่อน',actions);later.className='tbtn';later.onclick=()=>{close();renderTourBar();};
+   const go=element('button','ยืนยันทีม · เริ่มทัวร์นาเมนต์',actions);go.className='tbtn tug-primary';
+   const refresh=()=>{
+     picked=picked.filter(id=>t.slugs.some(s=>s.id===id));
+     const team=picked.map(id=>t.slugs.find(s=>s.id===id)).map(s=>({genes:foodGenes(s)}));
+     title.textContent='เลือกทาก '+team.length+'/3';verdict.replaceChildren();
+     if(t.slugs.length<3){verdict.className='tug-verdict-box is-block';element('b','ทากไม่พอ',verdict);element('span','ตู้แข่งวิ่งมีแค่ '+t.slugs.length+' ตัว — ย้ายทากลงตู้ให้ครบ 3 ตัว',verdict);}
+     else if(team.length<3){verdict.className='tug-verdict-box is-todo';element('b','เลือกอีก '+(3-team.length)+' ตัว',verdict);}
+     else{verdict.className='tug-verdict-box is-easy';element('b','ก้าวเฉลี่ย '+avgStep(team).toFixed(1)+' ซม.',verdict);}
+     go.disabled=team.length!==3;
+   };
+   const draw=()=>SlugHover.cards(grid,{slugs:t.slugs,selected:picked,multi:true,empty:'ยังไม่มีทากในตู้แข่งวิ่ง',
+     sub:s=>'ก้าวละ '+stride(foodGenes(s)).step.toFixed(1)+' ซม.',
+     onPick:s=>{if(picked.includes(s.id))picked=picked.filter(x=>x!==s.id);else{picked.push(s.id);if(picked.length>3)picked.shift();}refresh();return picked;}});
+   go.onclick=()=>{if(picked.length!==3)return;tr.teams[playerIdx(tr)].ids=picked.slice();tr.status='bracket';saveGame();close();renderTourBar();enterTank(t);showRaceBracket();};
+   draw();refresh();
+ }
+
+ /* ---- การ์ดทีม (ใช้ในหน้าสายแข่ง) ---- */
+ function teamCard(host,T,cls,wins){
+   const s=tourElement('div','tug-side '+cls,null,host);
+   element('h3',(T.player?'ทีมเรา':T.name)+(wins!=null?' · '+wins:''),s);
+   const list=tourMembers(T),stat=tourElement('p','tug-power',null,s);
+   element('span','ก้าวเฉลี่ย ',stat);element('b',avgStep(list).toFixed(1),stat);element('span',' ซม.',stat);
+   const row=tourElement('div','tug-slots',null,s);for(const m of list)portrait(row,m.genes);
+ }
+ function bracketMini(host,tr,n,me){
+   const br=tourElement('div','tug-br',null,host);
+   const name=i=>i==null?'—':tr.teams[i].player?'ทีมเรา':tr.teams[i].name;
+   const col=(title,pairs,winners,round)=>{const c=tourElement('div','tug-br-col',null,br);element('h4',title,c);
+     pairs.forEach(([x,y],k)=>{const box=tourElement('div','tug-br-pair'+(n&&n.round===round&&k===n.slot?' is-next':''),null,c);
+       for(const i of [x,y])tourElement('div','tug-br-team'+(i===me?' is-me':'')+(winners[k]!=null?(winners[k]===i?' is-win':' is-out'):''),name(i),box);});};
+   col('รอบ 8 ทีม',[[0,1],[2,3],[4,5],[6,7]],tr.qf,0);
+   col('รองชนะเลิศ',[[tr.qf[0],tr.qf[1]],[tr.qf[2],tr.qf[3]]],tr.sf,1);
+   col('ชิงชนะเลิศ',[[tr.sf[0],tr.sf[1]]],[tr.final],2);
+ }
+
+ /* ---- สายแข่ง: เลือกคู่ถัดไป ---- */
+ function showRaceBracket(){
+   const tr=state.tour;if(!tr||tr.status!=='bracket'||modal||state.active)return;
+   const t=tank();if(!t)return;
+   if(!tankMode||curTank!==t)enterTank(t);
+   if(tr.match){showSeries();return;}
+   const n=tourNext(tr);if(!n){showTourResult();return;}
+   const me=playerIdx(tr),mine=n.a===me||n.b===me;
+   let L=n.a,R=n.b;if(R===me){L=n.b;R=n.a;}
+   const d=tourDialog('ทัวร์นาเมนต์วิ่ง','tug-bracket');d.querySelector('h2').textContent='🏆 ทัวร์นาเมนต์วิ่ง';
+   sub(d,TOUR_ROUNDS[n.round]+(n.round<2?' · คู่ที่ '+(n.slot+1):''),'ชนะ 2 ใน 3');
+   const main=tourElement('div','tug-br-main',null,d),left=tourElement('div','tug-br-left',null,main);
+   const vs=tourElement('section','tug-vs',null,left);
+   teamCard(vs,tr.teams[L],tr.teams[L].player?'is-me':'is-foe');tourElement('div','tug-vs-mark','VS',vs);teamCard(vs,tr.teams[R],'is-foe');
+   note(left,mine?'ok':'todo',mine?'ถึงคิวทีมเรา':'คู่นี้ไม่มีทีมเรา',mine?'เลือกตัวที่จะวิ่งก่อนทุกเที่ยว':'ดูไว้พักนิ้ว/ดูฝีมือคู่แข่ง หรือข้ามไปก็ได้');
+   bracketMini(main,tr,n,me);
+   const actions=tourElement('div','tug-actions',null,left);
+   const pause=element('button','พักไว้ก่อน',actions);pause.className='tbtn tug-quiet';pause.onclick=()=>{close();exitTank();renderTourBar();};
+   const begin=()=>{tr.match={round:n.round,slot:n.slot,L,R,wins:[0,0],heat:0};saveGame();close();showSeries();};
+   if(mine){const go=element('button','เริ่มคู่นี้',actions);go.className='tbtn tug-primary';go.onclick=begin;}
+   else{
+     const skip=element('button','⏭ ข้ามคู่นี้',actions);skip.className='tbtn';
+     skip.onclick=()=>{tr.match={round:n.round,slot:n.slot,L,R,wins:[0,0],heat:0};while(tr.match){simulateSeriesHeat();}close();showRaceBracket();};
+     const watch=element('button','ดูการแข่ง',actions);watch.className='tbtn tug-primary';watch.onclick=begin;
+   }
+ }
+ /* ตัวที่บอทส่งลงเที่ยวนี้ = ตัวที่วิ่งน้อยที่สุดในทัวร์นาเมนต์ (เท่ากันเลือกตามลำดับ) */
+ function botRunner(T){let best=0;T.members.forEach((m,i)=>{if((m.runs|0)<(T.members[best].runs|0))best=i;});return best;}
+ function entrantOf(T,member){
+   if(T.player){const s=member;return {name:slugNick(s),genes:{...foodGenes(s)},id:s.id,...stride(foodGenes(s)),head:START,finished:null,next:0};}
+   const m=T.members[member],g=botGenes(m);return {name:T.name,genes:g,pace:m.pace,member,...stride(g),head:START,finished:null,next:1/m.pace};
+ }
+ function simulateSeriesHeat(){
+   const tr=state.tour,mt=tr.match,A=tr.teams[mt.L],B=tr.teams[mt.R];
+   const ea=entrantOf(A,botRunner(A)),eb=entrantOf(B,botRunner(B));
+   finishHeat(simulateHeat(ea,eb),ea,eb);
+ }
+ function finishHeat(w,ea,eb){
+   const tr=state.tour,mt=tr.match;
+   for(const [T,e] of [[tr.teams[mt.L],ea],[tr.teams[mt.R],eb]]){
+     if(T.player)applyFatigue(tank()?.slugs.find(s=>s.id===e.id));
+     else if(e.member!=null)T.members[e.member].runs=(T.members[e.member].runs|0)+1;
+   }
+   mt.wins[w]++;mt.heat++;mt.last={winner:w,names:[ea.name,eb.name]};
+   if(mt.wins[w]>=2)recordTour(mt.round,mt.slot,w===0?mt.L:mt.R);else saveGame();
+ }
+
+ /* ---- ก่อนแต่ละเที่ยว: เราเลือกตัววิ่ง / คู่บอทดูหรือข้าม ---- */
+ function showSeries(){
+   const tr=state.tour,mt=tr?.match;if(!mt||modal||state.active)return;
+   const t=tank();if(!t)return;
+   const A=tr.teams[mt.L],B=tr.teams[mt.R],mine=A.player;
+   const d=tourDialog('ทัวร์นาเมนต์วิ่ง','tug-bracket race-series');d.querySelector('h2').textContent='🏁 เที่ยวที่ '+(mt.heat+1);
+   sub(d,(A.player?'ทีมเรา':A.name)+' '+mt.wins[0]+' – '+mt.wins[1]+' '+B.name,TOUR_ROUNDS[mt.round]);
+   if(mt.last)note(d,mt.last.winner===0&&mine?'easy':mt.last.winner===1&&mine?'hard':'todo','เที่ยวที่แล้ว: '+mt.last.names[mt.last.winner]+' ชนะ',null);
+   const foeIdx=botRunner(B),foe=entrantOf(B,foeIdx);
+   const vs=tourElement('section','tug-vs',null,d);
+   const leftSide=tourElement('div','tug-side is-me',null,vs);element('h3',mine?'ตัววิ่งของเรา':A.name,leftSide);
+   const leftStat=tourElement('p','tug-power',null,leftSide),leftRow=tourElement('div','tug-slots',null,leftSide);
+   tourElement('div','tug-vs-mark','VS',vs);
+   const rightSide=tourElement('div','tug-side is-foe',null,vs);element('h3',B.name,rightSide);
+   const rs=tourElement('p','tug-power',null,rightSide);element('span','ก้าวละ ',rs);element('b',foe.step.toFixed(1),rs);element('span',' ซม. · วิ่งมาแล้ว '+(B.members[foeIdx].runs|0),rs);
+   portrait(tourElement('div','tug-slots',null,rightSide),foe.genes);
+   const actions=tourElement('div','tug-actions',null,d);
+   if(mine){
+     const verdict=tourElement('div','tug-verdict-box',null,d);d.insertBefore(verdict,actions);
+     const head=tourElement('div','tug-pick-head',null,d);d.insertBefore(head,actions);element('h3','เลือกตัวที่จะวิ่งเที่ยวนี้',head);
+     const grid=tourElement('div','tug-pick',null,d);d.insertBefore(grid,actions);
+     const team=(A.ids||[]).map(id=>t.slugs.find(s=>s.id===id)).filter(Boolean);
+     let picked=team.slice().sort((x,y)=>stride(foodGenes(y)).step-stride(foodGenes(x)).step)[0]?.id||null;
+     const fatigue=s=>(s.foodBuffs||[]).filter(b=>b.type==='raceFatigue'&&b.until>Date.now()).length;
+     const refresh=()=>{
+       const s=team.find(x=>x.id===picked);leftStat.replaceChildren();leftRow.replaceChildren();verdict.replaceChildren();
+       if(!s){verdict.className='tug-verdict-box is-block';element('b','ทีมเราหายจากตู้',verdict);element('span','ย้ายทากในทีมกลับลงตู้แข่งวิ่ง',verdict);go.disabled=true;return;}
+       const e=entrantOf(A,s);
+       element('span','ก้าวละ ',leftStat);element('b',e.step.toFixed(1),leftStat);element('span',' ซม.'+(fatigue(s)?' · เหนื่อย −'+fatigue(s)*FATIGUE_VIGOR:''),leftStat);
+       portrait(leftRow,e.genes);
+       const need=foe.step*foe.pace/e.step,kind=need<=7?'easy':need<=11?'ok':'hard';
+       verdict.className='tug-verdict-box is-'+kind;element('b','ต้องกด '+need.toFixed(1)+' ครั้ง/วิ',verdict);element('span',kind==='easy'?'สบาย':kind==='ok'?'พอไหว':'หนักมาก',verdict);
+       go.disabled=false;
+     };
+     const pause=element('button','พักไว้ก่อน',actions);pause.className='tbtn tug-quiet';pause.onclick=()=>{close();exitTank();renderTourBar();};
+     var go=element('button','เริ่มเที่ยวนี้',actions);go.className='tbtn tug-primary';
+     go.onclick=()=>{const s=team.find(x=>x.id===picked);if(!s)return;startHeat(entrantOf(A,s),foe,false);};
+     SlugHover.cards(grid,{slugs:team,selected:picked,sub:s=>'ก้าวละ '+stride(foodGenes(s)).step.toFixed(1)+' ซม.'+(fatigue(s)?' · เหนื่อย':''),onPick:s=>{picked=s.id;refresh();}});
+     refresh();
+   }else{
+     const la=botRunner(A),ea=entrantOf(A,la);
+     const ls=leftStat;element('span','ก้าวละ ',ls);element('b',ea.step.toFixed(1),ls);element('span',' ซม. · วิ่งมาแล้ว '+(A.members[la].runs|0),ls);portrait(leftRow,ea.genes);
+     const all=element('button','⏭ ข้ามทั้งคู่',actions);all.className='tbtn tug-quiet';
+     all.onclick=()=>{while(tr.match)simulateSeriesHeat();close();showRaceBracket();};
+     const skip=element('button','⏭ ข้ามเที่ยวนี้',actions);skip.className='tbtn';
+     skip.onclick=()=>{simulateSeriesHeat();close();showRaceBracket();};
+     const watch=element('button','ดูเที่ยวนี้',actions);watch.className='tbtn tug-primary';watch.onclick=()=>startHeat(ea,foe,true);
+   }
+ }
+ function startHeat(ea,eb,botOnly){
+   const tr=state.tour,mt=tr.match,t=tank();if(!mt||!t)return;
+   state.active={tankId:t.id,wager:0,elapsed:0,countdown:3,lastKey:null,settled:false,rank:0,botOnly,
+     tour:{round:mt.round,slot:mt.slot,heat:mt.heat},entrants:[ea,eb]};
+   t.slugs.filter(x=>x.id!==ea.id).forEach(x=>{x.fy=Math.max(8+slugCm(x.genes)/CM_PER_CELL*.55,x.fy);x.wall=null;x.climbZ=0;});
+   saveGame();close();openRace();
+ }
+ function tourHeatDone(){
+   const a=state.active,tr=state.tour;if(!a?.tour||!tr?.match)return;
+   const [ea,eb]=a.entrants,w=(eb.finished??Infinity)<(ea.finished??Infinity)?1:0;
+   state.active=null;close();
+   finishHeat(w,ea,eb);
+   showRaceBracket();
+ }
+ function showTourResult(){
+   const tr=state.tour;if(!tr||modal)return;
+   const me=playerIdx(tr),place=tourPlace(tr,me),prize=TOUR_PRIZE[place]||0;
+   if(!tr.paid){tr.paid=true;tr.prize=prize;addCoin(prize);saveGame();syncHUD();}
+   const d=tourDialog('ผลทัวร์นาเมนต์วิ่ง','tug-tour-result');
+   d.querySelector('h2').textContent=place===1?'🏆 แชมป์ทัวร์นาเมนต์วิ่ง!':'🏁 จบทัวร์นาเมนต์วิ่ง';
+   tourElement('p','tug-tour-place',place===1?'อันดับ 1':place===2?'อันดับ 2':place===3?'อันดับ 3–4':'อันดับ 5–8',d);
+   tourElement('p','tug-sub',(tr.prize>0?'รางวัล +'+tr.prize.toLocaleString()+' ทอง':'ไม่ได้รางวัล')+(place===1?'':' · แชมป์คือ '+tr.teams[tr.final].name),d);
+   const actions=tourElement('div','tug-actions',null,d);
+   const done=element('button','กลับร้าน',actions);done.className='tbtn tug-primary';
+   done.onclick=()=>{state.tour=null;tourLeave();close();exitTank();saveGame();renderTourBar();};
+   if(place===1)resultFireworks();
+ }
+ function tourTick(){
+   const tr=state.tour;
+   if(!tr){tourMail();renderTourBar();return;}
+   if(!tank()){renderTourBar();return;}
+   tourSpawn();
+   if(tr.status==='prep'&&!tr.autoPick&&Date.now()>=tr.prepUntil&&!modal&&!raceUI&&!state.active&&!(tankMode&&curTank!==tank())){tr.autoPick=true;tourPick();}
+   else if(tr.status==='bracket'&&!state.active&&!modal&&tankMode&&curTank===tank())showRaceBracket();
+   renderTourBar();
+ }
+
  window.addEventListener('keydown',e=>{
    if(!raceUI||modal?.open)return;
-   if(state.active){e.stopImmediatePropagation();if(['KeyA','KeyD','Space','Escape'].includes(e.code))e.preventDefault();if(!e.repeat&&(e.code==='KeyA'||e.code==='KeyD'))press(e.code==='KeyA'?'a':'d');}
+   if(state.active&&!state.active.botOnly){e.stopImmediatePropagation();if(['KeyA','KeyD','Space','Escape'].includes(e.code))e.preventDefault();if(!e.repeat&&(e.code==='KeyA'||e.code==='KeyD'))press(e.code==='KeyA'?'a':'d');}
  },true);
  document.addEventListener('visibilitychange',()=>{lastFrame=0;if(document.hidden)for(const a of burstAnimations)a.cancel();saveGame();});
- window.SlugRace={purchased,goal,drawTrack,drawChallengers,isOpen:()=>!!modal?.open,isRacing,normalSlugs,stepNormal,updateTankFrame,racingItems,drawRunner,stride};
+ /* ผู้ท้าแข่งยืนรออยู่ที่ตู้แข่ง = ลูกค้าปกติไม่มาดูตู้นี้ (people.js eventReservedTank) */
+ window.SlugRace={reserved:o=>!!o?.def?.race&&(tourOn()||visitors.some(p=>PEOPLE.includes(p))),tour:()=>state.tour,purchased,goal,drawTrack,drawChallengers,isOpen:()=>!!modal?.open,isRacing,normalSlugs,stepNormal,updateTankFrame,racingItems,drawRunner,stride};
  // Settled races retain their receipt; unfinished races resume, never reroll.
- if(state.active?.entrants?.length===3){
+ if(state.active?.entrants?.length===3||(state.active?.tour&&state.active?.entrants?.length===2)){
    state.active.entrants.forEach(r=>{if(r.finished===null&&state.active.settled)r.finished=Infinity;});
  }else state.active=null;
  if(owned())purchased();

@@ -237,8 +237,24 @@ function visitorProfiles(kind){
 function startPersonAction(p,action,duration,partner=null){
   p.action=action;p.actionT=0;p.actionDuration=duration;p.socialPartner=partner;
 }
+/* ความแรงของท่าทาง 0→1→0
+   ⚠️ เดิมเป็น sin(π·t/dur) ล้วน = แตะยอดแล้วลงทันที ไม่มีช่วงค้างเลย
+   ท่า "จับคาง" (3.0 วิ) จึงยกมือขึ้นถึงคาง 1.5 วิ แล้วลดลงทันที ดูเหมือน
+   เอาอะไรเข้าปากแล้วเอาออก ไม่ใช่ท่าครุ่นคิด · ตอนนี้เป็น ยก → ค้าง → ลด
+   ท่า 3.0 วิ จะได้ค้างเต็ม 2.0 วิพอดี (ยก 0.45 + ค้าง 2.0 + ลด 0.55)
+   'jump' ไม่อยู่ในลิสต์ เพราะมันคือการเด้งขึ้น-ลง ค้างกลางอากาศจะดูแปลก */
+const HOLD_ACTIONS=['chin','crouch','lean','point','adjust','chat','nod'];
+function personGesture(action,t,dur){
+  if(action==='watch')return 0;
+  const d=dur||1;
+  if(!HOLD_ACTIONS.includes(action))return Math.sin(Math.PI*Math.min(1,t/d));
+  const rise=Math.min(.45,d*.2), fall=Math.min(.55,d*.25), ss=v=>v*v*(3-2*v);
+  if(t<rise)   return ss(Math.max(0,t/rise));
+  if(t<d-fall) return 1;
+  return ss(Math.max(0,Math.min(1,(d-t)/fall)));
+}
 function beginPersonBrowse(p){
-  p.state='look';p.t=0;p.lookT=p.raceChallenger?Infinity:5;p._browseActed=false;
+  p.state='look';p.t=0;p.lookT=(p.raceChallenger||p.tugChallenger)?Infinity:5;p._browseActed=false;
   p.action='watch';p.actionT=0;p.actionDuration=0;p.socialPartner=null;
   p.socialCooldown=.5+Math.random()*.5;
 }
@@ -312,6 +328,8 @@ function chooseQuietKind(need,capacity){
 }
 /* ดูกี่ตู้ก่อนกลับ — ผูกกับจำนวนตู้ในร้าน
    ร้านมี 2 ตู้แล้วเดินวน 5 รอบมันประหลาด ช่วงแรกจึงเป็น "เข้ามาดู แล้วออก" */
+/* ตู้ที่ถูกจองให้อีเวนต์ — มีผู้ท้าแข่งชักเย่อ/วิ่งยืนรออยู่ หรือกำลังมีทัวร์นาเมนต์ · ลูกค้าปกติไม่เดินไปดู ไม่ยื่นซื้อ */
+function eventReservedTank(o){return !!(window.SlugTug?.reserved?.(o)||window.SlugRace?.reserved?.(o));}
 function visitorVisits(){
   const tanks=(G.objs||[]).filter(o=>o&&o.type==='tank'&&o!==moving).length;
   const cap=Math.min(VISIT_MAX,tanks),min=Math.min(VISIT_MIN,cap);
@@ -382,7 +400,16 @@ function stepVisitorArrivals(){
   }else _arrivalRetryAt=_peopleT+1; // Entrance physically blocked: retain the same party.
 }
 
+/* ---- คิวประตู: คนเข้าร้านห่างกันอย่างน้อย DOOR_GAP วินาที/คน (ลูกค้า · พ่อค้า · ผู้ท้าแข่ง ใช้คิวเดียวกัน) ----
+   เดิมทั้งกลุ่ม (และคนจากระบบอื่นที่สปอนเฟรมเดียวกัน) โผล่พร้อมกันหน้าประตู → ยืนอัดกันติดทางเข้า
+   คนที่ยังไม่ถึงคิวอยู่ใน PEOPLE แล้ว (ระบบแข่ง/พ่อค้าหาตัวเจอทันที) แต่ "ยังไม่เข้าร้าน":
+   ไม่ขยับ ไม่ถูกวาด คลิกไม่ได้ (personEntered → stepPeople / personOnScreen) · ยังจองจุดยืนหน้าประตูไว้ คนอื่นจึงไม่มาทับ */
+const DOOR_GAP=1;
+let _doorFreeAt=0;
+function personEntered(p){return !(p._enterAt>_peopleT);}
 function spawnVisitors(capacity,requestedKind=null,requestedProfiles=null){
+  // คิวยังค้างเกิน 1 คน = ยังไม่รับกลุ่มใหม่ (ผู้เรียกทุกตัวลองใหม่รอบหน้าอยู่แล้ว) คิวจึงไม่ยาวสะสม
+  if(_doorFreeAt>_peopleT+DOOR_GAP)return false;
   const kind=requestedKind||chooseVisitorKind(capacity);if(!kind)return false;
   const profiles=requestedProfiles||visitorProfiles(kind),count=profiles.length;if(count>capacity)return false;
   for(let attempt=0;attempt<15;attempt++){
@@ -397,6 +424,9 @@ function spawnVisitors(capacity,requestedKind=null,requestedProfiles=null){
     }
     if(batch.length!==count)continue;
     if(kind==='peddler'&&typeof makePeddler==='function'&&!makePeddler(batch[0]))continue;
+    const first=Math.max(_peopleT,_doorFreeAt);
+    batch.forEach((p,i)=>{p._enterAt=first+i*DOOR_GAP;});
+    _doorFreeAt=first+batch.length*DOOR_GAP;
     if(g){g.members=batch;assignFamilyBuyer(batch);}PEOPLE.push(...batch);_partySequence++;return true;
   }
   return false;
@@ -405,7 +435,7 @@ function planFamily(g){
   endFamilyColumn(g);
   for(const p of g.members){stopRegroup(p);p._yieldResume=null;p._groupViewed=false;p._routeRetryAt=0;p._pathRetryAt=0;p.crowdCooldown=0;}
   g.firstArrivedAt=null;
-  const leader=g.members[0],tanks=G.objs.filter(o=>o.type==='tank'&&o!==moving);
+  const leader=g.members[0],tanks=G.objs.filter(o=>o.type==='tank'&&o!==moving&&!eventReservedTank(o));
   const leaving=g.visits<=0||!tanks.length;
   /* เดิม filter ตู้ที่เพิ่งดูทิ้งไปเลย → ถ้าในร้านเหลือตู้ที่ยืนกันได้ทั้งกลุ่มแค่ตู้นั้นตู้เดียว
      กลุ่มจะวางแผนไม่สำเร็จตลอดกาล = ยืนแข็งคาที่ ตอนนี้แค่ "ไปอยู่ท้ายคิว" ยังชอบตู้ใหม่เหมือนเดิม */
@@ -451,6 +481,7 @@ function stepFamilies(dt){
     if(g.focus&&(!G.objs.includes(g.focus)||g.focus===moving)){planFamily(g);continue;}
     const atDestination=p=>{const goal=p._familyGoal||p.tgt;return goal&&Math.hypot(p.x-goal.x,p.y-goal.y)<1.2;};
     const ready=g.members.filter(atDestination);
+    if((g.stage==='walk'||g.stage==='look')&&ready.length<g.members.length&&refitFamilyAtTank(g,atDestination))continue;
     if(g.stage==='leave'){
       if(ready.length){
         endFamilyColumn(g);
@@ -484,6 +515,59 @@ function stepFamilies(dt){
   }
 }
 
+/* ---- สมาชิกครอบครัวเดินไปที่ยืนของตัวเองไม่ได้ = ขยับที่ยืนที่ตู้เดิม ----
+   ⚠️ 2026-09-17 เดิมจุดยืนที่จองตอน planFamily ค้างไว้จนกว่าจะหมด 35 วิ (หรือดูจบรอบ) ทั้งที่มีคนยืนขวาง/ไม่มีทางเดิน
+      คนที่ติดยืนนิ่ง และจุดนั้นก็ยังถูกนับว่า "มีคนจอง" คนอื่นใช้ไม่ได้ (ผู้เล่นทัก)
+   ลำดับแก้: 1) ย้ายเฉพาะคนที่ติดไปจุดว่างอื่นของตู้เดียวกันที่เดินไปถึงได้จริง
+             2) ไม่พอ → ทั้งครอบครัวเลือกชุดจุดยืนใหม่ที่ตู้เดียวกัน (คนที่ใกล้จุดไหนได้จุดนั้น ไม่เดินสลับกันไขว้)
+   จุดเก่าถูกปล่อยทันทีเพราะ tgt ถูกเปลี่ยน · ลองได้ทุก 2.5 วิต่อครอบครัว กันสลับที่ไปมาทุกเฟรม */
+const FAMILY_STUCK_S=2.5;
+/* "เดินไม่ได้" = ระยะถึงจุดยืนไม่ลดลงเกินครึ่งช่องมา FAMILY_STUCK_S วิ (ไม่พึ่ง _blockedFor ที่วัดแค่เฟรมที่ขยับไม่ได้เลย
+   คนที่โดนดันไปมา/เดินซอยเท้าอยู่กับที่ ก็นับว่าติด) · รอคิวแถวเดียว (_columnHold) หรือกำลังเดินไปรวมกลุ่ม ไม่นับ */
+function familyProgress(p,atDestination){
+  const goal=p._familyGoal||p.tgt;
+  if(!goal||atDestination(p)||p._columnHold||p._regroup){p._progAt=_peopleT;p._progD=null;return;}
+  const d=Math.hypot(p.x-goal.x,p.y-goal.y);
+  if(p._progD==null||p._progGoal!==goal||d<p._progD-.5){p._progD=d;p._progAt=_peopleT;p._progGoal=goal;}
+}
+function refitFamilyAtTank(g,atDestination){
+  for(const p of g.members)familyProgress(p,atDestination);
+  if(!g.focus||g.focus.type!=='tank'||_peopleT<(g._refitAt||0))return false;
+  const stuck=g.members.filter(p=>personEntered(p)&&!atDestination(p)&&!p._columnFollower&&!p._regroup&&!p.tradeOffer&&
+    (_peopleT-(p._progAt??_peopleT)>FAMILY_STUCK_S||(p.state==='wait'&&!(p.route&&p.route.length))));
+  if(!stuck.length)return false;
+  g._refitAt=_peopleT+2.5;
+  const spots=accessibleTankSpots(g.focus);
+  const taken=s=>personBlocked(s.x,s.y)||inDoorWalkway(s.x,s.y)||
+    PEOPLE.some(q=>q.family!==g&&(Math.hypot(q.x-s.x,q.y-s.y)<PERSON_GAP||q.tgt&&Math.hypot(q.tgt.x-s.x,q.tgt.y-s.y)<PERSON_GAP));
+  const go=(p,s,route)=>{p._progAt=_peopleT;p._progD=null;p._familyGoal=s;p.tgt=s;p.route=route;p.routeGoal=s;p.state='walk';p.stuck=0;p._blockedFor=0;p._routeRetryAt=0;p._pathRetryAt=0;p.t=0;p.lookT=Infinity;p._groupViewed=false;};
+  // 1) ย้ายเฉพาะคนที่ติด
+  const used=g.members.filter(p=>!stuck.includes(p)).map(p=>p._familyGoal||p.tgt).filter(Boolean),moves=[];
+  for(const p of stuck){
+    const old=p._familyGoal||p.tgt;
+    const list=spots.filter(s=>!taken(s)&&!used.some(u=>Math.hypot(u.x-s.x,u.y-s.y)<PERSON_GAP+.3)&&!(old&&Math.hypot(old.x-s.x,old.y-s.y)<PERSON_GAP))
+      .sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));
+    let pick=null;for(const s of list){const route=personRoute(p,s);if(route.length){pick={p,s,route};break;}}
+    if(!pick)break;moves.push(pick);used.push(pick.s);
+  }
+  if(moves.length===stuck.length){for(const m of moves)go(m.p,m.s,m.route);return true;}
+  // 2) ทั้งครอบครัวขยับไปชุดจุดยืนใหม่ที่ตู้เดียวกัน
+  const cx=g.members.reduce((n,p)=>n+p.x,0)/g.members.length,cy=g.members.reduce((n,p)=>n+p.y,0)/g.members.length;
+  const free=spots.filter(s=>!taken(s)&&!stuck.some(p=>{const old=p._familyGoal||p.tgt;return old&&Math.hypot(old.x-s.x,old.y-s.y)<PERSON_GAP;}))
+    .sort((a,b)=>Math.hypot(a.x-cx,a.y-cy)-Math.hypot(b.x-cx,b.y-cy));
+  const chosen=[];for(const s of free){if(chosen.some(q=>Math.hypot(q.x-s.x,q.y-s.y)<PERSON_GAP+.3))continue;chosen.push(s);if(chosen.length===g.members.length)break;}
+  if(chosen.length<g.members.length)return false;                     // ตู้นี้ไม่มีที่พอทั้งกลุ่ม = ปล่อยให้กติกาเดิม (หมดเวลาแล้ววางแผนตู้อื่น) ทำงาน
+  const plan=[],left=chosen.slice();
+  for(const p of g.members.slice().sort((a,b)=>stuck.includes(a)-stuck.includes(b))){   // คนที่ไม่ติดเลือกจุดก่อน = ขยับน้อยที่สุด
+    left.sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));
+    let k=left.findIndex(s=>personRoute(p,s).length||Math.hypot(s.x-p.x,s.y-p.y)<1.2);
+    if(k<0)return false;
+    const s=left.splice(k,1)[0];plan.push({p,s,route:personRoute(p,s)});
+  }
+  for(const m of plan){if(Math.hypot(m.s.x-m.p.x,m.s.y-m.p.y)<1.2){m.p._familyGoal=m.s;m.p.tgt=m.s;m.p.route=[];m.p.state='wait';m.p._blockedFor=0;}else go(m.p,m.s,m.route);}
+  if(g.stage==='look'){g.stage='walk';g.firstArrivedAt=null;}           // ย้ายที่ยืนระหว่างดู = รวมตัวใหม่แล้วค่อยเริ่มดูพร้อมกัน
+  return true;
+}
 function familyPurchaseChance(members){
   const children=members.filter(p=>p.kid);
   if(!children.length)return null;
@@ -576,6 +660,7 @@ function crowdRoute(p,target){
 
 function nextGoal(p){
   if(p.raceChallenger&&window.SlugRace&&SlugRace.goal(p))return;
+  if(p.tugChallenger&&window.SlugTug&&SlugTug.goal(p))return;
   if(p._columnFollower)return;
   if(p._yieldResume)return;
   if(p.tradeOffer)return;
@@ -585,7 +670,7 @@ function nextGoal(p){
   if(p.strolls > 0){                                   // เดินเล่นคั่นก่อน
     p.strolls--; p.focus = null; p.tgt = strollSpot(p); p.state = 'walk'; p.stuck = 0; return;
   }
-  const tanks = G.objs.filter(o => o.type === 'tank' && o !== moving);
+  const tanks = G.objs.filter(o => o.type === 'tank' && o !== moving && !eventReservedTank(o));
   if(p.visits > 0 && tanks.length){
     for(let i = 0; i < 6; i++){
       const o = tanks[(Math.random()*tanks.length)|0];
@@ -622,6 +707,7 @@ function stepPeople(){
   for(let i = PEOPLE.length - 1; i >= 0; i--){
     const p = PEOPLE[i];
     p._stepX=p.x;p._stepY=p.y;
+    if(!personEntered(p)) continue;                  // ยังไม่ถึงคิวเข้าประตู (DOOR_GAP)
     p.t += dt; p.idle += dt;
     stepPersonLife(p,dt);
     p.motion *= Math.exp(-dt*12);
@@ -632,6 +718,8 @@ function stepPeople(){
     if(p.state==='wait') continue;
     if(p.state === 'look'){
       if(p.focus && G.objs.indexOf(p.focus) < 0){ nextGoal(p); continue; }   // ตู้ถูกย้ายหาย
+      /* ผู้ท้าแข่งมาถึงตู้ระหว่างที่ลูกค้ายืนดูอยู่ = ลูกค้าปกติเดินไปดูตู้อื่นแทน (ครอบครัวรอจบรอบดูของกลุ่มแล้วเลือกตู้ใหม่เอง) */
+      if(p.focus && !p.tugChallenger && !p.raceChallenger && !p.family && eventReservedTank(p.focus)){ nextGoal(p); continue; }
       if(p.focus){                                   // หันหน้าเข้าหากลางตู้
         p.fdx = (p.focus.cx + oW(p.focus)/2) - p.x;
         p.fdy = (p.focus.cy + oH(p.focus)/2) - p.y;
@@ -753,21 +841,82 @@ function drawPersonShadow(p){
 }
 
 let _personBatch=null;
+const _carriedSlugs=[];   // ตู้ทากที่มีคนถืออยู่ในเฟรมนี้ (วาดตัวทากหลังเมชคนเสร็จ)
 
 function endPersonBatch(){
   const faces=_personBatch;_personBatch=null;
+  if(faces?.length)window.DecorGLB?.queuePeople(faces);
   if(faces&&faces.length)paintPersonMesh(faces,{x:0,y:0},Math.max(100,cellsW()+cellsH()));
+  drawCarriedSlugs();
   drawVisitorAnger();
 }
 
+/* ทากในตู้ที่คนถือ (พ่อค้าเร่ · คนมาท้าแข่ง/ชักเย่อ) — วาดหลังเมชคน เพราะเมชคนเป็นสีทึบล้วน
+   วาดโมเดลทากลงไปในเมชตรง ๆ ไม่ได้ จึงวาดทับลงแคนวาสทีหลัง แล้วตัดขอบให้อยู่ในช่องเปิดหน้าตู้
+   ⚠️ ใช้สไปรต์ของทาก "ตัวนั้นจริง ๆ" (slugSprite — อาร์ตชุดเดียวกับโหมด 2D) ไม่ใช่ Slug3D.draw
+      Slug3D.draw เป็นระบบ atlas: เฟรมแรกแค่ "จองคิว" แล้วคืน true ทั้งที่ยังไม่มีภาพ
+      ของชิ้นนี้เล็ก (~50 px) และติดไปกับคนที่เดินตลอด ลองแล้วมันไม่เคยวอร์มอัปจนวาดได้จริง ตู้เลยว่างเปล่า
+      สไปรต์ถูกแคชไว้ในตัวทากอยู่แล้ว (s._sprite) ค่าใช้จ่ายต่อเฟรมคือ drawImage ครั้งเดียว
+   ช่องเปิดหันหนีกล้อง (คนหันหลังให้เรา) = สี่เหลี่ยมบนจอวนกลับทิศ ข้ามไปเลย ไม่งั้นทากจะโผล่ทับหลังคน
+   ซูมออกจนช่องเปิดแคบกว่า 6 px ก็ไม่ต้องวาด มองไม่เห็นอยู่ดี */
+function drawCarriedSlugs(){
+  for(const {p,quad:world,cm} of _carriedSlugs){
+    const slug=p.carrySlug;if(!slug)continue;
+    const quad=world.map(v=>P(v[0],v[1],v[2]*ZUNIT));   // ฉายด้วยกล้องของเฟรมนี้ (ท่าทางคนอาจมาจากแคชเฟรมก่อน)
+    let area=0;for(let i=0;i<4;i++){const a=quad[i],b=quad[(i+1)%4];area+=a.x*b.y-b.x*a.y;}
+    if(area<=0)continue;
+    const width=Math.hypot(quad[1].x-quad[0].x,quad[1].y-quad[0].y);
+    if(width<6)continue;
+    const sprite=typeof slugSprite==="function"?slugSprite(slug):null;
+    const parts=typeof slugPartsOf==="function"?slugPartsOf(slug):null;
+    if(!sprite||!parts||!(parts.bw*parts.s>0))continue;
+    /* ขนาดตามตัวจริงของทากตัวนั้น เทียบกับความกว้างตู้ (ตู้ที่ถือกว้าง ~30 ซม.)
+       ตัวหารต้องเป็นความกว้างลำตัวในสไปรต์ (bw*s) ไม่ใช่ความกว้างผืนสไปรต์ ซึ่งมีขอบเผื่อออร่าอยู่ด้วย
+       สูตรเดียวกับที่หน้าร้านย่อสไปรต์ทากในตู้ (shop-floor.js) */
+    const genes=typeof foodGenes==="function"?foodGenes(slug):slug.genes;
+    const bodyPx=(typeof slugCm==="function"?slugCm(genes):6)*width/cm;
+    const k=bodyPx/(parts.bw*parts.s);
+    const lowX=(quad[2].x+quad[3].x)/2,lowY=(quad[2].y+quad[3].y)/2;
+    const highX=(quad[0].x+quad[1].x)/2,highY=(quad[0].y+quad[1].y)/2;
+    const t=.30,x=lowX+(highX-lowX)*t,y=lowY+(highY-lowY)*t;   // เกาะอยู่บนทราย ไม่ลอยกลางตู้
+    ctx.save();
+    ctx.beginPath();ctx.moveTo(quad[0].x,quad[0].y);for(let i=1;i<4;i++)ctx.lineTo(quad[i].x,quad[i].y);ctx.closePath();ctx.clip();
+    ctx.drawImage(sprite.c,x-sprite.w*k/2,y-sprite.h*k/2,sprite.w*k,sprite.h*k);
+    ctx.restore();
+  }
+  _carriedSlugs.length=0;
+}
 function personScreenBounds(p){
   const h=p.hCm/CM_PER_CELL,z=cam.zoom,b=P(p.x,p.y,0),rx=h*TW*z*.55;
   return{x0:b.x-rx-4,x1:b.x+rx+4,y0:b.y-h*(ZUNIT+TH*.55)*z-4,y1:b.y+h*TH*z*.55+4};
 }
-function personOnScreen(p){const r=personScreenBounds(p);return r.x1>=0&&r.x0<=CW&&r.y1>=0&&r.y0<=CH;}
+function personOnScreen(p){if(!personEntered(p))return false;const r=personScreenBounds(p);return r.x1>=0&&r.x0<=CW&&r.y1>=0&&r.y0<=CH;}
+// The culling rectangle includes room for every arm pose. It is NOT a click
+// target: at close zoom it covers neighbouring tanks and large empty areas.
+// Pick the already-cached visible mesh only, on pointer events (no frame work).
+function personHitTest(p,sx,sy){
+  const pose=p._drawPose,b=personScreenBounds(p);
+  if(!pose||sx<b.x0||sx>b.x1||sy<b.y0||sy>b.y1)return false;
+  function depthAt(faces,dx=0,dy=0){
+    let nearest=-Infinity;
+    for(const face of faces){
+      const v=face.v||face,q=v.map(a=>{const x=a[0]+dx,y=a[1]+dy,z=a[2],s=P(x,y,z*ZUNIT);return[s.x,s.y,x+y+z];});
+      for(let i=1;i<q.length-1;i++){
+        const a=q[0],c=q[i+1],b=q[i],den=(b[1]-c[1])*(a[0]-c[0])+(c[0]-b[0])*(a[1]-c[1]);
+        if(Math.abs(den)<1e-8)continue;
+        const u=((b[1]-c[1])*(sx-c[0])+(c[0]-b[0])*(sy-c[1]))/den;
+        const w=((c[1]-a[1])*(sx-c[0])+(a[0]-c[0])*(sy-c[1]))/den,t=1-u-w;
+        if(u>=-1e-7&&w>=-1e-7&&t>=-1e-7)nearest=Math.max(nearest,u*a[2]+w*b[2]+t*c[2]);
+      }
+    }
+    return nearest;
+  }
+  const hit=depthAt(pose.faces,p.x-pose.x,p.y-pose.y);
+  return Number.isFinite(hit)&&hit>=depthAt(personFurnitureFaces(true))-1e-6;
+}
 let _personBounds=null,_personVertexData=new Float32Array(65536);
 function beginPersonBatch(visitors){
-  _personBatch=[];_personBounds=null;
+  _personBatch=[];_personBounds=null;_carriedSlugs.length=0;
   if(visitors?.length){const r={x0:CW,y0:CH,x1:0,y1:0};for(const p of visitors){const b=personScreenBounds(p);r.x0=Math.min(r.x0,b.x0);r.y0=Math.min(r.y0,b.y0);r.x1=Math.max(r.x1,b.x1);r.y1=Math.max(r.y1,b.y1);}_personBounds=r;}
 }
 function paintPersonMesh(faces,p,H,snapshot=false){
@@ -839,6 +988,16 @@ function solvePersonArm(shoulder,wantedHand,preferredElbow,maxReach=.215,upper=m
   return {hand,elbow};
 }
 
+// Reuse each existing hand mesh's upper surface when placing it under a tank.
+const carryPalmTops=new WeakMap();
+function carryPalmTop(part){
+  if(!carryPalmTops.has(part)){
+    let top=-Infinity;for(let i=2;i<part.v.length;i+=3)top=Math.max(top,part.v[i]);
+    carryPalmTops.set(part,top);
+  }
+  return carryPalmTops.get(part);
+}
+
 function drawPerson(p){
   if(!personOnScreen(p))return;
   // Camera movement does not change a person's world-space geometry.
@@ -849,8 +1008,11 @@ function drawPerson(p){
   if(p._drawPose&&p._drawPose.key===poseKey){
     const cached=p._drawPose,dx=p.x-cached.x,dy=p.y-cached.y;
     const faces=dx||dy?cached.faces.map(f=>({rgb:f.rgb,v:f.v.map(v=>[v[0]+dx,v[1]+dy,v[2]])})):cached.faces;
+    if(cached.carryQuad)_carriedSlugs.push({p,cm:cached.carryCm,
+      quad:dx||dy?cached.carryQuad.map(v=>[v[0]+dx,v[1]+dy,v[2]]):cached.carryQuad});
     paintPersonMesh(faces,p,p.hCm/CM_PER_CELL);return;
   }
+  let carryQuad=null,carryCm=0;
   const H=p.hCm/CM_PER_CELL, b=P(p.x,p.y,0), px=H*ZUNIT*cam.zoom;
   if(px<5||b.x < -px||b.x>CW+px||b.y < -px||b.y>CH+px) return;
   const turned=p._squeezeUntil>_peopleT&&p._squeezeFacing;
@@ -873,10 +1035,10 @@ function drawPerson(p){
   let bob=0;                       // ตัวขึ้น-ลงตามจังหวะก้าว คำนวณจริงหลังรู้ความยาวขา (ดูบล็อกโมเดล)
   const breath=Math.sin(p.idle*1.6)*0.0015;
   const action=p.action||'watch';
-  const gesture=action==='watch'?0:Math.sin(Math.PI*Math.min(1,(p.actionT||0)/(p.actionDuration||1)));
+  const gesture=personGesture(action,p.actionT||0,p.actionDuration||1);
   const actionProgress=Math.min(1,(p.actionT||0)/(p.actionDuration||1));
   const jump=action==='jump'&&p.kid?Math.max(0,Math.sin(actionProgress*Math.PI*4))*.07:0;
-  const crouch=action==='crouch'?Math.min(gesture,Math.max(0,(clearance/H-.14)/.5)):0;
+  const crouch=!p.carryTank&&action==='crouch'?Math.min(gesture,Math.max(0,(clearance/H-.14)/.5)):0;
   let posedArms=false;
   function inspectPose(v){
     v=v.slice();if(!crouch)return v;
@@ -928,7 +1090,8 @@ function drawPerson(p){
     const len=Math.hypot(...norm)||1;norm=norm.map(x=>x/len);
     if(norm[0]+norm[1]+norm[2]<=0){
       if(!twoSided) return;
-      v=[v[0],v[2],v[1]];norm=norm.map(x=>-x);
+      // Reverse the whole face: keeping only three corners opened half of a tank wall.
+      v=v.slice().reverse();norm=norm.map(x=>-x);
     }
     const light=norm[0]*-.28+norm[1]*.36+norm[2]*.75;
     faces.push({v,rgb:shadeRgb(hexToRgb(color),shade+light*16-5),depth:v.reduce((s,v)=>s+v[0]+v[1]+v[2],0)/v.length});
@@ -1129,13 +1292,15 @@ function drawPerson(p){
     if(side===1&&action==='chat'){hand[1]+=.055*gesture;hand[2]+=.09*gesture;}
     if(side===-1&&action==='adjust'){hand[0]*=1-.6*gesture;hand[1]+=.065*gesture;hand[2]+=.16*gesture;}
     if(action==='chin'&&side===1){const tgt=[side*.030,lean+.060,JT.head[2]-.030+bob];for(let i=0;i<3;i++)hand[i]+=(tgt[i]-hand[i])*gesture;}
-    /* อุ้มตู้ทากไว้หน้าท้อง — สั่งตำแหน่งมือ/ศอกทั้งสองข้างให้สมมาตร แล้วปล่อย IK จัดข้อต่อ
-       ต้องมาก่อน solvePersonArm ไม่งั้นแขนจะแกว่งทับตู้ */
-    if(p.carryTank&&!crouch){
-      hand=[side*(CARRY_HW+.022), lean+CARRY_Y-.012, CARRY_Z-.004+bob];
-      elbow=[side*(CARRY_HW+.055), lean+.012, CARRY_Z+.085+bob];
+    const ua=MDL.parts['arm'+S],fa=MDL.parts['fore'+S],hd=MDL.parts['hand'+S];
+    /* รองก้นตู้: ข้อมืออยู่หลังก้นตู้ นิ้วชี้ไปข้างหน้าและฝ่ามืออยู่ใต้พื้น
+       ใช้ความหนามือจริง ไม่วางข้อมือกลางตู้แล้วให้นิ้วชี้ตามท่อนแขนทะลุผนัง
+       pole ของ IK อยู่ใต้ไหล่ใกล้ลำตัว ไม่ชี้ออกข้างจนศอกกาง */
+    if(p.carryTank){
+      hand=[side*CARRY_HW*.72/bw, lean+CARRY_Y-CARRY_HD-.030, CARRY_Z-CARRY_HH-carryPalmTop(hd)-.002+bob];
+      elbow=[shoulder[0]+side*.012, shoulder[1]-.015, shoulder[2]-UARM];
     }
-    if(action==='jump'&&p.kid){hand[0]+=(side*.170-hand[0])*gesture;hand[1]+=(lean+.015-hand[1])*gesture;hand[2]+=(shoulder[2]+.10-hand[2])*gesture;elbow[0]+=(side*.16-elbow[0])*gesture;}
+    if(action==='jump'&&p.kid&&!p.carryTank){hand[0]+=(side*.170-hand[0])*gesture;hand[1]+=(lean+.015-hand[1])*gesture;hand[2]+=(shoulder[2]+.10-hand[2])*gesture;elbow[0]+=(side*.16-elbow[0])*gesture;}
     if(crouch){
       const sh=inspectPose(shoulder),rest=inspectPose(hand);
       const kneeT=inspectPose([side*.055,.030,JT['knee'+S][2]+.03+bob]);
@@ -1145,15 +1310,15 @@ function drawPerson(p){
     }
     let pose=solvePersonArm(shoulder,hand,elbow,REACH,UARM,FARM);
     hand=pose.hand.slice();elbow=pose.elbow.slice();
-    if(!crouch)constrainVisitorArm(p,[hand],world,H,right,fx,fy);
+    if(!crouch&&!p.carryTank)constrainVisitorArm(p,[hand],world,H,right,fx,fy);
     pose=solvePersonArm(shoulder,hand,elbow,REACH,UARM,FARM);
     hand=pose.hand.slice();elbow=pose.elbow.slice();
-    if(!crouch)constrainVisitorArm(p,[elbow],world,H,right,fx,fy);
-    const ua=MDL.parts['arm'+S],fa=MDL.parts['fore'+S],hd=MDL.parts['hand'+S];
+    if(!crouch&&!p.carryTank)constrainVisitorArm(p,[elbow],world,H,right,fx,fy);
     const axU=norm(sub(elbow,shoulder)),axF=norm(sub(hand,elbow));
     emit(ua,shoulder,axisRot(ua.axis,axU),dist(shoulder,elbow)/ua.len);
     emit(fa,elbow,axisRot(fa.axis,axF),dist(elbow,hand)/fa.len);
-    emit(hd,hand,axisRot(hd.axis,axF),1);
+    // Orient the palms independently of the forearms: fingers forward, thumbs inward.
+    emit(hd,hand,p.carryTank?[0,-side,0, side,0,0, 0,0,1]:axisRot(hd.axis,axF),1);
   }
   posedArms=false;
 
@@ -1171,8 +1336,18 @@ function drawPerson(p){
     q([x0,y0,z0],[x0,y1,z0],[x1,y1,z0],[x1,y0,z0],frame,0);           // ก้นตู้
     q([x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],frame,6);           // ขอบบน
     q([x0+.006,y0+.004,z0+.010],[x1-.006,y0+.004,z0+.010],[x1-.006,y1-.006,z0+.010],[x0+.006,y1-.006,z0+.010],sand,0); // ทราย
-    // ตัวทากในตู้ — สีจากยีนสีลำตัว/หงอนของตัวที่เอามาขาย · ไม่มี carryAccent (เช่น พ่อค้ารับเหมาที่ถือกล่องเปล่ามารับซื้อ) = ไม่วาดทาก
-    if(p.carryAccent)rings([[0,lean+CARRY_Y,z0+.016,.030,.018],[0,lean+CARRY_Y,z0+.030,.038,.024],[0,lean+CARRY_Y,z0+.046,.026,.016]],p.carryAccent,8);
+    /* ⚠️ 2026-09-16 ตัวทากในตู้ = "โมเดลทากของจริง" ตัวเดียวกับที่หน้าร้านวาดในตู้ (Slug3D.draw → สไปรต์ 2D เป็นตัวสำรอง)
+       เดิมปั้นทรงเองด้วยวงแหวน/ท่อ ออกมาเป็นก้อนกลม ๆ ดูไม่ออกว่าเป็นทาก และไม่ใช่ตัวที่เขาเอามาขาย/มาท้าจริง ๆ ด้วย
+       เมชคนวาดด้วยสีทึบล้วน ยัดโมเดลเข้าไปในเมชไม่ได้ จึงจดสี่เหลี่ยม "ช่องเปิดหน้าตู้" บนจอไว้
+       แล้ววาดทากทับทีหลังตอนจบ batch (drawCarriedSlugs) โดยตัดขอบไม่ให้ล้นออกนอกช่องเปิด
+       คนถือกล่องเปล่ามารับซื้อ (พ่อค้ารับเหมา) ไม่มี carrySlug = ตู้ว่างตามเดิม */
+    if(p.carrySlug){
+      /* ⚠️ เก็บเป็น "พิกัดโลก" ไม่ใช่พิกัดจอ แล้วไปฉายตอนวาด (drawCarriedSlugs)
+         เพราะท่าทางคนถูกแคช (poseKey) ใช้ซ้ำหลายเฟรม ถ้าฉายลงจอตรงนี้ ค่าจะค้างอยู่กับกล้องตอนที่สร้างท่า
+         และต้องแนบไปกับ _drawPose ด้วย ไม่งั้นเฟรมที่ใช้ท่าจากแคชจะไม่มีตู้ให้วาด = ทากกระพริบ */
+      carryQuad=[[x0,z1],[x1,z1],[x1,z0],[x0,z0]].map(([mx,mz])=>world([mx,y1,mz]));
+      carryCm=2*CARRY_HW*p.hCm;
+    }
     // โครงกรอบหน้า 4 ด้าน (เปิดโล่งตรงกลาง)
     for(const [a,b] of [[[x0,y1,z0],[x1,y1,z0]],[[x0,y1,z1],[x1,y1,z1]],[[x0,y1,z0],[x0,y1,z1]],[[x1,y1,z0],[x1,y1,z1]]])
       limb(a,b,.006,.006,frame);
@@ -1192,7 +1367,8 @@ function drawPerson(p){
     rings([[0,lean-.073,.565+bob,.055,.023],[0,lean-.081,.62+bob,.063,.031],[0,lean-.078,.727+bob,.055,.030],[0,lean-.068,.754+bob,.035,.020]],p.pants,12);
     for(const side of [-1,1])limb([side*.06,lean-.046,.77+bob],[side*.061,lean+.059,.694+bob],.007,.007,p.pants);
   }
-  p._drawPose={key:poseKey,x:p.x,y:p.y,faces};
+  p._drawPose={key:poseKey,x:p.x,y:p.y,faces,carryQuad,carryCm};
+  if(carryQuad)_carriedSlugs.push({p,quad:carryQuad,cm:carryCm});
   paintPersonMesh(faces,p,H);
 }
 
@@ -1209,7 +1385,7 @@ function syncPeopleBtn(){
     if(!peopleOn){const issue=shopOpeningIssue();if(issue){shopStatusReason=issue;syncShopStatus();toast(issue,'bad');return;}}
     peopleOn = !peopleOn;shopStatusReason=''; _pLast = 0;
     if(!peopleOn){PEOPLE.length = 0;_openingRemaining=0;_openingParty=null;}              // ปิดแล้วเคลียร์ทิ้ง เปิดใหม่ค่อยเดินเข้ามาใหม่
-    else { _openingRemaining=null;_openingParty=null;_openingAt=0; _peopleT = 0; _spawnAt = 0.3; _partySequence=0; _arrivalScore=null; _pendingParty=null; _arrivalRetryAt=0; }
+    else { _openingRemaining=null;_openingParty=null;_openingAt=0; _doorFreeAt=0; _peopleT = 0; _spawnAt = 0.3; _partySequence=0; _arrivalScore=null; _pendingParty=null; _arrivalRetryAt=0; }
     syncPeopleBtn();if(typeof saveGame==='function')saveGame();
   };
   syncPeopleBtn();

@@ -167,7 +167,7 @@
   try{ if(typeof selSlug!=='undefined'&&selSlug===hit.s) selSlug=null; }catch(e){}
   try{ if(typeof heldSlug!=='undefined'&&heldSlug===hit.s) heldSlug=null; }catch(e){}
   o.done=true; o.doneAt=Date.now(); o.slugId=hit.s.id;
-  G.coin=(G.coin||0)+o.reward;
+  addCoin(o.reward);
   if(typeof syncHUD==='function') syncHUD();
   if(typeof syncOv==='function') try{ syncOv(); }catch(e){}
   if(typeof renderBreederUI==='function') try{ renderBreederUI(); }catch(e){}
@@ -242,7 +242,7 @@
     var pv=document.createElement('canvas'); pv.width=180; pv.height=132;
     pv.style.cssText='width:100%;height:auto;display:block';
     try{ if(typeof drawSlugPortrait==='function') drawSlugPortrait(pv,s); }catch(e){}
-    cell.append(pv);SlugBrowser.heart(cell,s,paint,'order');
+    cell.append(pv);SlugHover.mark(cell,s);SlugBrowser.heart(cell,s,paint,'order');
     var cap=document.createElement('div');
     cap.innerHTML='<b>'+esc(SlugBrowser.name(s))+'</b> '+(x.m.ok?'<span style="color:#a6d68a">ตรงสเปก ✓</span>':'')
       +'<br>'+x.m.rows.map(function(r){
@@ -261,6 +261,7 @@
     grid.append(cell);
    });
    box.append(grid);
+   SlugHover.attach(grid);   // ชี้/กดค้างการ์ด = แผงยีน เหมือนหน้าเลือกทากผสมพันธุ์ (slug-hover.js)
 
    submitBtn=document.createElement('button');
    submitBtn.className='tbtn'; submitBtn.type='button'; submitBtn.disabled=true;

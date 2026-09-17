@@ -54,7 +54,7 @@ window.BOOTING = true;
         Object.keys(FOOD_TYPES).forEach(k => urls.push('assets/food/' + k + '.png'));
       const dkeys = new Set();
       (G.objs||[]).concat(G.shelter||[]).forEach(o => (o.decor||[]).forEach(d => dkeys.add(d.key)));
-      dkeys.forEach(k => { try{ decorImg(k); }catch(_){} });
+      dkeys.forEach(k => { if(!TANK_DECOR[k]?.model) try{ decorImg(k); }catch(_){} });
 
       const list = allSlugs();
       total = urls.length + list.length + 1;

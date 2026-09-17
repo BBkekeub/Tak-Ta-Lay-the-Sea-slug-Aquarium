@@ -1,9 +1,9 @@
 import {projectedHeading,intersectsCanvas} from './slug-view-math.js?v=direction16';
-import {SlugCrowd} from './slug-crowd.js?v=gilln2';
+import {SlugCrowd} from './slug-crowd.js?v=gilln4';
 import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {applySlugSkin,addSlugEyes,updateSlugPalette} from './slug-skin.js?v=face14';
+import {applySlugSkin,addSlugEyes,updateSlugPalette} from './slug-skin.js?v=face16';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {softenBody} from './slug-surface.js';
 const api=window.Slug3D={ready:false,enabled:true,all:true,targetId:null,error:null,stats:{renders:0,reuses:0,culled:0,ms:0,triangles:0,drawCalls:0,instances:0,copies:0,animationHz:0},clip:null};
@@ -28,6 +28,42 @@ function wallBasis(w,out){
 let resolution=256,atlasW=2048,atlasH=1920,columns=8,atlasRows=10,viewMode=null;const slotsPerPage=256;
 const highGeometries=new Map();
 const posePool=new Map();
+/* ---- ชักเย่อ: สะบัดหงอน/หนวดไปหน้า-หลังตามปุ่มที่กด (s.tugLean: +1 = ไปทางหาง … −1 = ไปทางหัว) ----
+   เอียงกระดูกโคนหงอน/โคนหนวด "ต่อจาก" ท่าที่คลิปเล่นอยู่ รอบแกนข้างลำตัว (ทุกพุ่มเอียงพร้อมกัน)
+   ⚠️ ต้องถอดค่าเอียงเดิมออกก่อนคลิปอัปเดตเฟรมถัดไปทุกครั้ง — กระดูกที่คลิปไม่ได้แตะ
+      จะไม่ถูกเขียนทับ ถ้าไม่ถอดจะเอียงสะสมไปเรื่อย ๆ จนหงอนพับราบ
+   ⚠️ ทากที่กำลังดึงเชือกต้องใช้โครงกระดูกของตัวเอง ห้ามเข้า posePool (โครงที่แชร์กัน)
+      ไม่งั้นทากทุกตัวที่ท่าตรงกันจะสะบัดตามไปด้วย */
+const LEAN_BONES=/^(Crown_\d+_Attach|gill_\d+_base|rhino_[LR]_base)$/;
+const leanQ=new THREE.Quaternion(),leanP=new THREE.Quaternion(),leanA=new THREE.Vector3(),leanB=new THREE.Vector3(),LEAN_UP=new THREE.Vector3(0,1,0);
+function leanRig(v){
+ if(v.leanRig)return v.leanRig;
+ const bones=[];let head=null,root=null;
+ v.model.traverse(o=>{if(!o.isBone)return;if(LEAN_BONES.test(o.name))bones.push({b:o,d:new THREE.Quaternion(),k:o.name[0]==='r'?.3:.45});if(o.name==='Head')head=o;if(o.name==='root')root=o;});
+ v.model.updateMatrixWorld(true);
+ /* ทิศหัวในพิกัดโมเดล = จากกระดูก root ไปหา Head (ตัดแกนตั้งทิ้ง) · แกนหมุน = หัว × บน
+    หมุนบวกรอบแกนนี้ ปลายหงอนที่ชี้ขึ้นจะเอนไปทาง "หาง" พอดี */
+ const fwd=head&&root?head.getWorldPosition(leanA).sub(root.getWorldPosition(leanB)).setY(0).normalize():new THREE.Vector3(1,0,0);
+ return v.leanRig={bones,side:new THREE.Vector3().crossVectors(fwd,LEAN_UP).normalize()};
+}
+function unleanBones(v){
+ if(!v.leanOn)return;
+ for(const x of v.leanRig.bones)x.b.quaternion.premultiply(leanQ.copy(x.d).invert());
+ v.leanOn=false;
+}
+function leanBones(v,lean){
+ if(!lean)return;
+ const rig=leanRig(v);v.model.updateMatrixWorld(true);
+ for(const x of rig.bones){
+  x.b.parent.getWorldQuaternion(leanP);
+  /* ฝั่งไปทางหางลดเหลือ 60% — ท่ายืนปกติของโมเดลเอนหงอนไปทางหางอยู่แล้ว
+     เอียงเท่ากันสองฝั่ง ตอนกด F หงอนเลยนอนราบ ส่วนกด K แค่ตั้งตรง (เทสต์เห็นแล้ว) */
+  leanQ.setFromAxisAngle(rig.side,lean*x.k*(lean>0?.6:1));
+  x.d.copy(leanP).invert().multiply(leanQ).multiply(leanP);   // หมุนรอบแกนโลก แปลงเป็นแกนของพ่อกระดูก: D = P⁻¹·Q·P
+  x.b.quaternion.premultiply(x.d);
+ }
+ v.leanOn=true;
+}
 const instances=new Map(),pages=[],pending=new Map();let scheduled=false,slotSeq=0;const freeSlots=[];
 let viewFrame=0;
 api.beginFrame=()=>{viewFrame++;pending.clear();api.stats.frameCulled=0;if(!scheduled){scheduled=true;requestAnimationFrame(flush);}};
@@ -62,16 +98,18 @@ function renderJob(job,now){
  else{v.basis=null;v.tileLift=0;}
  const eyes={sleep:.07,sneeze:.08,startle:1.25,flee:1.18,held:1.12,eat:.72,dashCharge:.38,dash:.5,greet:.78,inspect:.85,mating:.65,larvaDeath:.07};
  let eyeTarget=eyes[key]??1;
+ /* ชักเย่อ: กำลังออกแรง (s.tugStrain) = โชว์ตา ＞＜ (เมช EyeStrain_ ใน slug-skin.js) แล้วบีบตาจริงให้แบนอยู่ข้างใต้ */
+ v.strain=s.tugStrain?1:0;if(v.strain)eyeTarget=.02;
  const blinkPhase=(now/1000+v.slot*.731)%4.7;if(eyeTarget===1&&blinkPhase<.16)eyeTarget=.08;
  v.eyeOpen=(v.eyeOpen??1)+(eyeTarget-(v.eyeOpen??1))*(1-Math.exp(-dt*24));
- v.poseModel=null;
- if(instances.size>24&&meta[key]?.loop&&!lifted&&now-v.changedAt>300){
+ v.poseModel=null;unleanBones(v);
+ if(instances.size>24&&meta[key]?.loop&&!lifted&&s.tugLean===undefined&&now-v.changedAt>300){
   const phase=String(s.id).split('').reduce((a,c)=>a+c.charCodeAt(0),0)%8,poolKey=key+'|'+phase;
   let pose=posePool.get(poolKey);
   if(!pose){const model=cloneSkeleton(template),mixer=new THREE.AnimationMixer(model),clip=clips.find(c=>c.name===key),action=mixer.clipAction(clip);action.setLoop(THREE.LoopRepeat,Infinity).play();pose={model,mixer,clip,last:0};posePool.set(poolKey,pose);}
   if(pose.last!==now){pose.mixer.setTime(now/1000+phase*pose.clip.duration/8);pose.last=now;}
   v.poseModel=pose.model;
- }else v.mixer.update(dt);
+ }else{v.mixer.update(dt);leanBones(v,s.tugLean);}
  if(v.last)api.stats.animationHz=api.stats.animationHz*.95+1000/(now-v.last)*.05;
  v.last=now;v.valid=true;api.clip=key;api.stats.renders++;api.stats.triangles=renderer.info.render.triangles;api.stats.drawCalls=renderer.info.render.calls;
 }
@@ -165,6 +203,14 @@ try{
  template=cloneSkeleton(model);clips=gltf.animations;scene.remove(model);crowd=new SlugCrowd(template,scene);const detailed=cloneSkeleton(template);detailed.traverse(o=>{if(o.isMesh&&highGeometries.has(o.name))o.geometry=highGeometries.get(o.name);});highCrowd=new SlugCrowd(detailed,scene);const distant=cloneSkeleton(template);applyLOD(distant,farLod);farCrowd=new SlugCrowd(distant,scene);api.stats.meshes=crowd.parts.map(p=>({name:p.name,triangles:p.mesh.geometry.index.count/3,rank:p.rank}));   // rank = ลำดับที่หงอนพุ่มนี้โผล่ตามยีน gillN (undefined = ไม่ใช่หงอน โชว์เสมอ)
  api.crowds={crowd,highCrowd,farCrowd};   // เปิดไว้ให้ตรวจได้จากคอนโซล เช่น เช็กว่าหงอนที่เกินยีนถูกย่อเป็นศูนย์จริงไหม
  api.ready=true;api.names=Object.keys(actions);api.meta=meta;
+ // Share the already-loaded GLB for direct tank depth rendering. No second fetch.
+ api.meshSource=()=>({template,clips,meta});
+ // Reuse the exact animation/crossfade/eyes/gene pipeline for a visible world renderer.
+ // This does not enqueue an atlas job or read pixels back.
+ api.worldPose=(s,heading,basis,lifted,worldMatrix)=>{
+  const v=instance(s),job={s,v,heading,lifted};renderJob(job,performance.now());
+  v.basis=basis;return{...job,worldMatrix};
+ };
  api.checkClips=()=>{
   const s={id:'__validation',genes:{mainC:200,accC:250,len:50,girth:50,gillLen:50,gillN:50,spotN:50,tentLen:50,vigor:50},flip:false},v=instance(s),slot=v.slot,canvas=document.createElement('canvas');canvas.width=512;canvas.height=384;const ctx=canvas.getContext('2d'),results=[];v.slot=0;v.tile=0;v.sx=0;v.sy=0;v.sw=128;v.sh=96;
   for(const c of clips){

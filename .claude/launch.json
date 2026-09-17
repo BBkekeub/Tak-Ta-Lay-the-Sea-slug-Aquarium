@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "game",
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:\\Users\\ACER\\AppData\\Local\\Temp\\claude\\C--Users-ACER-Documents-GitHub-Tak-Ta-Lay-the-Sea-slug-Aquarium\\b4b14238-33ae-4ef9-ad13-9e69a0b329b8\\scratchpad\\serve.ps1", "-Root", "C:\\Users\\ACER\\Documents\\GitHub\\Tak-Ta-Lay-the-Sea-slug-Aquarium", "-Port", "8123"],
+      "port": 8123
+    }
+  ]
+}

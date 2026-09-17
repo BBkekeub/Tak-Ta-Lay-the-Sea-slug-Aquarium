@@ -35,6 +35,20 @@ uniform vec4 geneTraits;
 ${body?'uniform sampler2D mantlePattern;':''}
 float disk(vec2 p,vec2 c,vec2 r){return 1.0-smoothstep(.86,1.0,length((p-c)/r));}
 float grain(vec3 p){return sin(p.x*91.0+sin(p.z*53.0))*sin(p.y*117.0+p.z*63.0)*.5+.5;}
+/* ผัง 8 ลาย (u,v,r) พอร์ตตรงจาก SPOT_SLOTS ใน slug-engine.js (สั่งจัดมือ 2026-09-02) เป๊ะ ๆ
+   ห้ามแก้ตัวเลขที่นี่แยกจากไฟล์นั้น — ยีนตัวเดียวกันต้องได้ลายเดียวกันทั้ง 2D และ 3D */
+vec3 spotSlot(int i){
+ if(i==0)return vec3(0.2927,0.3443,0.1445);
+ if(i==1)return vec3(0.4526,0.6583,0.1445);
+ if(i==2)return vec3(0.5584,0.2853,0.1183);
+ if(i==3)return vec3(0.6889,0.5692,0.0928);
+ if(i==4)return vec3(0.3783,0.5303,0.0647);
+ if(i==5)return vec3(0.4559,0.2853,0.0623);
+ if(i==6)return vec3(0.6278,0.4245,0.0534);
+ return vec3(0.7584,0.6416,0.0519);
+}
+// สูตรสุ่มคงที่เดียวกับ SPOT_SLOTS.forEach ในไฟล์ 2D เป๊ะ ๆ (i คือลำดับหลัง sort r มาก→น้อย)
+float spotHash(float i,float n){float x=sin((i+1.0)*n)*43758.5453;return x-floor(x);}
 vec3 skinColor(){
  vec3 pearl=geneBase,blue=geneDark,ice=geneAcc,ink=vec3(.002,.006,.009);
  vec3 p=skinRest;
@@ -52,16 +66,29 @@ vec3 skinColor(){
  c=mix(c,paleRim,painted.g*topMask*strength);
  vec3 stripeInk=mix(vec3(.002,.004,.012),geneBase*.055,.25);
  c=mix(c,stripeInk,painted.r*topMask*strength);
- // Irregular ring spots on the mantle, kept behind the face.
+ /* ลาย 8 ดวง — ตำแหน่ง/รัศมี/มุมเอียง มาจาก SPOT_SLOTS จริงของ 2D ไม่ใช่สูตรสุ่มแยกต่างหาก
+    เติมดวงใหญ่→เล็กตามลำดับเดียวกับ spotPlan() (geneTraits.y = nSpot)
+    2D เห็นแค่ฝั่งเดียวเพราะกล้องคงที่ — ตัวจริงสมมาตรซ้าย-ขวา จึงพลิก z แปะอีกชุดคนละฝั่ง
+    รวมเป็น nSpot*2 ดวงทั้งตัว ต่างจาก 2D ที่นับได้แค่ nSpot ดวงเดียว */
  for(int i=0;i<8;i++){
   if(float(i)>=geneTraits.y)break;
-  float k=float(i);vec2 q=vec2(-.30+k*.081,sin(k*2.31)*.10);
-  float radius=.019+.008*(.5+.5*sin(k*3.7));
-  vec2 uv=(p.xz-q)/radius;
-  float metric=geneTraits.z<.5?length(uv):geneTraits.z<1.5?max(abs(uv.x),abs(uv.y)):max(abs(uv.x)*.866+uv.y*.5,-uv.y);
-  float d=metric+(grain(p*1.3)-.5)*.10;
-  float spot=(1.0-smoothstep(.88,1.05,d))*smoothstep(.075,.14,p.y);
-  c=mix(c,mix(blue,ice,smoothstep(.53,.75,d)),spot*.58);
+  vec3 slot=spotSlot(i);
+  // (u,v) เศษส่วนของผ้าใบวาดตัว 2D → พิกัดโลคัลของเมช 3D ผ่านกรอบเดียวกับ mantleUV ด้านล่าง
+  vec2 qBase=vec2(slot.x*1.10-.55,(1.0-slot.y)*.62-.31);
+  float jr=spotHash(float(i),12.9898)*2.0-1.0, js=spotHash(float(i),78.233);
+  float radius=slot.z*.62*1.2*(.92+js*.16);   // *1.2 = หนาขึ้นจากเดิมหน่อยตามที่สั่ง
+  float tiltDeg=geneTraits.z<.5?6.0:geneTraits.z<1.5?34.0:44.0;   // SPOT_TILT ต่อรูปทรง (circle/sq/tri)
+  float tilt=tiltDeg*jr*3.14159265/180.0, ct=cos(tilt), st=sin(tilt);
+  for(int side=0;side<2;side++){
+   vec2 q=vec2(qBase.x, side==0?qBase.y:-qBase.y);
+   vec2 rel=(p.xz-q)/radius;
+   vec2 uv=vec2(rel.x*ct-rel.y*st, rel.x*st+rel.y*ct);
+   float metric=geneTraits.z<.5?length(uv):geneTraits.z<1.5?max(abs(uv.x),abs(uv.y)):max(abs(uv.x)*.866+uv.y*.5,-uv.y);
+   float dd=metric+(grain(p*1.3)-.5)*.10;
+   float spot=(1.0-smoothstep(.85,1.0,dd))*smoothstep(.075,.14,p.y);
+   // สีเดียวกับหงอน (blue/ice = geneDark/geneAcc จาก accC) แค่คูณมืดลงให้เห็นชัดบนพื้นลำตัว
+   c=mix(c,mix(blue*.55,ice*.55,smoothstep(.53,.75,dd)),spot*.75);
+  }
  }
  // Two eyes painted onto the head surface, not floating objects.
  float front=smoothstep(.07,.115,p.y);
@@ -110,6 +137,32 @@ export function addSlugEyes(root,data){
   geometry.applyMatrix4(head.matrixWorld.clone().invert());
   geometry.computeVertexNormals();geometry.computeBoundingSphere();
   const eye=new THREE.Mesh(geometry,material);eye.name=source.name;head.add(eye);
+ }
+ /* ---- ตา ＞＜ ตอนออกแรง (ชักเย่อ) — เมชใหม่เฉพาะอีเวนต์ วางทับตาจริงแต่ละข้าง ----
+    สร้างจากกรอบของตาที่ศิลปินปั้นไว้ (edited-eyes.json) ตำแหน่ง/ขนาดจึงตามตาเดิมเป๊ะ ไม่ต้องเดาพิกัด
+    รูป ＞ อยู่ในระนาบ x-y (x = ทางหัว, y = ขึ้น) ปลายแหลมชี้ไปทางหัว — ฝั่งเราหันขวา คู่แข่งหันซ้าย
+    บนจอเลยกลายเป็น ＞＜ หันเข้าหากันพอดี
+    ปกติซ่อน (slug-crowd.js ย่อเป็นศูนย์) · โผล่เฉพาะตัวที่ v.strain (slug-3d.js ← s.tugStrain) พร้อมบีบตาจริงให้แบน
+    ⚠️ ชื่อต้องขึ้นต้น EyeStrain_ ไม่ใช่ Eye_ — ชื่อ Eye_ ถูกย่อตาม eyeOpen (ตากะพริบ) ใน slug-crowd.js */
+ const box=(L,t,d,ang,x,y)=>{const g=new THREE.BoxGeometry(L,t,d);g.rotateZ(ang);g.translate(x,y,0);return g;};
+ for(const source of data.eyes){
+  const p=source.positions,min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+  for(let i=0;i<p.length;i+=3)for(let k=0;k<3;k++){min[k]=Math.min(min[k],p[i+k]);max[k]=Math.max(max[k],p[i+k]);}
+  const sx=max[0]-min[0],sy=max[1]-min[1],sz=max[2]-min[2];
+  /* ใหญ่ราว 2 เท่าของตาจริง + เส้นหนา — เทสต์แล้วขนาดเท่าตาเดิม (~3 px บนจอในตู้) มองเป็นแค่จุดดำ อ่านไม่ออกว่าเป็น ＞ */
+  const a=sx*1.5,b=sy*1.05,t=sy*.34,depth=sz*2;             // ครึ่งความกว้าง · ครึ่งความสูง · ความหนาเส้น · ความลึก
+  /* แขนสองข้างของ ＞ : จากปลายแหลม (a,0) ไปปลายแขน (−a,±b) — กล่องบาง ๆ หมุนตามแนวแขน */
+  const arms=[1,-1].map(sgn=>{const dx=-2*a,dy=sgn*b;return box(Math.hypot(dx,dy)+t,t,depth,Math.atan2(dy,dx),a+dx/2,dy/2);});
+  const n0=arms[0].attributes.position.count,geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute([...arms[0].attributes.position.array,...arms[1].attributes.position.array],3));
+  geometry.setIndex([...arms[0].index.array,...Array.from(arms[1].index.array,i=>i+n0)]);
+  arms.forEach(g=>g.dispose());
+  /* ดันออกนอกหัวนิดหน่อยตามด้านของตา (z) — ตัวใหญ่ขึ้นแล้วแขนจะจมหายเข้าไปในผิวหัวที่โค้งออก */
+  const cz=(min[2]+max[2])/2;
+  geometry.translate((min[0]+max[0])/2,(min[1]+max[1])/2,cz+Math.sign(cz)*sz*.3);
+  geometry.applyMatrix4(head.matrixWorld.clone().invert());
+  geometry.computeVertexNormals();geometry.computeBoundingSphere();
+  const strain=new THREE.Mesh(geometry,material);strain.name='EyeStrain_'+source.name.replace(/^Eye_/,'');head.add(strain);
  }
 }
 

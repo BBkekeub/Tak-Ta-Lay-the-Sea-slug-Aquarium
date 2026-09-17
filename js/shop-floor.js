@@ -259,7 +259,9 @@ function drawWall(a, b, tint, wallKeyId, z0=0, z1=ROOM_H){
   /* ไล่แสง: บนสว่างกว่าล่างนิดหน่อย + ย้อมให้ผนังสองด้านต่างกันเหมือนโดนแสงคนละมุม
      ใช้บน–ล่างของ "ทั้งบาน" เป็นจุดอ้างอิงเดียวกันทุกช่อง ไม่งั้นแสงจะไล่ซ้ำ (สว่าง-มืด-สว่าง-มืด) ทุกช่อง */
   const g=ctx.createLinearGradient(0,top.y,0,bottom.y);
-  g.addColorStop(0,'rgba(255,240,215,0.11)'); g.addColorStop(1,'rgba(0,0,0,0.28)');
+  /* ⚠️ 2026-09-13 เบาลงจาก +11% / −28% เพราะซ้อนกับการย้อมรายด้านใน floor-grid.js อีกชั้น
+     รวมกันแล้วเชิงผนังฝั่งมืดเคยลงไปถึง ~136 จากหินอ่อน 236 = สีที่ทาอ่านไม่ออกเลย */
+  g.addColorStop(0,'rgba(255,240,215,0.08)'); g.addColorStop(1,'rgba(0,0,0,0.18)');
   ctx.fillStyle=g; ctx.fill();
   if(tint){ ctx.fillStyle=tint; ctx.fill(); }
   /* บัวเชิงผนัง — เส้นสว่างบาง ๆ ตรงรอยต่อผนังกับพื้น ช่วยให้อ่านออกว่าเป็นห้อง
@@ -333,6 +335,7 @@ function drawRoomFloorLayer(){
 
 function drawFloor(){
   if(document.hidden)return;
+  window.DecorGLB?.beginShop();
   window.Slug3D?.beginFrame();
   // อนิเมชันหน้าร้าน (เปิด/ปิดได้) — เปิด = ทากเดินในตู้
   if(engineReady){
@@ -343,7 +346,7 @@ function drawFloor(){
     } else floorLastT=0;
   }
   if(typeof stepPeople==='function') stepPeople();     // ลูกค้าเดินดูตู้ (มีตัวจับเวลาของตัวเอง)
-  if(typeof PlayTable!=='undefined'&&PlayTable.isOpen())return;
+  if(typeof PlayTable!=='undefined'&&PlayTable.isOpen()){window.DecorGLB?.hide();return;}
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,CW,CH);
   /* ---- ชั้นห้อง+พื้น: เปลี่ยนเฉพาะตอนกล้องขยับ/ร้านโต จึงแคชเป็นภาพไว้ แล้วแปะทีเดียว ----
      ก่อนหน้านี้เททั้งเท็กซ์เจอร์ผนัง+พื้นแกรนิตใหม่ทุกเฟรม 60 ครั้ง/วิ = ต้นเหตุที่กระตุก
@@ -407,6 +410,8 @@ function drawFloor(){
   if(ghost) drawGhost(ghost);
   drawAreaBadges();
   if(window.SlugRace)SlugRace.drawChallengers();
+  if(window.SlugTug)SlugTug.drawChallengers();
+  window.DecorGLB?.endShop();
 }
 
 function drawBigDiamond(bx0,by0,bw,bh, fill, stroke, dashed){
@@ -537,6 +542,8 @@ function drawObject(o){
     ctx.fillStyle=sg; ctx.fill();
   } else { ctx.fillStyle='#d8bd8c'; ctx.fill(); }
   if(d.race&&window.SlugRace)SlugRace.drawTrack(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);});
+  /* ตู้ชักเย่อ: วาดเลน/เส้นชนะ-แพ้บนพื้นทรายให้เห็นจากหน้าร้านด้วย แบบเดียวกับสนามตู้แข่งวิ่งบรรทัดบน (เดิมเห็นแค่ตอนเข้าตู้) */
+  if(d.tug&&window.SlugTug)SlugTug.drawLane(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);});
   // ทากอยู่ก้นตู้ (ในน้ำ) — clip ให้อยู่ในกรอบตู้ (หัวไม่ทะลุกระจก) · ขนาด = ความยาวลำตัวจริง
   const displaySlugs=[...o.slugs,...breederVisualSlugs(o)];
   const pxPerCm=TW/CM_PER_CELL, shown=window.Slug3D?.ready&&Slug3D.enabled&&Slug3D.all?displaySlugs.length:Math.min(displaySlugs.length,isBreeder(o)?70:20);   // ระยะแนวนอนต่อ 1 ช่อง (ตรงกับในตู้)
@@ -573,6 +580,10 @@ function drawObject(o){
       return;
     }
     if(it.dec){                                        // ---- หิน/ของตกแต่ง ----
+      if(typeof TidalDecor!=='undefined' && TidalDecor.is(it.dec.key)){
+        window.DecorGLB?.queueShop(o,it.dec);
+        return;
+      }
       const dd=it.dec, def=TANK_DECOR[dd.key], e=decorImg(dd.key);
       const dw=def.wCm*(d.decorScale||1)*pxPerCm*cam.zoom;
       const dh=(e.ok? dw*(e.img.naturalHeight/e.img.naturalWidth) : dw*0.8);
@@ -588,6 +599,7 @@ function drawObject(o){
       return;
     }
     const s=it.s;                                      // ---- ทาก ----
+    if(window.DecorGLB?.queueShopSlug(o,s))return;
     const showcaseScale=d.shopSlugScale||1;
     const a=Math.min(w*.92,Math.max(w*.08,it.sm[0]));
     const b=Math.min(h*.92,Math.max(h*.08,it.sm[1]));
@@ -606,8 +618,11 @@ function drawObject(o){
            รวมแล้วลอยสูงเกินไป ~1.7 ช่อง = โผล่พ้นผิวน้ำไปลอยอยู่นอกตู้
            แก้เป็นยึดจุดจริงบนจอแทน: ก้นตู้ = standH · ผิวน้ำ = standH+tankH*0.88
            แล้วไล่ตำแหน่งจาก "หางแตะทราย" (climbZ=0) ไป "หัวถึงผิวน้ำ" (climbZ=rise) */
-        const limits=slugWallLimits(s,d.w,d.h,d), edge=s.climbSide==='right'?d.w:0;
-        const point=MAP(edge,s.fy), inPt=MAP(edge?d.w-1:1, s.fy);
+        /* กระจกขวาของตู้ผสมพันธุ์คือ "ผนังกั้น" ที่ fx=20 ไม่ใช่ขอบนอก d.w — ซิมจำกัดตัวไว้ใน fw=20 (stepTankSlugs)
+           ต้องใช้กติกาเดียวกับ drawWallSlug/drawWallSlug3D ใน tank-view.js ไม่งั้นทากไปเกาะกระจกนอกห่างตัวจริง 10 ช่อง
+           และจุด "ด้านใน" ต้องถอยจาก edge จริง (edge-1) ไม่ใช่ d.w-1 — ไม่งั้นหลังจะหันเข้าช่องผสมพันธุ์แทนกลางตู้ */
+        const limits=slugWallLimits(s,d.w,d.h,d), edge=s.climbSide==='right'?(d.breeder?20:d.w):0;
+        const point=MAP(edge,s.fy), inPt=MAP(edge?edge-1:1, s.fy);
         const floorPoint=P(cx+point[0],cy+point[1],standH);
         const waterPoint=P(cx+point[0],cy+point[1],standH+tankH*0.88);
         const sprite=slugSprite(s), sw=sprite.w*sa, sh=sprite.h*sa;
@@ -717,9 +732,11 @@ function placeBuy(cell){
   const o=snapFootprint(cell,def,buyRot);
   if(!canPlace(o.cx,o.cy,def,null,buyRot)){ toast('วางไม่ได้: ของทับกัน บังประตู หรือเหลือทางเข้าตู้ไม่พอ','bad'); return; }
   if(def.race&&[...G.objs,...G.shelter].some(t=>t.def.race)){toast('มีตู้แข่งได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
-  G.coin-=def.price;
+  if(def.tug&&[...G.objs,...G.shelter].some(t=>t.def.tug)){toast('มีตู้ชักเย่อได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
+  addCoin(-def.price);
   G.objs.push({ id:'o'+(G.seq++), type:def.kind, _key:buyKey, cx:o.cx, cy:o.cy, def, rot:buyRot, slugs:[] });
   if(def.race&&window.SlugRace)SlugRace.purchased();
+  if(def.tug&&window.SlugTug)SlugTug.purchased();
   toast('วาง'+def.name+' −'+def.price,'good'); syncHUD();finishConstruction();
 }
 function objAt(cell){
@@ -771,7 +788,7 @@ function expand(dir){
   if(cur>=MAX_B){ toast('พื้นที่เต็มขนาดสูงสุดแล้ว (32×32)','bad'); return; }
   const n = dir==='w'? G.bh : G.bw, cost = expandCost(n, floorArea());   // ขยายทั้งแถว = คิดทีละช่อง
   if(G.coin<cost){ toast('เหรียญไม่พอ ('+cost.toLocaleString()+')','bad'); return; }
-  G.coin-=cost; if(dir==='w') G.bw++; else G.bh++;
+  addCoin(-cost); if(dir==='w') G.bw++; else G.bh++;
   toast('ขยายพื้นที่ '+n+' ช่อง −'+cost.toLocaleString(),'good'); syncHUD();
 }
 function toShelter(o){ G.objs=G.objs.filter(x=>x!==o); G.shelter.push(o); toast('ย้าย'+o.def.name+'ไปที่พักพิง','good'); syncHUD();finishConstruction(); }
@@ -788,7 +805,7 @@ function fromShelter(idx){
 function removeObj(o){
   if(o.type==='tank'){ toShelter(o); return; }
   G.objs=G.objs.filter(x=>x!==o);
-  const back=Math.round(o.def.price*DECO_REFUND); G.coin+=back;
+  const back=Math.round(o.def.price*DECO_REFUND); addCoin(back);
   toast('เก็บ'+o.def.name+' +'+back,'good'); syncHUD();finishConstruction();
 }
 function sellObj(o){
@@ -799,10 +816,10 @@ function sellObj(o){
     (o.slugs||[]).forEach(s=>{ if(Array.isArray(G.inv)) G.inv.push(s); });
     if(o.slugs) o.slugs.length=0;
     G.objs=G.objs.filter(x=>x!==o);
-    G.coin+=val; toast('ขายตู้'+o.def.name+' +'+val+' เหรียญ','good'); syncHUD(); finishConstruction();
+    addCoin(val); toast('ขายตู้'+o.def.name+' +'+val+' เหรียญ','good'); syncHUD(); finishConstruction();
   } else {
     G.objs=G.objs.filter(x=>x!==o);
-    const back=Math.round((o.def.price||0)*DECO_REFUND); G.coin+=back;
+    const back=Math.round((o.def.price||0)*DECO_REFUND); addCoin(back);
     toast('ขายทิ้ง'+o.def.name+' +'+back+' เหรียญ','good'); syncHUD(); finishConstruction();
   }
 }
@@ -864,7 +881,15 @@ cv.addEventListener('pointerup', e=>{
   // คลิก (ไม่ลาก) — ใช้ tankHit ก่อน (คลิกกระจกตู้ที่ยกสูงก็เข้าได้ + รู้จุดโฟกัส)
   const th=tankHit(sx,sy);
   const o=objAt(cell);
-  if(appMode==='view'){ const play=typeof playTableHit==='function'?playTableHit(sx,sy):null;if(play&&(!th||play.cx+play.cy>=th.o.cx+th.o.cy)){openPlayTable(play);return;} if(th) enterTank(th.o,{fx:th.fx,fy:th.fy}); return; } // โหมดดู: คลิกตู้=เข้า
+  /* โหมดดู: คลิกตู้=เข้า · โต๊ะเล่นกับตู้ทับกันบนจอได้ ใครถูกวาดทีหลัง (อยู่หน้า) คนนั้นได้คลิก
+     ⚠️ ห้ามตัดสินด้วย cx+cy — นั่นคนละสูตรกับลำดับวาดจริง (isoSortedObjects ดูขนาด+การบังกันด้วย)
+        ตู้ใบใหญ่ที่จุดเริ่มอยู่หลังโต๊ะแต่ยื่นมาข้างหน้า จะถูกวาดทับโต๊ะ แต่เดิมกลับเสียคลิกให้โต๊ะ */
+  if(appMode==='view'){
+    const play=typeof playTableHit==='function'?playTableHit(sx,sy):null;
+    if(play&&th){ const order=isoSortedObjects(); if(order.indexOf(play)>=order.indexOf(th.o)){ openPlayTable(play); return; } }
+    else if(play){ openPlayTable(play); return; }
+    if(th) enterTank(th.o,{fx:th.fx,fy:th.fy}); return;
+  }
   // โหมดก่อสร้าง
   if(tool==='remove'){ if(o) removeObj(o); else if(th) removeObj(th.o); return; }
   if(tool==='sell'){ if(o) sellObj(o); else if(th) sellObj(th.o); return; }
@@ -992,8 +1017,35 @@ document.getElementById('expH').onclick=()=>expand('h');
    = จอค้างยาว ซึ่งคือสิ่งที่หน้าโหลดตั้งใจจะเลี่ยง */
 function loop(){
   if(!window.BOOTING && !document.hidden && !(typeof tankMode!=='undefined' && tankMode) && !window.SlugRace?.isOpen()) drawFloor();
+  else if(document.hidden||window.SlugRace?.isOpen())window.DecorGLB?.hide();
   requestAnimationFrame(loop);
 }
+
+/* ---------- จำลองอิสระ: ทาก/ลูกค้าที่ drawFloor() มองไม่เห็น ----------
+   drawFloor() ข้างบนเดินทาก(onScreen)+ลูกค้าให้เองทุกเฟรมอยู่แล้วตอนที่มันทำงาน (หน้าร้าน,
+   แท็บไม่ซ่อน, ไม่ได้อยู่ในตู้/แข่ง) — จุดนั้นเร็ว 60Hz อยู่แล้ว ไม่ต้องแตะ
+   ปัญหาคือทาก "หลุดจอเพราะแพนกล้อง" (onScreen เป็นเท็จ) กับทุกอย่าง "ตอน drawFloor ไม่ทำงานเลย"
+   (แท็บถูกซ่อน / กำลังดูอยู่ในตู้อื่น / เปิดหน้าแข่ง) ไม่มีใครเดินให้เลย นาฬิกาค้างสนิท
+   ผิดกฎ AGENTS.md ข้อ 5 — ตัวนี้อุดเฉพาะช่องว่างนั้น ใช้ setInterval เพราะเบราว์เซอร์ไม่หยุด
+   setInterval สนิทตอนแท็บซ่อนเหมือนที่หยุด requestAnimationFrame (ดู breeding.js/tank-hygiene.js) */
+let _simLastT = 0;
+function stepShopSimulation(){
+  if(window.BOOTING) return;
+  const now=performance.now();
+  let dt=(now-(_simLastT||now))/1000; _simLastT=now;
+  if(dt>1) dt=1;   // กันกระโดดยาวผิดปกติ (เครื่อง sleep ค้างนาน) เหมือน breeding.js
+  const drawFloorActive = !document.hidden && !(typeof tankMode!=='undefined' && tankMode) && !window.SlugRace?.isOpen();
+  const openTank = (typeof tankMode!=='undefined' && tankMode && !document.hidden) ? curTank : null;   // ตู้ที่เปิดดูอยู่ (ไม่ซ่อน) ให้ tank-view.js เดินเอง
+  if(engineReady && shopAnim){
+    G.objs.forEach(o=>{
+      if(o.type!=='tank' || !o.slugs.length || o===openTank) return;
+      if(drawFloorActive && onScreen(o)) return;   // drawFloor() ดูแลของที่เห็นในจอเองทุกเฟรมอยู่แล้ว
+      stepTankSlugs(o.slugs, o.def.w, o.def.h, dt, o.slugs.length<=25, o.decor, o.def);
+    });
+  }
+  if(typeof stepPeople==='function' && !drawFloorActive) stepPeople();   // drawFloorActive เรียกของมันเองอยู่แล้ว
+}
+setInterval(stepShopSimulation, 100);
 
 
 /* ---------- R = หมุนของ 90° ----------

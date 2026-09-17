@@ -10,6 +10,7 @@ import * as THREE from 'three';
    ⚠️ ยีน gillN = 50 (ค่าเริ่มต้น) ให้ 2 พุ่ม ไม่ใช่ 9 — ตรงกับ 2D แต่ต่างจากของเดิมที่โชว์ครบเสมอ */
 const CROWN_ORDER=[4,5,6,0,2,8,1,3,7];
 const HIDDEN=new THREE.Vector3(0,0,0);
+const TINT=new THREE.Color();            // ตัวแปรพักสีตอนผสมกระจก — สร้างครั้งเดียว ไม่ใช่ทุกอินสแตนซ์ทุกเฟรม
 // GPU instancing: one draw per mesh part, with independent skeleton matrices and colors.
 export class SlugCrowd {
  constructor(template,scene,capacity=256){
@@ -67,7 +68,7 @@ export class SlugCrowd {
    };
    const thisCrowd=this;m.customProgramCacheKey=()=>key.call(source.material)+'-crowd-'+skin;
    const mesh=new THREE.InstancedMesh(g,m,capacity);mesh.frustumCulled=false;if(source.morphTargetInfluences?.length)mesh.setMorphAt(0,source);mesh.count=0;scene.add(mesh);
-   this.parts.push({name:source.name,mesh,pose,colors,skin,metal,traits,rank});
+   this.parts.push({name:source.name,mesh,pose,colors,skin,metal,traits,rank,strain:/^EyeStrain_/.test(source.name)});
   });
   this.transform=new THREE.Matrix4();this.rotation=new THREE.Matrix4();this.offset=new THREE.Matrix4();this.shape=new THREE.Matrix4();this.appendage=new THREE.Matrix4();this.anchor=new THREE.Vector3();
  }
@@ -97,10 +98,15 @@ export class SlugCrowd {
    if(v.colorKey!==colorKey){const d=SlugEngine.derived(genes),rgb=c=>new THREE.Color(SlugEngine.hex(c));v.palette={geneBase:rgb(d.base),geneAcc:rgb(d.acc),geneDark:rgb(d.matA.d),geneLight:rgb(d.matA.l)};v.bodyMetal=0;v.gillMetal=0;v.colorKey=colorKey;}
    // tileLift slides the model inside its own tile, in tile heights, positive upward on screen.
    // Wall poses stand the body on end, so they need the tile's vertical centre, not the floor anchor.
-   const scale=v.sw/128,offset=up.clone().multiplyScalar(-v.sy/96*1.65-(scale-1)*.825+(v.tileLift||0)*1.65*scale);offset.x+=v.sx/128*2.2+(scale-1)*1.1;offset.y+=.23*(1-scale);this.offset.makeTranslation(offset.x,offset.y,offset.z);this.offset.scale(new THREE.Vector3(scale,scale,scale));
+   if(job.worldMatrix)this.offset.copy(job.worldMatrix);
+   else{
+    const scale=v.sw/128,offset=up.clone().multiplyScalar(-v.sy/96*1.65-(scale-1)*.825+(v.tileLift||0)*1.65*scale);offset.x+=v.sx/128*2.2+(scale-1)*1.1;offset.y+=.23*(1-scale);this.offset.makeTranslation(offset.x,offset.y,offset.z);this.offset.scale(new THREE.Vector3(scale,scale,scale));
+   }
    // basis carries a full orientation (head and back axes), yaw alone cannot express a slug on glass.
    if(v.basis)this.rotation.copy(v.basis);else this.rotation.makeRotationY(v.orientation||0);
-   this.shape.makeScale(d.stretch,1,1);this.shape.setPosition(0,floorLift,0);
+   /* girth (d.size) ต้องขยายทั้ง 3 แกนเหมือน 2D (bw=stretch*size, bh=size) ไม่ใช่แค่ X
+      floorLift วัดมาจากโพสท่าที่ยังไม่ scale — คูณ size เข้าไปด้วยกันจุดสัมผัสพื้นถึงจะไม่ลอย/จม */
+   this.shape.makeScale(d.stretch*d.size,d.size,d.size);this.shape.setPosition(0,floorLift*d.size,0);
    for(const part of this.parts){const src=parts.get(part.name);
     this.appendage.identity();
     /* ⚠️ ห้ามกลับไปใช้ startsWith('Gill') — หงอนใน GLB ตั้งชื่อสองชุด
@@ -123,7 +129,14 @@ export class SlugCrowd {
     /* หงอนที่เกินจำนวนของยีนตัวนี้ → ย่อเป็นศูนย์ ไม่มีพิกเซลออกมา
        (อินสแตนซ์ทุกตัวใช้ mesh.count เดียวกัน ซ่อนรายตัวได้แค่ทางนี้ · ไม่มีต้นทุนเพิ่ม) */
     if(part.rank>=d.nGill)this.transform.scale(HIDDEN);
-    part.traits.setXYZW(i,d.aura,d.nSpot,d.shape==='sq'?1:d.shape==='tri'?2:0,part.name==='Body'?d.deep:d.gdeep);part.mesh.setMatrixAt(i,this.transform);part.pose.setX(i,i);part.metal.setX(i,part.name==='Body'?v.bodyMetal:v.gillMetal);for(const [k,attr] of Object.entries(part.colors)){const c=v.palette[k];attr.setXYZ(i,c.r,c.g,c.b);}if(src.morphTargetInfluences?.length)part.mesh.setMorphAt(i,src);}
+    if(part.strain&&!v.strain)this.transform.scale(HIDDEN);   // ตา ＞＜ (slug-skin.js) โผล่เฉพาะตอนออกแรงชักเย่อ
+    part.traits.setXYZW(i,d.aura,d.nSpot,d.shape==='sq'?1:d.shape==='tri'?2:0,part.name==='Body'?d.deep:d.gdeep);part.mesh.setMatrixAt(i,this.transform);part.pose.setX(i,i);part.metal.setX(i,part.name==='Body'?v.bodyMetal:v.gillMetal);
+     /* job.tint = สีกระจกตู้ (หน้าร้านส่งมา) — ผสมเข้ากับสีจากยีนก่อนเขียนลง attribute
+        ทากที่อยู่ในตู้จึงดู "มองผ่านกระจก" เท่าของ 2D แทนที่จะคมเด่นลอยอยู่เหนือชั้นกระจก */
+     for(const [k,attr] of Object.entries(part.colors)){const c=v.palette[k];
+      if(job.tint){TINT.copy(c).lerp(job.tint.color,job.tint.amount);attr.setXYZ(i,TINT.r,TINT.g,TINT.b);}
+      else attr.setXYZ(i,c.r,c.g,c.b);}
+     if(src.morphTargetInfluences?.length)part.mesh.setMorphAt(i,src);}
   });
   this.texture.needsUpdate=true;
   for(const p of this.parts){p.mesh.instanceMatrix.needsUpdate=true;p.pose.needsUpdate=true;p.metal.needsUpdate=true;p.traits.needsUpdate=true;for(const a of Object.values(p.colors))a.needsUpdate=true;if(p.mesh.morphTexture)p.mesh.morphTexture.needsUpdate=true;}

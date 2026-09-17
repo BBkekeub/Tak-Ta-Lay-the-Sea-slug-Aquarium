@@ -4,6 +4,9 @@
  #ov .ov-body{overflow:hidden}
  .tank-side{position:absolute;top:14px;z-index:5;width:190px;display:flex;flex-direction:column;gap:9px;max-height:calc(100% - 28px);overflow:auto;scrollbar-width:thin;pointer-events:auto}
  .tank-side.left{left:12px}.tank-side.right{right:12px}
+ /* แถบซ้ายกับ "การ์ดยีน" ที่วาดบนแคนวาสใต้มันต้องกว้างเท่ากันและชิดขอบเดียวกัน
+    การ์ดอ่านความกว้างจริงของแถบนี้ตอนวาด (ดูท้ายไฟล์) เปลี่ยนตรงนี้ที่เดียวพอ */
+ .tank-side.left{width:206px}
  .tank-side .tbtn{white-space:normal;width:100%;text-align:left;padding:10px 12px}
  .tank-side details,.tank-side>.tbtn{background:rgba(15,28,31,.93);border:1px solid #536365;border-radius:10px;box-shadow:0 3px 14px #0003}
  .tank-side summary{cursor:pointer;padding:11px 12px;color:#e9ddc4;font-size:13px;user-select:none}
@@ -17,7 +20,7 @@
  #ov #ovDecor{padding:8px;background:rgba(15,28,31,.95);max-height:55vh;overflow:auto;flex-direction:column;border-radius:8px}
  #ov #ovDecor:not([hidden]){display:flex}#ovDecor .dpal{flex-wrap:wrap}#ovDecor .dlabel{display:none}
  #ov .ov-bottom{display:none!important}
- @media(max-width:800px){.tank-side{width:145px;top:8px}.tank-side.left{left:6px}.tank-side.right{right:6px}.tank-side .tbtn,.tank-side summary{font-size:12px;padding:8px}}
+ @media(max-width:800px){.tank-side{width:145px;top:8px}.tank-side.left{left:6px;width:186px}.tank-side.right{right:6px}.tank-side .tbtn,.tank-side summary{font-size:12px;padding:8px}}
  `;document.head.append(style);
  const body=ov.querySelector('.ov-body'),left=document.createElement('aside'),right=document.createElement('aside');left.className='tank-side left';right.className='tank-side right';left.setAttribute('aria-label','จัดการทาก');right.setAttribute('aria-label','เครื่องมือในตู้');body.append(left,right);
  const disclosure=(label,parent)=>{const d=document.createElement('details'),s=document.createElement('summary');s.textContent=label;d.append(s);parent.append(d);return d;};
@@ -32,6 +35,11 @@
  document.getElementById('foodCancel').addEventListener('click',()=>{food.open=false;food.querySelector('summary').textContent='🌸 ให้อาหาร';});
  document.getElementById('ovBuild').addEventListener('click',()=>{food.open=false;});
  tankCv.addEventListener('pointerup',()=>{if(!foodChoice)food.querySelector('summary').textContent='🌸 ให้อาหาร';});
- const originalGeneCard=drawGeneCard;drawGeneCard=function(slug,x,y){const r=left.getBoundingClientRect(),c=tankCv.getBoundingClientRect();return originalGeneCard(slug,x,Math.max(y,r.bottom-c.top+10));};
+ /* การ์ดยีนวางต่อใต้แถบซ้าย ใช้ขอบซ้ายและความกว้างเดียวกันเป๊ะ จะได้เป็นคอลัมน์เดียวกัน
+    (เดิม x=12 ตายตัว + การ์ดกว้าง 250 แต่แถบกว้าง 190 = เหลื่อมกันและกินที่เกินจำเป็น) */
+ const originalGeneCard=drawGeneCard;drawGeneCard=function(slug,x,y){
+  const r=left.getBoundingClientRect(),c=tankCv.getBoundingClientRect();
+  return originalGeneCard(slug, r.width?r.left-c.left:x, Math.max(y,r.bottom-c.top+10), r.width||undefined);
+ };
  const originalEnter=enterTank;enterTank=function(...args){food.open=false;breed.open=false;if(typeof foodModeSet==='function')foodModeSet(false);originalEnter(...args);renderBreederUI();updateBreed();};
 })();

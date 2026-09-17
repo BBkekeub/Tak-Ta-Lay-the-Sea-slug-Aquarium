@@ -44,21 +44,9 @@
    }
    positionTray();
  }
- function stopFireworks(){for(const a of animations)a.cancel();animations=[];content.querySelector('.new-slug-fireworks')?.remove();}
- function fireworks(hero){
-   stopFireworks();if(document.hidden||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-   const layer=el('div',null,hero);layer.className='new-slug-fireworks';layer.setAttribute('aria-hidden','true');
-   for(let burst=0;burst<3;burst++)for(let i=0;i<10;i++){
-     const spark=el('i',null,layer),angle=i*Math.PI/5,reach=34+Math.random()*35;
-     spark.style.left=(20+burst*30)+'%';spark.style.top=(burst===1?24:48)+'%';
-     spark.style.background=['#ffde82','#81e2d0','#f5a8cb'][i%3];
-     const a=spark.animate([{transform:'translate(0,0) scale(.2)',opacity:0},{offset:.15,opacity:1},
-       {transform:'translate('+Math.cos(angle)*reach+'px,'+(Math.sin(angle)*reach+18)+'px) scale(.3)',opacity:0}],
-       {duration:850,delay:burst*120,easing:'cubic-bezier(.15,.7,.4,1)',fill:'both'});
-     animations.push(a);
-   }
-   Promise.all(animations.map(a=>a.finished.catch(()=>{}))).then(()=>layer.remove());
- }
+ function stopFireworks(){for(const a of animations)a.cancel();animations=[];}
+ /* พลุเต็มจอ (js/fireworks.js) — เรียกหลัง showModal() เสมอ พลุจึงอยู่เหนือการ์ดใน top layer */
+ function fireworks(){if(window.Fireworks)Fireworks.play({count:8,duration:2400});}
  /* ---- อนิเมชันทากในการ์ด: วาดสดด้วย SlugEngine.drawSlug ทุกเฟรม แทนสไปรต์นิ่ง ----
     ผลจากยีนตัวเดียวกัน จึงแคช "ชิ้นส่วน" (parts) ได้ผ่าน slugPartsOf ตามปกติของเกม
     แต่ห้ามใช้ slugSprite() เพราะฟังก์ชันนั้นตั้งใจบังคับ ANIM=false เพื่ออบภาพนิ่ง */
@@ -77,7 +65,7 @@
  }
  function startHeroAnim(canvas,who){
    stopHeroAnim();heroCanvas=canvas;heroPortrait=who;
-   const still=document.hidden||matchMedia('(prefers-reduced-motion: reduce)').matches;
+   const still=document.hidden||reducedMotion();
    if(still){paintHero(canvas,who);return;}
    const loop=()=>{
      if(!current||document.hidden){heroRaf=null;return;}

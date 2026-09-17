@@ -88,7 +88,7 @@
   var genes=(typeof SlugEngine!=='undefined'&&SlugEngine.randGene)?SlugEngine.randGene():null;
   if(!genes||typeof makeSlug!=='function') return false;
   var slug=makeSlug(genes);
-  p.wantsSell=true; p.wantsBuy=false; p.sellSlug=slug; p.sellPrice=peddlerValue(genes);
+  p.wantsSell=true; p.wantsBuy=false; p.sellSlug=slug; p.carrySlug=slug; p.sellPrice=peddlerValue(genes);
   p.carryTank=true; p.carryColor='#2f6f78'; p.carryAccent=slugBodyHex(genes);
   p.visits=1; p.strolls=0;                 // มาเพื่อยื่นขาย ไม่ได้มาเดินดูของ
   p.bagged=false; p.accessory='none';      // มือถือตู้อยู่ ไม่สะพายอะไรเพิ่ม
@@ -103,8 +103,9 @@
   var counters=(G.objs||[]).filter(function(c){return c._key==='counter'&&c!==moving;});
   for(var i=0;i<counters.length;i++){
    var counter=counters[i];
-   if(TRADE_OFFERS.some(function(o){return o.counter===counter;})) continue;
-   var target=freeSpot([counterFront(counter)],p); if(!target) continue;
+   /* เข้าคิวหน้าเคาน์เตอร์ได้แล้ว (trade.js) ไม่ต้องรอให้เคาน์เตอร์ว่างเปล่าเหมือนเดิม */
+   if(counterOfferCount(counter)>=COUNTER_QUEUE) continue;
+   var target=freeSpot(counterQueueSpots(counter),p); if(!target) continue;
    var route=personRoute(p,target); if(!route.length) continue;
    var offer={id:++tradeSeq, p:p, counter:counter, sell:true, slug:p.sellSlug, price:p.sellPrice,
               tank:null, matched:[], timeout:OFFER_TTL, arrived:false, age:0,
@@ -148,7 +149,7 @@
    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
    +'<canvas data-trade-slug="'+o.id+'" width="120" height="80" style="width:100px;height:66px;flex-shrink:0;background:radial-gradient(ellipse at center,#385e5b,#172e32);border:1px solid #ffffff20;border-radius:10px"></canvas>'
    +'<div style="min-width:0"><small style="color:#b9ceca">ทากจากพ่อค้า</small><div style="font-size:17px;font-weight:700;overflow-wrap:anywhere">'+esc(o.slug.id)+'</div>'
-   +'<small style="color:#b9ceca">'+(o.arrived?'รอคำตอบ · '+remaining+' วิ':'กำลังเดินมา')+'</small></div></div>'
+   +'<small style="color:#b9ceca" data-live="card-status">'+(o.arrived?'รอคำตอบ · '+remaining+' วิ':'กำลังเดินมา')+'</small></div></div>'
    +'<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;font-size:12px;line-height:1.45;margin-bottom:14px">'+list+'</div>'
    +'<div style="display:flex;align-items:baseline;gap:5px;margin-bottom:10px"><b style="font-size:26px;line-height:1.2;color:#ffda80">'+o.price.toLocaleString()+'</b><span style="font-size:12px;color:#dfd3b6">เหรียญ</span></div>'
    +'<div class="trade-actions" style="display:flex;gap:8px"><button class="tbtn trade-accept" style="flex:1" '+(o.arrived?'':'disabled')
@@ -159,10 +160,10 @@
  /* ---------- ซื้อจริง (trade.js เรียกจาก finishTrade) ---------- */
  function buyFromPeddler(o){
   if((G.coin||0)<o.price){ if(typeof toast==='function') toast('เหรียญไม่พอ ต้องมี '+o.price.toLocaleString()+' เหรียญ','bad'); return false; }
-  G.coin-=o.price;
+  addCoin(-o.price);
   (G.inv||(G.inv=[])).push(o.slug);
   /* ส่งตู้ให้เราแล้ว มือก็ต้องว่าง — ไม่งั้นเดินออกจากร้านโดยยังอุ้มทากที่ขายไปแล้ว */
-  if(o.p){ o.p.carryTank=false; o.p.sellSlug=null; o.p.carryAccent=null; }
+  if(o.p){ o.p.carryTank=false; o.p.sellSlug=null; o.p.carryAccent=null; o.p.carrySlug=null; }
   if(typeof toast==='function') toast('ซื้อทาก '+o.slug.id+' −'+o.price.toLocaleString()+' เหรียญ · เก็บเข้าคลังทากแล้ว','good');
   if(typeof syncOv==='function'){ try{ syncOv(); }catch(e){} }
   return true;

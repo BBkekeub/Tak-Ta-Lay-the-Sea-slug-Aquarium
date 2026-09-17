@@ -268,6 +268,16 @@ kbd{font-family:"IBM Plex Mono",monospace; font-size:10.5px; background:#0C0C0F;
 #tradeOffers .trade-condition.matched{border-color:#6ed2a4;background:#123d32b3;color:#c0ffdb}
 #tradeOffers .trade-actions{display:flex;gap:8px;margin-top:8px}#tradeOffers .trade-actions .tbtn{min-height:43px}
 #tradeOffers .trade-accept{flex:1;background:#d5b260;border:1px solid #ffe2a0;color:#192928;font-weight:750;box-shadow:0 2px 5px #0003}#tradeOffers .trade-accept:hover{background:#ebc978}#tradeOffers .trade-accept:disabled{opacity:.45;cursor:default}
+/* หลายข้อเสนอพร้อมกัน — ยุบการ์ดเป็นบรรทัดเดียว กางทีละใบ (trade.js) */
+#tradeOffers .trade-offer{margin-top:10px;border:1px solid #6f8a86;border-radius:12px;background:#1b3438;overflow:hidden}
+#tradeOffers .trade-offer[open]{border-color:#bd9d58}
+#tradeOffers .trade-offer>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 12px;min-height:44px;cursor:pointer;font-size:13px;color:#f2eee3;list-style:none}
+#tradeOffers .trade-offer>summary::-webkit-details-marker{display:none}
+#tradeOffers .trade-offer>summary>span:first-child{overflow-wrap:anywhere}
+#tradeOffers .trade-offer>summary:hover{background:#24464a}
+#tradeOffers .trade-offer[open]>summary{border-bottom:1px solid #71887c55}
+/* การ์ดข้างในไม่ต้องมีกรอบ/เงาซ้อนอีกชั้น กรอบเป็นของ <details> แล้ว */
+#tradeOffers .trade-offer>.trade-offer-card{margin:0;border:0;border-radius:0;box-shadow:none}
 
 /* คอมพิวเตอร์ร้าน — ปุ่มแท็บห้ามตัดคำกลางปุ่ม จะได้เรียงเป็นแถวเดียว */
 #counterComputer .tbtn{white-space:nowrap}

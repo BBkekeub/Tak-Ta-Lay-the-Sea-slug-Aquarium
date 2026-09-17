@@ -11,7 +11,7 @@
  .decor-open #tankDecorDock{left:0;bottom:0;width:100%;height:140px;max-width:100%;background:#142b2e;border-top:1px solid #997f49;box-sizing:border-box}
  .decor-open #tankDecorDock #ovBuild{position:absolute;right:10px;top:6px;padding:5px 14px;z-index:2}
  #ov #tankDecorDock #ovDecor{position:static;width:100%;height:100%;max-height:none;box-sizing:border-box;padding:6px 10px;gap:5px;flex-direction:column;align-items:stretch;overflow:hidden;background:none;border:0;border-radius:0}
- .decorTrayHead{height:27px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding-right:115px;color:#d8c492}.decorTrayHead strong{font-size:13px}.decorTrayCount{font-size:11px;color:#9eafae}.decorTrayHead output{font-size:12px;margin-left:auto}.decorTrayHead>button{display:none}
+ .decorTrayHead{height:27px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding-right:115px;color:#d8c492;overflow:hidden}.decorTrayHead strong{font-size:13px}.decorTrayCount{font-size:11px;color:#9eafae}.decorTrayHead output{font-size:12px;margin-left:auto}.decorTrayHead>button{display:none}
  #tankDecorDock #dpal{width:100%;max-width:100%;box-sizing:border-box;display:flex;flex:1;min-width:0;min-height:0;gap:6px;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding:0 32px}
  #tankDecorDock #dpal::-webkit-scrollbar{display:none}
  #tankDecorDock .dbtn{position:relative;flex:0 0 132px;width:132px;min-width:132px;height:130px;padding:4px;box-sizing:border-box;display:flex;flex-direction:column;gap:0;background:#20383a;border:1px solid #48605e;border-radius:7px;color:#e7d8b4;cursor:pointer}
@@ -19,24 +19,44 @@
  #tankDecorDock .dbtn img{display:block;width:100%;height:65px;object-fit:contain}
  #tankDecorDock .dbtn strong,#tankDecorDock .dbtn small{display:none}
  #tankDecorDock .dbtn b{font-size:12px;line-height:18px;text-align:center;color:#e7c778}
- .decorSelection{display:flex;gap:6px;align-items:center;position:absolute;top:7px;left:125px;right:120px;height:25px;overflow:hidden}.decorSelection span{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c8d0c7}.decorSelection .tbtn{padding:3px 8px;font-size:11px;white-space:nowrap}
+ /* ⚠️ 2026-09-14 เดิมอันนี้เป็น position:absolute ทอดยาวจาก left:125px ถึง right:120px คาดทับแถบแท็บพอดี
+    สมัยมี 2 แท็บ (Pumice / อื่น ๆ) แท็บยังอยู่ในช่วง 125px แรกเลยไม่โดน แต่พอมี 4 แท็บ
+    แท็บที่ 3-4 ไปอยู่ใต้แถบนี้ = กดไม่ติดเลยแม้จะมองเห็น
+    ตอนนี้ให้เป็นไอเทมปกติในแถว .decorTrayHead ต่อท้ายแท็บ (ดูตอน append ด้านล่าง) ไม่ทับใครอีก */
+ .decorSelection{display:flex;gap:6px;align-items:center;height:25px;flex:1 1 0;min-width:0;overflow:hidden}.decorSelection span{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c8d0c7}.decorSelection .tbtn{padding:3px 8px;font-size:11px;white-space:nowrap}
  .decorNav{position:absolute;top:45px;bottom:10px;width:28px;border:0;border-radius:6px;background:#102426;color:#dcc78e;font-size:26px;cursor:pointer}.decorNav.prev{left:7px}.decorNav.next{right:7px}
- @media(max-width:700px){.decorSelection{left:110px;right:120px}.decor-open .decorTrayHead strong,.decor-open .decorTrayCount,.decor-open .decorTrayHead output{visibility:hidden}}
- .decorTabs{display:flex;gap:6px;height:27px}.decorTabs button{border:1px solid #52615a;border-radius:6px 6px 0 0;background:#20383a;color:#c3c9bd;padding:4px 16px;cursor:pointer;font-size:12px}.decorTabs button[aria-selected="true"]{color:#f0d390;background:#3b4638;border-color:#b59a5c;border-bottom:2px solid #e6c173}
+ @media(max-width:700px){.decor-open .decorTrayHead strong,.decor-open .decorTrayCount,.decor-open .decorTrayHead output{visibility:hidden}}
+ /* แท็บเยอะขึ้นได้เรื่อย ๆ — ให้ย่อ/เลื่อนได้เอง แต่ห้ามหด (flex:0 0 auto ที่ปุ่ม) จะได้ยังกดถูก */
+ .decorTabs{display:flex;gap:6px;height:27px;flex:0 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+ .decorTabs::-webkit-scrollbar{display:none}
+ .decorTabs button{flex:0 0 auto;border:1px solid #52615a;border-radius:6px 6px 0 0;background:#20383a;color:#c3c9bd;padding:4px 16px;cursor:pointer;font-size:12px}.decorTabs button[aria-selected="true"]{color:#f0d390;background:#3b4638;border-color:#b59a5c;border-bottom:2px solid #e6c173}
  .decorCreditBadge{position:absolute;top:2px;right:2px;background:#e6c173;color:#142b2d;font-size:10px;font-weight:700;line-height:15px;min-width:15px;text-align:center;padding:0 4px;border-radius:8px;z-index:3;pointer-events:none}
  `;document.head.append(style);
  const header=document.createElement('div');header.className='decorTrayHead';header.innerHTML='<div class="decorTabs" role="tablist" aria-label="หมวดของตกแต่ง"></div>';tray.prepend(header);
- let activeCategory='Pumice';const category=key=>/^pumice/i.test(key)?'Pumice':'อื่น ๆ';
+ let activeCategory='Pumice';
+ /* ชุดใหม่ ๆ ใส่ cat มาในนิยามเลย (decor3d-defs.js) · ของเดิมยังใช้กฎจากชื่อคีย์เหมือนเดิม */
+ const category=key=>(TANK_DECOR[key]&&TANK_DECOR[key].cat)||(/^pumice/i.test(key)?'Pumice':'อื่น ๆ');
  function selectCategory(name){activeCategory=name;for(const b of header.querySelectorAll('[role="tab"]')){const on=b.textContent===name;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;}for(const b of pal.querySelectorAll('.dbtn'))b.hidden=category(b.dataset.key)!==name;}
  function syncTabs(){const names=[...new Set(Object.keys(TANK_DECOR).map(category))];for(const name of names){if([...header.querySelectorAll('[role="tab"]')].some(b=>b.textContent===name))continue;const b=document.createElement('button');b.type='button';b.textContent=name;b.setAttribute('role','tab');b.setAttribute('aria-controls','dpal');b.onclick=()=>{selectCategory(name);pal.scrollLeft=0;};b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const tabs=[...header.querySelectorAll('[role="tab"]')],i=tabs.indexOf(b),next=tabs[(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length];next.click();next.focus();};header.firstChild.append(b);}selectCategory(names.includes(activeCategory)?activeCategory:names[0]);}
  pal.setAttribute('role','tabpanel');pal.setAttribute('aria-label','ของตกแต่ง');
  
- const actions=document.createElement('div');actions.className='decorSelection';const selection=document.createElement('span');actions.append(selection);tray.append(actions);
+ const actions=document.createElement('div');actions.className='decorSelection';const selection=document.createElement('span');actions.append(selection);header.append(actions);
  actions.append(document.getElementById('dFlip'),document.getElementById('dRemove'));
  const cancel=document.createElement('button');cancel.className='tbtn';cancel.textContent='ยกเลิกเลือก';actions.append(cancel);cancel.onclick=()=>{selDecorKey=null;selDecor=null;decorHover=null;dragGhost=null;syncDecorBar();};
  const oldBuild=buildDecorBar;buildDecorBar=function(){oldBuild();for(const button of pal.querySelectorAll('.dbtn:not([data-preview-ready])')){
   button.dataset.previewReady='1';const key=button.dataset.key,d=TANK_DECOR[key];button.replaceChildren();
-  const image=document.createElement('img');image.alt=d.name;image.loading='lazy';image.decoding='async';image.src=d.src;image.onerror=()=>{image.alt='ไม่พบภาพ';};
+  /* ⚠️ 2026-09-14 แถบนี้เคยชี้ img.src ไปที่ภาพเต็ม — อาร์ตหิน 1536×1024 = 6 MB ในหน่วยความจำต่อใบ
+     เปิดแถบทีเดียว 31 ปุ่ม ≈ 86 MB ที่ต้องถอดรหัส เครื่องค้างเป็นวินาที
+     ตอนนี้ชี้ไปที่ thumbs/<ชื่อเดิม> (264×130 ≈ 0.13 MB/ใบ · รวมทั้งชุด 623 KB) แล้วค่อยตกกลับไป
+     ภาพเต็มถ้าไม่มีไฟล์ย่อ — ของที่ทำใหม่ทีหลังจึงไม่ต้องแก้โค้ดตรงนี้ แค่วางไฟล์ใน thumbs/ */
+  const realGLB=!!d.model;
+  const image=document.createElement(realGLB?'span':'img');
+  if(realGLB){image.className='decorGLBPreview';image.dataset.modelKey=key;image.setAttribute('aria-label',d.name+' โมเดล 3D');}
+  else {image.alt=d.name;image.loading='lazy';image.decoding='async';
+  const full=d.src, small=full&&full.replace(/([^/]+)$/,'thumbs/$1');
+  image.src=small||full;
+  image.onerror=()=>{ if(full&&image.getAttribute('src')!==full){image.src=full;} else image.alt='ไม่พบภาพ'; };
+  }
   const name=document.createElement('strong');name.textContent=d.name;button.title=d.name+" · กว้าง "+d.wCm+" ซม.";
   const size=document.createElement('small');size.textContent='กว้าง '+d.wCm+' ซม.';
   const price=document.createElement('b');price.textContent='● '+decorPrice(key).toLocaleString();button.append(image,name,size,price);
@@ -45,7 +65,7 @@
  let dockOpen=false;
  const oldSync=syncDecorBar;syncDecorBar=function(){oldSync();if(dockOpen!==tankBuildMode){const oldHeight=tankCv.getBoundingClientRect().height;dockOpen=tankBuildMode;body.classList.toggle('decor-open',dockOpen);resizeTank();tankCam.oy+=(TCH-oldHeight)/2;}toggle.textContent=tankBuildMode?'✓ เสร็จสิ้น':'✦ ตกแต่งตู้';toggle.setAttribute('aria-expanded',String(tankBuildMode));toggle.setAttribute('aria-controls','ovDecor');
   if(!tankBuildMode)return;syncTabs();
-  {const _cr=G.decorCredit||0;for(const b of pal.querySelectorAll('.dbtn')){let bd=b.querySelector('.decorCreditBadge');if(_cr>0){if(!bd){bd=document.createElement('span');bd.className='decorCreditBadge';b.appendChild(bd);}bd.textContent='🎟️'+_cr;}else if(bd)bd.remove();}}
+  {const _cr=G.decorCredit||{};for(const b of pal.querySelectorAll('.dbtn')){const n=_cr[b.dataset.key]||0;let bd=b.querySelector('.decorCreditBadge');if(n>0){if(!bd){bd=document.createElement('span');bd.className='decorCreditBadge';b.appendChild(bd);}bd.textContent='🎟️'+n;}else if(bd)bd.remove();}}
   const key=selDecorKey||selDecor?.key;selection.textContent=key?TANK_DECOR[key].name:'';cancel.hidden=!key;document.getElementById('dRemove').hidden=!selDecor;document.getElementById('dFlip').hidden=!key;
  };
  const oldEnter=enterTank;enterTank=function(...args){const result=oldEnter(...args);syncDecorBar();return result;};
@@ -156,7 +176,15 @@
  const expandSummary=document.createElement('summary');expandSummary.textContent='ขยายร้าน';expandDetails.append(expandSummary);
  while(expansion.firstChild)expandDetails.append(expansion.firstChild);
  expansion.remove();dock.querySelector('.floorBuildSelection').append(expandDetails);
- dock.addEventListener('click',e=>{if(e.target.closest('button')&&!expandDetails.contains(e.target))expandDetails.open=false;});
+ /* ⚠️ 2026-09-17 ผู้เล่นขอ: ปุ่ม "ขยายร้าน" ไปอยู่แถวบน "ก่อนปุ่มเสร็จสิ้น"
+    ย้ายแค่ปุ่มเปิด — แผงขยายร้าน (details) ยังอยู่ที่เดิม เพราะตอนเปิดมันลอย (position:absolute) ถ้ายก details ทั้งก้อนไปแถวบน
+    ปุ่มเสร็จสิ้น/เครื่องมือจะกระโดดตำแหน่งทุกครั้งที่เปิด-ปิด · summary เดิมซ่อน ใช้ปุ่มนี้สลับเปิดแทน */
+ const expandToggle=document.createElement('button');expandToggle.type='button';expandToggle.className='tbtn floorBuildExpandBtn';expandToggle.textContent='ขยายร้าน';
+ expandToggle.setAttribute('aria-expanded','false');
+ expandToggle.onclick=()=>{expandDetails.open=!expandDetails.open;};
+ expandDetails.addEventListener('toggle',()=>expandToggle.setAttribute('aria-expanded',String(expandDetails.open)));
+ expandSummary.hidden=true;dock.querySelector('.floorBuildDone').before(expandToggle);
+ dock.addEventListener('click',e=>{if(e.target.closest('button')&&!expandDetails.contains(e.target)&&!expandToggle.contains(e.target))expandDetails.open=false;});
  // Wall fixtures use the same product list, but never become floor CATALOG objects.
  function paintWallProduct(canvas,key){
   if(typeof drawWallShelf!=='function')return;
@@ -214,7 +242,7 @@
  body.mode-build:not(.inside-tank) #cv{height:calc(100% - 250px)}
  body.mode-build:not(.inside-tank) .zoombar{bottom:266px}
  #floorBuildDock [hidden]{display:none!important}
- .floorBuildHead{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px;height:88px}.floorBuildHead>.decorTabs{flex-basis:100%!important;height:36px}.floorBuildActions{display:flex;flex:1;gap:5px;min-width:0}.floorBuildActions button{min-height:40px;white-space:nowrap;padding:5px 10px!important;font-size:12px!important}.floorBuildHint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;color:#b5c3ba}.floorBuildExpansion{margin-left:auto;position:relative;flex-shrink:0}.floorBuildExpansion summary{cursor:pointer;padding:6px 10px}.floorBuildExpansion[open]{position:absolute;right:8px;bottom:150px;width:min(360px,calc(100% - 32px));padding:12px;background:#20383a;border:1px solid #997f49;border-radius:10px;z-index:3}.floorBuildExpansion h2{display:none}.floorBuildExpansion .hint{font-size:12px}.floorBuildExpansion .toolrow{display:flex}.floorBuildExpansion button{min-height:40px}.floorBuildExpansion [hidden]{display:none!important}
+ .floorBuildHead{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px;height:88px}.floorBuildHead>.decorTabs{flex-basis:100%!important;height:36px}.floorBuildActions{display:flex;flex:1;gap:5px;min-width:0}.floorBuildActions button{min-height:40px;white-space:nowrap;padding:5px 10px!important;font-size:12px!important}.floorBuildHint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;color:#b5c3ba}.floorBuildExpansion{margin-left:auto;position:relative;flex-shrink:0}.floorBuildExpansion:not([open]){display:none}.floorBuildExpansion>summary[hidden]{display:none}#floorBuildDock .floorBuildExpandBtn{flex-shrink:0;padding:5px 12px;white-space:nowrap}#floorBuildDock .floorBuildExpandBtn[aria-expanded=true]{border-color:#e2cc90;color:#ffe1a0}#floorBuildDock .floorBuildExpansion[open]{bottom:calc(100% + 8px)!important}.floorBuildExpansion summary{cursor:pointer;padding:6px 10px}.floorBuildExpansion[open]{position:absolute;right:8px;bottom:150px;width:min(360px,calc(100% - 32px));padding:12px;background:#20383a;border:1px solid #997f49;border-radius:10px;z-index:3}.floorBuildExpansion h2{display:none}.floorBuildExpansion .hint{font-size:12px}.floorBuildExpansion .toolrow{display:flex}.floorBuildExpansion button{min-height:40px}.floorBuildExpansion [hidden]{display:none!important}
  #floorBuildDock .decorTabs{flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
  #floorBuildDock .decorTabs button{white-space:nowrap;padding:4px 10px}
  #floorBuildDock .floorBuildDone{flex-shrink:0;padding:5px 12px;background:#c6a459;color:#172b2d;border-color:#e2cc90;font-weight:700}
@@ -247,4 +275,3 @@
  `;document.head.append(style);
  buildShop();resize();
 })();
-
