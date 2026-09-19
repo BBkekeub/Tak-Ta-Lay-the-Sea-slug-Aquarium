@@ -142,9 +142,37 @@ function freeSpot(list, self){
 /* จุดเข้า-ออกร้าน = ขอบหน้า (ฝั่งที่ไม่มีผนัง)
    ⚠️ ต้องเป็นจุดที่ "ยืนได้จริง" — เคยไม่เช็ค แล้วคนเกิดกลางกันชนของตู้ที่วางชิดขอบหน้า
    ผลคือทุกทิศที่ก้าวไปโดนบล็อกหมด → ยืนแข็งอยู่ตรงนั้นตลอดกาล */
-function doorSpot(){ return chosenDoorSpot(); }
+/* ประตูที่คนคนนี้ใช้ได้ — ประเภทคนมาจาก p.access (ตั้งตอนสปอน) หรือธงบนตัว
+   way='out' ตอนจะออกจากร้าน · 'in' ตอนเดินเข้า
+   ⚠️ ถ้าไม่มีบานไหนตั้งเป็นทางออกเลย doorsFor() จะคืนบานที่เหลือให้ใช้ออกแทน
+      (ผู้เล่นกำหนด) — ตรงนี้จึงไม่มีทางคืน null เพราะ "ไม่มีทางออก" อีกแล้ว */
+function doorSpot(p=null,way='out'){ return chosenDoorSpot(personAccessKind(p),way); }
 /* คนที่ "อยู่ในของ" (โดนวางตู้ทับ / เกิดในกันชน) ต้องดันตัวเองออกมาให้ได้
-   ไม่งั้นทุกก้าวโดนบล็อกหมดแล้วยืนค้างตลอดกาล */
+   ไม่งั้นทุกก้าวโดนบล็อกหมดแล้วยืนค้างตลอดกาล
+
+   ⚠️ 2026-09-20 ผู้เล่น: "คนติดอะไรอยู่ ทำไมไม่ออกร้านซักที" (เห็นในจอ: ยืนซ้อนอยู่ในตู้)
+   ของเดิมดันออกโดย "ไม่ตรวจว่าดันแล้วหลุดจริงไหม" — พังสามทาง:
+     1) ติดในซอกระหว่างของสองชิ้น ชิ้นซ้ายดันไปขวา ชิ้นขวาดันไปซ้าย ผลรวมเป็น 0 → ไม่ขยับ
+     2) ด้านที่ใกล้ที่สุดของตู้ A ดันเข้าไปในตู้ B พอดี → เด้งไปมาอยู่กับที่ตลอดกาล
+     3) ยืนบนช่องที่ "ไม่ใช่พื้นร้าน" (floorRect ไม่ผ่าน · ร้านรูปตัว L) — personBlocked ตีว่าติด
+        แต่ตรงนี้ไม่มีโค้ดดันออกจากช่องไม่ใช่พื้นเลย ex/ey = 0 ทุกเฟรม
+   แล้วตัวเฝ้าระวัง _idleWalk ก็ช่วยไม่ได้ เพราะมันนับเฉพาะ "ขยับไม่ได้เลย"
+   คนที่เด้งอยู่กับที่ถือว่าขยับได้ ตัวนับถูกรีเซ็ตทุกเฟรม = ค้างถาวร
+   (สมาชิกครอบครัวยิ่งหนัก เพราะ _idleWalk ข้ามคนที่มี p.family อยู่แล้ว)
+   แก้: ดันแล้วต้องลงที่ว่างจริง ไม่งั้นไล่ลองทิศอื่น · ไม่รอดสักทิศ ให้ตัวนับ _stuckIn
+        ใน stepPeopleSlice วาร์ปไปจุดว่างใกล้สุดแทน */
+/* 16 ทิศรอบตัว ใช้ทั้งตอนดันออกและตอนหาจุดว่าง — สร้างครั้งเดียว ไม่ใช่ทุกเฟรม */
+const UNSTICK_DIRS=Array.from({length:16},(_,i)=>{const a=i*Math.PI/8;return [Math.cos(a),Math.sin(a)];});
+const UNSTICK_S=2.5;        // ติดต่อเนื่องเกินกี่วินาทีถึงวาร์ป
+/* จุดว่างที่ใกล้ตัวที่สุด — ไล่รัศมีทีละครึ่งช่องใหญ่ เรียกเฉพาะตอนจะวาร์ป (ไม่ใช่ทุกเฟรม) */
+function nearestFreeSpot(p,maxR=8*SUB){
+  for(let r=PERSON_R+1;r<=maxR;r+=SUB/2)
+    for(const [ux,uy] of UNSTICK_DIRS){
+      const x=p.x+ux*r,y=p.y+uy*r;
+      if(!personBlocked(x,y))return {x,y};
+    }
+  return null;
+}
 function escapeBlocked(p, dt){
   let ex = 0, ey = 0;
   for(const o of G.objs){
@@ -159,11 +187,14 @@ function escapeBlocked(p, dt){
   const E = PERSON_EDGE;                                        // หลุดขอบพื้นก็ดึงกลับเข้ามา
   if(p.x < E) ex += 1; else if(p.x > cellsW()-E) ex -= 1;
   if(p.y < E) ey += 1; else if(p.y > cellsH()-E) ey -= 1;
-  const n = Math.hypot(ex, ey);
-  if(!n) return;
   const v = p.spd * 1.6 * dt;
-  p.x += ex/n*v; p.y += ey/n*v;
-  p.motion=1; p.fdx = ex; p.fdy = ey; /* Actual displacement drives gait below. */                    // เดินออกมาให้เห็นว่าขยับ
+  const move=(ux,uy)=>{p.x+=ux*v;p.y+=uy*v;p.motion=1;p.fdx=ux;p.fdy=uy;};   // เดินออกมาให้เห็นว่าขยับ
+  const n = Math.hypot(ex, ey);
+  /* ทิศที่ใกล้ที่สุดใช้ได้ก็ต่อเมื่อก้าวแล้ว "หลุดจริง" ไม่ใช่ไปโผล่ในของอีกชิ้น */
+  if(n && !personBlocked(p.x+ex/n*v, p.y+ey/n*v)){ move(ex/n, ey/n); return; }
+  /* ไม่หลุด (ติดซอก / ยืนบนช่องไม่ใช่พื้น) → ไล่หาทิศที่ก้าวแล้วว่างจริง */
+  for(const [ux,uy] of UNSTICK_DIRS) if(!personBlocked(p.x+ux*v, p.y+uy*v)){ move(ux,uy); return; }
+  /* รอบตัวตันหมดในระยะหนึ่งก้าว — ปล่อยให้ตัวนับ _stuckIn วาร์ปให้ ไม่ต้องขยับมั่ว */
 }
 /* แยกคนที่ตัวซ้อนกันแบบบังคับตำแหน่ง (แรงผลักอย่างเดียวสู้ความเร็วเดินไม่ทัน) */
 function separatePeople(){
@@ -187,7 +218,7 @@ function strollSpot(self){
     const y = PERSON_EDGE + Math.random()*(cellsH()-PERSON_EDGE*2);
     if(!inDoorWalkway(x,y)&&!personBlocked(x,y) && !spotTaken(x,y,self) && Math.hypot(x-self.x, y-self.y) > 10) return {x,y};
   }
-  return doorSpot();
+  return doorSpot(self,'out');
 }
 
 /* ============================================================
@@ -197,13 +228,16 @@ function strollSpot(self){
 let _partySequence=0;
 function partySpots(anchor,count,party,edgeOnly=false,focus=null){
   const candidates=[anchor];
-  const entrance=edgeOnly?entranceRect():null;
+  /* ⚠️ ต้องใช้ "บานที่ถูกเลือกไว้ใน anchor" ไม่ใช่ G.door (บานแรก) — ตอนนี้ร้านมีประตูได้หลายบาน
+     ถ้าอ้างบานแรกเสมอ กลุ่มที่เข้าทางบานอื่นจะถูกตีว่าอยู่นอกกรอบประตูแล้วสปอนไม่ผ่านตลอดกาล */
+  const entranceDoor=edgeOnly?(anchor&&anchor.door)||G.door:null;
+  const entrance=edgeOnly?entranceRect(entranceDoor):null;
   if(edgeOnly){
     if(!entrance)return null;
     // Use a compact staging area inside the selected doorway for whole parties.
     candidates.length=0;
     for(const depth of [3,11])for(const along of [5,13]){
-      candidates.push(G.door.side==='north'
+      candidates.push(entranceDoor.side==='north'
         ?{x:entrance.cx+along,y:entrance.cy+depth}
         :{x:entrance.cx+depth,y:entrance.cy+along});
     }
@@ -322,34 +356,49 @@ function challengerRoom(){return Math.max(0,CHALLENGER_MAX-challengerCount());}
 function traderRoom(){return Math.max(0,TRADER_MAX-traderCount());}
 function visitorAttraction(){const slug=G.objs.reduce((n,o)=>n+(o.type==='tank'&&Array.isArray(o.slugs)?o.slugs.length*(typeof tankAttractionFactor==='function'?tankAttractionFactor(o):1):0),0);const deco=G.objs.reduce((n,o)=>n+((o.type==='deco'&&o._key!=='counter'&&o.def&&Number.isFinite(o.def.attr))?o.def.attr:0),0);const tankDeco=G.objs.reduce((n,o)=>n+((o.type==='tank'&&Array.isArray(o.decor))?o.decor.length*0.5:0),0);return Math.round((slug+deco+tankDeco)*10)/10;}
 function visitorInterval(score){return Math.max(20,60-Math.max(0,Math.ceil(Math.max(0,score)/10)-1)*5);}
-/* ---- พื้นขั้นต่ำของจำนวนลูกค้า (ช่วงเงียบ) ----
+/* ---- พื้น / เพดานจำนวนลูกค้า ----
    ช่วงแรกความดึงดูดต่ำ ลูกค้ามาห่างกัน 60 วิ แต่แต่ละคนอยู่ในร้านแค่ ~30-40 วิ
    ค่าเฉลี่ยจึงเหลือคนในร้านไม่ถึง 1 คน = ร้านโล่งเกือบตลอด
-   แก้ที่ "อัตราการไหลเข้า" ไม่ใช่ "เวลาที่อยู่": ถ้าในร้านน้อยกว่า VISITOR_MIN
-   คนถัดไปจะเข้ามาภายใน QUIET_GAP วินาที (และเลือกกลุ่มเล็กเพื่อเติมให้ไว)
-   ลูกค้าช่วงแรกยังเดินเข้า-ดูตู้-เดินออกไวเหมือนเดิม แค่มีคนใหม่ไหลเข้ามาแทนที่ทันที */
-var VISITOR_MIN=3;     // คนขั้นต่ำที่อยากให้มีในร้านตลอด (ร้านเพิ่งเปิด ความนิยมยังต่ำ) — 2 → 3 ให้ร้านไม่โล่งตั้งแต่ต้นเกม
+   แก้ที่ "อัตราการไหลเข้า" ไม่ใช่ "เวลาที่อยู่": ถ้าในร้านน้อยกว่าพื้นของช่วง
+   คนถัดไปจะเข้ามาภายใน QUIET_GAP วินาที (และเลือกกลุ่มเล็กเพื่อเติมให้ไว) */
 var QUIET_GAP=3;       // วินาทีระหว่างคนเข้า ตอนที่ยังไม่ถึงขั้นต่ำ
-/* ⚠️ 2026-09-19 ผู้เล่น: "ความนิยมจะ 70 แล้วลูกค้ายังมีแค่ 2 คน"
-   เดิมความนิยมมีผลแค่ "ความถี่ที่คนเดินเข้า" (60 วิ → 20 วิ) แต่แต่ละคนอยู่แค่ ~30–40 วิ
-   จำนวนคนเฉลี่ยในร้านเลยตันอยู่ที่ราว 2 คนตลอดเกม ต่อให้แต่งร้านจนความนิยมพุ่ง
-   ตอนนี้ความนิยมกำหนด "จำนวนคนที่อยากให้อยู่ในร้านพร้อมกัน" ตรง ๆ แล้วเติมให้ถึงเป้าเสมอ
-
-   ⚠️ รอบสอง ผู้เล่น: "แค่ตู้กับทากก็ได้ 70 แล้ว หารเท่ากันหมดไม่ดีแน่ ต้องสเกลขึ้นไปเรื่อย ๆ"
-   ความนิยมโตง่ายและไม่มีเพดาน (ทาก 1 ตัว = 1 แต้ม · ปลายเกมทากหลักพันตัว = หลักพันแต้ม)
-   ตัวหารคงที่จึงระเบิด — เปลี่ยนเป็น "ลูกค้าคนที่ n ต้องใช้ความนิยมเพิ่มอีก ATTR_STEP × n"
-     รวมความนิยมที่ต้องใช้เพื่อได้ n คน = STEP·n(n+1)/2  →  n = (√(1+8·score/STEP) − 1) / 2
-   ต้นเกมยังไต่ไว ปลายเกมต้องทุ่มหนักขึ้นเรื่อย ๆ กว่าจะได้อีกหนึ่งคน (แนวเดียวกับราคาขยายร้าน) */
-/* ปรับสดจากคอนโซลได้: ShopBusy.set(2) = คนเยอะขึ้นทั้งเส้น · ShopBusy.set(4) = ฝืดลง · ShopBusy.show() ดูตาราง
+/* ⚠️ 2026-09-20 ผู้เล่น: "สูตรมันปรับซะยากไปหน่อยว่ะ"
+   เลิกใช้สูตรพีระมิด (ATTR_STEP · n = (√(1+8·score/STEP)−1)/2) ที่ต้องแก้ตัวคูณ
+   แล้วไล่คำนวณทั้งเส้นกว่าจะรู้ว่าได้กี่คน — เปลี่ยนเป็น "ตารางช่วง" อ่านออก แก้ทีละแถวได้
+   แต่ละช่วงมีสองค่า: พื้น = เติมคนให้ถึงเร็ว ๆ · เพดาน = ห้ามเกิน
+   จำนวนจริงจึงลอยอยู่ระหว่างสองค่าตามจังหวะคนเข้า-ออก = ที่ผู้เล่นเขียนว่า "2-3 คน"
+     ดึงดูด   0–19   → 2–3 คน
+     ดึงดูด  20–69   → 5–6 คน   (ผู้เล่นระบุ 20–50 · ช่วง 51–69 ที่ไม่ได้ระบุ ใช้ค่าเดียวกัน)
+     ดึงดูด  70–99   → 6–7 คน
+     ดึงดูด 100 ขึ้นไป → พื้นที่ร้าน ÷ VISITOR_AREA_DIV (ปลายเกมโตตามขนาดร้าน ไม่ตันที่ 7)
+   ⚠️ ช่วงสุดท้ายต้องไม่ต่ำกว่าช่วงก่อนหน้า (Math.max กับ 6–7) ไม่งั้นร้านเริ่มต้น 48 ช่อง ÷ 20 = 2
+      พอดึงดูดแตะ 100 คนจะ "ลดลง" จาก 6-7 เหลือ 2 ซึ่งกลับหัวกลับหาง
+      สูตรพื้นที่จึงมีผลจริงตอนร้านโตเกิน 140 ช่อง ซึ่งเป็นจังหวะที่ควรโตต่อพอดี
+   ⚠️ นับเฉพาะ "ลูกค้า" (isCustomer) — ผู้ท้าแข่ง/พ่อค้ามีถังของตัวเอง ไม่กินโควตานี้ */
+/* ปรับสดจากคอนโซลได้: ShopBusy.show() ดูตาราง · ShopBusy.set(20,5,6) แก้พื้น/เพดานของช่วงที่เริ่มที่ 20
    ค่าที่ชอบแล้วบอกมา จะได้ใส่เป็นค่าตั้งต้นถาวร (ค่านี้ไม่ถูกเซฟ รีเฟรชแล้วกลับเป็นค่าตั้งต้น) */
-var ATTR_STEP=2.5;
-function visitorTarget(capacity,score=visitorAttraction()){
-  const n=Math.floor((Math.sqrt(1+8*Math.max(0,score)/ATTR_STEP)-1)/2);
-  return Math.max(0,Math.min(capacity,VISITOR_MIN+n));
+var VISITOR_BANDS=[[0,2,3],[20,5,6],[70,6,7]];   // [ความดึงดูดที่เริ่มช่วงนี้, พื้น, เพดาน]
+var VISITOR_AREA_FROM=100, VISITOR_AREA_DIV=20;  // ดึงดูดตั้งแต่เท่านี้ → ใช้พื้นที่ร้าน ÷ เท่านี้แทน
+function visitorBand(capacity,score=visitorAttraction()){
+  const s=Math.max(0,score),top=VISITOR_BANDS[VISITOR_BANDS.length-1];
+  let lo=top[1],hi=top[2];
+  if(s>=VISITOR_AREA_FROM){
+    /* n = เป้าของช่วงนี้ · เว้นช่วง n-1 ถึง n ไว้เหมือนช่วงอื่น ไม่งั้นพื้น=เพดาน
+       จำนวนคนจะแข็งเป๊ะไม่มีจังหวะหายใจ (และต่อเนื่องกับช่วงก่อน: ร้าน 140 ช่อง → 6–7 พอดี) */
+    const n=Math.floor(floorArea()/VISITOR_AREA_DIV);
+    lo=Math.max(lo,n-1);hi=Math.max(hi,n);
+  }else{
+    const b=VISITOR_BANDS.filter(b=>s>=b[0]).pop()||VISITOR_BANDS[0];
+    lo=b[1];hi=b[2];
+  }
+  const cap=Math.max(0,capacity);
+  return {lo:Math.min(cap,lo),hi:Math.min(cap,hi)};
 }
+/* เพดานของช่วง — ใช้เป็น "เป้า" ของชุดเปิดร้านและตัวจัดคิว */
+function visitorTarget(capacity,score=visitorAttraction()){return visitorBand(capacity,score).hi;}
 /* ความนิยมที่ต้องมีเพื่อให้ได้ลูกค้าพร้อมกัน n คน (ใช้โชว์ใน HUD/ดีบัก) */
-function attractionForVisitors(n){const k=Math.max(0,n-VISITOR_MIN);return Math.ceil(ATTR_STEP*k*(k+1)/2);}
-function visitorFloor(capacity){return visitorTarget(capacity);}
+function attractionForVisitors(n){const b=VISITOR_BANDS.find(b=>b[2]>=n);return b?b[0]:VISITOR_AREA_FROM;}
+function visitorFloor(capacity){return visitorBand(capacity).lo;}
 /* คนที่กำลังเดินออก ไม่นับว่าอยู่ในร้านแล้ว — สั่งคนใหม่ตั้งแต่ตอนเขาเริ่มเดินออก
    คนใหม่จะเดินสวนเข้ามาพอดี ร้านเลยไม่มีช่วงโล่งระหว่างรอยต่อ */
 function visitorPresent(){let n=0;for(const p of PEOPLE)if(p.state!=='leave'&&isCustomer(p))n++;return n;}
@@ -380,7 +429,8 @@ function chooseVisitorKind(capacity){
 }
 let _openingRemaining=null, _openingAt=0, _openingParty=null;
 function openingVisitorCount(score,capacity){
-  return Math.min(capacity,6,2+Math.floor(Math.max(0,score-1)/20));
+  /* ชุดแรกตอนเปิดร้านต้องไม่ทะลุเป้าเหมือนกัน ไม่งั้นกดเปิดร้านแล้วคนพรึ่บเกินที่ตั้งไว้ */
+  return Math.min(capacity,6,visitorTarget(capacity,score),2+Math.floor(Math.max(0,score-1)/20));
 }
 function stepOpeningVisitors(capacity,score){
   // Wait for the first real animation tick, after the saved shop has loaded.
@@ -421,17 +471,30 @@ function stepVisitorArrivals(){
   if(_pendingParty&&_pendingParty.profiles.length>capacity){
     _pendingParty=null;_spawnAt=_peopleT+visitorInterval(score);
   }
-  /* ยังไม่ถึงคนขั้นต่ำ = โหมดช่วงเงียบ ดึงคนถัดไปเข้ามาไว ๆ และเลือกกลุ่มเล็ก */
-  const floorN=visitorFloor(capacity),here=visitorPresent(),quiet=here<floorN;
+  /* พื้น = เติมให้ถึงไว ๆ (โหมดช่วงเงียบ) · เพดาน = ห้ามเกิน — คนละค่ากัน ดูตาราง VISITOR_BANDS */
+  const band=visitorBand(capacity,score),floorN=band.lo,ceilN=band.hi;
+  const here=visitorPresent(),seen=customerCount(),quiet=here<floorN;
   if(quiet){
     const need=floorN-here;
     if(_pendingParty&&_pendingParty.profiles.length>Math.max(1,need))_pendingParty=null;
     if(_spawnAt>_peopleT+QUIET_GAP)_spawnAt=_peopleT+QUIET_GAP;
   }
+  /* ⚠️ เพดานจริงอยู่ตรงนี้ — ก่อนหน้านี้เป้าถูกใช้เป็นแค่ "พื้น" เติมคนจนชน visitorCapacity()
+     (พื้นที่ ÷ 3) ความดึงดูดจึงไม่ได้คุมจำนวนคนเลย ร้าน 48 ช่องดันไปได้ถึง 16 คน
+     ⚠️ ต้องเช็กสองตัว: here (ไม่นับคนกำลังเดินออก) กับ seen (นับหมดเท่าที่ตายังเห็น)
+        here อย่างเดียวไม่พอ — ตอนมีคนเดินออก 2 คน here ต่ำกว่าเป้า ระบบเลยเติมคนใหม่เข้ามาทับ
+        แล้วในจอมีพร้อมกันเกินเป้าไป 2-3 คน (วัดจริงแล้ว: เป้า 6-7 แต่เห็นสูงสุด 9)
+        ยอมให้ล้นได้ 1 คนพอดี = ยังมีคนเดินสวนเข้ามาแทนทันที ร้านไม่โล่งเป็นช่วง ๆ */
+  if(here>=ceilN||seen>ceilN){ _spawnAt=_peopleT+1; return; }
   if(_peopleT<_spawnAt)return;
-  if(!_pendingParty){const kind=quiet?chooseQuietKind(floorN-visitorPresent(),capacity):chooseVisitorKind(capacity);_pendingParty={kind,profiles:visitorProfiles(kind)};}
-  if(capacity-customerCount()<_pendingParty.profiles.length||_peopleT<_arrivalRetryAt)return;
-  if(spawnVisitors(capacity-customerCount(),_pendingParty.kind,_pendingParty.profiles)){
+  /* ขนาดกลุ่มต้องไม่ล้นที่ว่างที่เหลือ ไม่งั้นเป้า 3 คนแต่ครอบครัว 4 คนมาทั้งก้อน = ทะลุเป้าทุกครั้ง
+     ⚠️ ห้ามมี Math.max(1,…) ครอบ — นั่นแปลว่า "อย่างน้อยรับได้ 1 คนเสมอ" ซึ่งทำให้เพดานรั่วทุกรอบ */
+  const room=Math.min(capacity-seen,ceilN-here,ceilN-seen+1);
+  if(room<1){ _spawnAt=_peopleT+1; return; }
+  if(_pendingParty&&_pendingParty.profiles.length>room)_pendingParty=null;
+  if(!_pendingParty){const kind=quiet?chooseQuietKind(floorN-visitorPresent(),room):chooseVisitorKind(room);_pendingParty={kind,profiles:visitorProfiles(kind)};}
+  if(room<_pendingParty.profiles.length||_peopleT<_arrivalRetryAt)return;
+  if(spawnVisitors(room,_pendingParty.kind,_pendingParty.profiles)){
     _pendingParty=null;_spawnAt=_peopleT+visitorInterval(score);
   }else _arrivalRetryAt=_peopleT+1; // Entrance physically blocked: retain the same party.
 }
@@ -443,18 +506,26 @@ function stepVisitorArrivals(){
 const DOOR_GAP=1;
 let _doorFreeAt=0;
 function personEntered(p){return !(p._enterAt>_peopleT);}
-function spawnVisitors(capacity,requestedKind=null,requestedProfiles=null){
+/* ชนิดกลุ่มที่สปอน → ประเภทสิทธิ์ผ่านประตู · ที่ไม่อยู่ในตารางนี้คือลูกค้าปกติ
+   ⚠️ พ่อค้าส่งใช้ kind 'solo' เหมือนลูกค้าเดี่ยว แยกด้วยชื่อไม่ได้
+      slug-wholesaler.js จึงส่ง accessKind='wholesale' เข้ามาตรง ๆ */
+const SPAWN_ACCESS={peddler:'peddler',race:'challenger',tug:'challenger',eat:'challenger',throw:'challenger'};
+function spawnVisitors(capacity,requestedKind=null,requestedProfiles=null,accessKind=null){
   // คิวยังค้างเกิน 1 คน = ยังไม่รับกลุ่มใหม่ (ผู้เรียกทุกตัวลองใหม่รอบหน้าอยู่แล้ว) คิวจึงไม่ยาวสะสม
   if(_doorFreeAt>_peopleT+DOOR_GAP)return false;
   const kind=requestedKind||chooseVisitorKind(capacity);if(!kind)return false;
+  const access=accessKind||SPAWN_ACCESS[kind]||'cust';
+  /* ไม่มีประตูบานไหนให้คนประเภทนี้เข้าเลย = ไม่ต้องสปอน (ผู้เล่นตั้งใจปิดกั้นไว้) */
+  if(!doorsFor(access,'in').length)return false;
   const profiles=requestedProfiles||visitorProfiles(kind),count=profiles.length;if(count>capacity)return false;
   for(let attempt=0;attempt<15;attempt++){
-    const door=doorSpot();if(!door)continue;
+    const door=chosenDoorSpot(access,'in');if(!door)continue;
     const spots=partySpots(door,count,null,true);if(!spots)continue;
     const g=count>1?{kind,members:[],visits:visitorVisits(),stage:'new',time:0,replan:false}:null;
     const batch=[];
     for(let i=0;i<count;i++){
       const p=makePerson({...profiles[i],at:spots[i]});if(!p)break;
+      p.access=access;
       p.family=g;if(g)p.spd=PERSON_SPEED_CM/CM_PER_CELL*(p.kid?1.04:.96);
       batch.push(p);
     }
@@ -476,7 +547,7 @@ function planFamily(g){
   /* เดิม filter ตู้ที่เพิ่งดูทิ้งไปเลย → ถ้าในร้านเหลือตู้ที่ยืนกันได้ทั้งกลุ่มแค่ตู้นั้นตู้เดียว
      กลุ่มจะวางแผนไม่สำเร็จตลอดกาล = ยืนแข็งคาที่ ตอนนี้แค่ "ไปอยู่ท้ายคิว" ยังชอบตู้ใหม่เหมือนเดิม */
   const mkOptions=list=>list.flatMap(o=>lookSpots(o).map(spot=>({spot,focus:o}))).sort(()=>Math.random()-.5);
-  const options=leaving?Array.from({length:16},()=>({spot:doorSpot(),focus:null})):
+  const options=leaving?Array.from({length:16},()=>({spot:doorSpot(leader,'out'),focus:null})):
     [...mkOptions(tanks.filter(o=>o!==g.focus)), ...mkOptions(tanks.filter(o=>o===g.focus))];
   for(const choice of options){
     if(!choice.spot)continue;
@@ -718,7 +789,7 @@ function nextGoal(p){
     }
     p.focus = null; p.tgt = strollSpot(p); p.state = 'walk'; p.stuck = 0; return;   // ตู้มีคนยืนเต็ม เดินเล่นรอ
   }
-  p.focus = null; p.tgt = doorSpot(); p.state = 'leave'; p.stuck = 0;
+  p.focus = null; p.tgt = doorSpot(p,'out'); p.state = 'leave'; p.stuck = 0;
 }
 
 /* ============================================================
@@ -760,7 +831,26 @@ function stepPeopleSlice(dt){
     p.motion *= Math.exp(-dt*12);
     if(!p.tgt) nextGoal(p);
     if(!p.tgt) continue;
-    if(personBlocked(p.x, p.y)){ escapeBlocked(p, dt); continue; }   // ติดอยู่ในของ → ดันออกก่อน
+    if(personBlocked(p.x, p.y)){                                     // ติดอยู่ในของ → ดันออกก่อน
+      /* ⚠️ ตัวนับนี้ต้องแยกจาก _idleWalk ด้านล่าง เพราะอันนั้นนับ "ระยะที่ขยับได้"
+         คนที่เด้งไปมาอยู่กับที่ถือว่าขยับได้ ตัวนับนั้นจึงถูกรีเซ็ตทุกเฟรม ไม่มีวันครบ
+         และ _idleWalk ข้ามสมาชิกครอบครัวทั้งหมด ซึ่งเป็นเคสที่ค้างถาวรจริง ๆ
+         ดันออกไม่สำเร็จครบ UNSTICK_S วิ = วาร์ปไปจุดว่างใกล้สุด (ระยะสั้น ผู้เล่นเห็นเป็นก้าวหลบ)
+         ทั้งร้านไม่มีที่ยืนเลย = เอาออกจากร้าน ดีกว่าปล่อยค้างถาวร
+         ข้อเสนอที่ค้างอยู่ไม่ต้องเก็บกวาดเอง — stepTradeOffers ปิดให้เมื่อคนหลุดจาก PEOPLE */
+      p._stuckIn=(p._stuckIn||0)+dt;
+      if(p._stuckIn>UNSTICK_S){
+        p._stuckIn=0;
+        const free=nearestFreeSpot(p);
+        if(free){ p.x=free.x;p.y=free.y;p.route=[];p.routeGoal=null;p._pathRetryAt=0;p.stuck=0;p._idleWalk=0; }
+        else{
+          if(p.family){p.family.members=p.family.members.filter(q=>q!==p);p.family=null;}
+          PEOPLE.splice(i,1);continue;
+        }
+      }
+      escapeBlocked(p, dt); continue;
+    }
+    p._stuckIn=0;
 
     if(p.state==='wait') continue;
     if(p.state === 'look'){
@@ -841,7 +931,7 @@ function stepPeopleSlice(dt){
       p._idleWalk=(p._idleWalk||0)+dt;
       if(p._idleWalk>20){PEOPLE.splice(i,1);continue;}
       if(p._idleWalk>10&&p.state!=='leave'){
-        p.state='leave';p.focus=null;p.tgt=doorSpot();p.route=[];p.routeGoal=null;p._pathRetryAt=0;p.stuck=0;
+        p.state='leave';p.focus=null;p.tgt=doorSpot(p,'out');p.route=[];p.routeGoal=null;p._pathRetryAt=0;p.stuck=0;
       }
     }
     if(distance>1e-5){
@@ -1714,13 +1804,21 @@ window.PeoplePerf={
 };
 function _bumpGeoBuilds(){_geoBuilds++;}   // cat-seller.js เรียกเมื่อทิ้งแคชรูปทรงบัง (ตัวเดียวกับที่ PeoplePerf รายงาน)
 
-/* ตัวหมุนความคึกคักของร้าน — ปรับสดระหว่างเล่น ไม่ต้องรีเฟรช (people.js ATTR_STEP)
-   ค่าน้อย = คนเยอะขึ้นทั้งเส้น · ค่ามาก = ฝืดขึ้น · ShopBusy.show() ดูว่าความนิยมเท่านี้ได้กี่คน */
+/* ตัวหมุนความคึกคักของร้าน — ปรับสดระหว่างเล่น ไม่ต้องรีเฟรช (people.js VISITOR_BANDS)
+   ShopBusy.show() ดูว่าความนิยมเท่านี้ได้กี่คน · ShopBusy.set(20,5,6) แก้พื้น/เพดานของช่วงที่เริ่มที่ 20 */
 window.ShopBusy={
-  get step(){return ATTR_STEP;},
-  set(n){const v=Number(n);if(!(v>0)){console.warn('ใส่ตัวเลขมากกว่า 0');return ATTR_STEP;}
-    ATTR_STEP=v;if(typeof toast==='function')toast('ความคึกคัก: step = '+v,'good');return this.show();},
+  get bands(){return VISITOR_BANDS.map(b=>b.slice());},
+  set(from,lo,hi){
+    const f=Number(from),a=Math.round(Number(lo)),b=Math.round(Number(hi));
+    if(!(f>=0)||!(a>=0)||!(b>=a)){console.warn('ใช้: ShopBusy.set(ความดึงดูดที่เริ่มช่วง, พื้น, เพดาน) · เพดานต้องไม่น้อยกว่าพื้น');return this.show();}
+    const row=VISITOR_BANDS.find(r=>r[0]===f);
+    if(row){row[1]=a;row[2]=b;}else{VISITOR_BANDS.push([f,a,b]);VISITOR_BANDS.sort((x,y)=>x[0]-y[0]);}
+    if(typeof toast==='function')toast('ความคึกคัก: ดึงดูด '+f+'+ → '+a+'-'+b+' คน','good');
+    return this.show();},
   show(){const cap=visitorCapacity();
-    const rows=[5,20,40,70,100,200,400,800].map(s=>({'ความนิยม':s,'เป้าคน':visitorTarget(1e9,s),'ได้จริงในร้านนี้':visitorTarget(cap,s)}));
-    console.table(rows);return {step:ATTR_STEP,ความจุร้าน:cap,ตอนนี้มีลูกค้า:customerCount(),rows};}
+    const rows=[0,10,19,20,40,69,70,99,100,200,400].map(s=>{const g=visitorBand(1e9,s),r=visitorBand(cap,s);
+      return {'ความนิยม':s,'เป้าคน':g.lo+'-'+g.hi,'ได้จริงในร้านนี้':r.lo+'-'+r.hi};});
+    console.table(rows);
+    return {ช่วง:this.bands,พื้นที่ร้าน:floorArea(),'สูตรช่วงท้าย':'พื้นที่ ÷ '+VISITOR_AREA_DIV+' (ตั้งแต่ดึงดูด '+VISITOR_AREA_FROM+')',
+            ความจุร้าน:cap,ตอนนี้มีลูกค้า:customerCount(),rows};}
 };

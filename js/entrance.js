@@ -1,7 +1,34 @@
+/* ============================================================
+   ประตู — มีได้หลายบาน แต่ละบานกำหนดทิศทางและสิทธิ์ผ่านของตัวเอง
+     {side,offset, dir:'both'|'in'|'out', allow:{cust,peddler,wholesale,challenger}, paid}
+   ⚠️ G.door (เอกพจน์) ยังใช้ได้อยู่ = บานแรก — quests.js/tank-decor-ui.js/save เก่าอ้างชื่อนี้
+   ============================================================ */
+const DOOR_WAYS=[['both','เข้า–ออก'],['in','ทางเข้าอย่างเดียว'],['out','ทางออกอย่างเดียว']];
+const doorList=()=>Array.isArray(G.doors)?G.doors:(G.doors=[]);
+const doorWay =d=>DOOR_WAYS.some(w=>w[0]===d?.dir)?d.dir:'both';
+let doorRevision=0;
+Object.defineProperty(G,'door',{
+  configurable:true,
+  get(){return doorList()[0]||null;},
+  set(v){const a=doorList();doorRevision++;if(!v)a.length=0;else if(a.length)a[0]=v;else a.push(v);}
+});
+/* กรอบประตูทุกบานที่ใช้ได้จริง — แคชไว้เพราะ inDoorWalkway() ถูกเรียกหนักมาก
+   (freeSpot / accessibleTankSpots / partySpots เรียกต่อจุดยืนต่อคนต่อเฟรม)
+   ล้างแคชเมื่อ: ประตูเปลี่ยน (doorRevision) · พื้นเปลี่ยน (floorRevision) · ร้านขยาย (bw/bh)
+   เทียบกันแค่ตัวเลข 4 ตัว ไม่ได้ต่อสตริงคีย์ใหม่ทุกครั้ง */
+let _doorRects=[],_drAt=-1,_drFloor=-1,_drW=-1,_drH=-1;
+function doorRects(){
+  if(_drAt!==doorRevision||_drFloor!==floorRevision||_drW!==G.bw||_drH!==G.bh){
+    _drAt=doorRevision;_drFloor=floorRevision;_drW=G.bw;_drH=G.bh;
+    _doorRects=[];
+    for(const d of doorList()){const r=entranceRect(d);if(r){r.door=d;_doorRects.push(r);}}
+  }
+  return _doorRects;
+}
 function inDoorWalkway(x,y){
- const r=entranceRect();if(!r)return false;
- const margin=PERSON_R;
- return x>r.cx-margin&&x<r.cx+r.w+margin&&y>r.cy-margin&&y<r.cy+r.h+margin;
+ const m=PERSON_R;
+ for(const r of doorRects()) if(x>r.cx-m&&x<r.cx+r.w+m&&y>r.cy-m&&y<r.cy+r.h+m) return true;
+ return false;
 }
 /* One grid-aligned, two-large-cell entrance, saved independently of furniture. */
 function entranceRect(d=G.door){
@@ -12,10 +39,29 @@ function entranceRect(d=G.door){
 }
 function rectHits(a,b){return a.cx<b.cx+b.w&&a.cx+a.w>b.cx&&a.cy<b.cy+b.h&&a.cy+a.h>b.cy;}
 function entranceClear(objects=G.objs,d=G.door){const r=entranceRect(d);return !!r&&floorRect(r.cx,r.cy,r.w,r.h)&&!objects.some(o=>rectHits(r,{cx:o.cx,cy:o.cy,w:oW(o),h:oH(o)}));}
-function chosenDoorSpot(){
-  if(!entranceClear())return null;
-  const r=entranceRect(),e=PERSON_EDGE+1,v=PERSON_R+Math.random()*(2*SUB-2*PERSON_R);
-  const s=G.door.side;return{x:s==='west'?e:s==='east'?cellsW()-e:r.cx+v,y:s==='north'?e:s==='south'?cellsH()-e:r.cy+v};
+function anyEntranceClear(objects=G.objs){return doorList().some(d=>entranceClear(objects,d));}
+/* ประตูที่คนประเภทนี้ใช้ได้สำหรับทางนั้น (way = 'in' หรือ 'out')
+   ⚠️ ทางออกมีกฎถอยหลังหนึ่งชั้น (ผู้เล่นกำหนด 2026-09-20: "หากไม่มีทางออก จะใช้ประตูนี้ออกแทน")
+      ไม่มีบานไหนตั้งเป็นทางออกเลย → ใช้บานที่เหลือออกแทน
+      เพราะถ้าคืนลิสต์ว่าง คนจะไม่มีเป้าหมายแล้วยืนค้างในร้านถาวร (บั๊กที่เพิ่งแก้ไป)
+   ⚠️ ทางเข้าไม่มีกฎนี้ — "ทางออกอย่างเดียว" ต้องแปลว่าเข้าไม่ได้จริง ๆ
+      ไม่งั้นตั้งค่ายังไงคนก็เดินเข้าได้หมด ปุ่มนั้นก็ไม่มีความหมาย
+      ไม่มีทางเข้า = ไม่สปอนคนเข้ามา ซึ่งไม่ทำให้ใครติดค้าง (ยังไม่มีใครอยู่ในร้าน) */
+function doorsFor(kind='cust',way='in',objects=G.objs){
+  const usable=doorList().filter(d=>accessAllows(d.allow,kind)&&entranceClear(objects,d));
+  const fit=usable.filter(d=>{const w=doorWay(d);return w==='both'||w===way;});
+  return (fit.length||way==='in')?fit:usable;
+}
+/* ไม่มีบานไหนตั้งเป็นทางออก (หรือ เข้า–ออก) ให้คนประเภทนี้เลยหรือเปล่า — ใช้เตือนผู้เล่น */
+function lacksExitFor(kind='cust'){
+  const allowed=doorList().filter(d=>accessAllows(d.allow,kind));
+  return allowed.length>0&&!allowed.some(d=>{const w=doorWay(d);return w==='both'||w==='out';});
+}
+function chosenDoorSpot(kind='cust',way='in'){
+  const list=doorsFor(kind,way);if(!list.length)return null;
+  const d=list[(Math.random()*list.length)|0],r=entranceRect(d);if(!r)return null;
+  const e=PERSON_EDGE+1,v=PERSON_R+Math.random()*(2*SUB-2*PERSON_R),s=d.side;
+  return{x:s==='west'?e:s==='east'?cellsW()-e:r.cx+v,y:s==='north'?e:s==='south'?cellsH()-e:r.cy+v,door:d};
 }
 // Free intervals along each tank side; obstacles and shop boundaries count as walls.
 function tankSideGaps(t,objects,side,depth){
@@ -53,14 +99,15 @@ function tankAccessIssue(objects){
 }
 function layoutAllowsPlacement(cx,cy,def,ignore,rot){
   const candidate={cx,cy,def,rot,type:def.kind},objects=G.objs.filter(o=>o!==ignore).concat(candidate);
-  if(G.door&&!entranceClear(objects))return false;
+  if(doorList().some(d=>!entranceClear(objects,d)))return false;   // ห้ามบังบานไหนก็ตาม
   return !tankAccessIssue(objects);
 }
 function shopOpeningIssue(){
-  if(!G.door)return 'ต้องวางประตูก่อนเปิดร้าน';
-  if(!entranceClear())return 'ทางเข้าประตูถูกบัง ต้องเว้นพื้นที่หน้าประตู 2×2 ช่องใหญ่';
+  if(!doorList().length)return 'ต้องวางประตูก่อนเปิดร้าน';
+  if(!anyEntranceClear())return 'ทางเข้าประตูถูกบัง ต้องเว้นพื้นที่หน้าประตู 2×2 ช่องใหญ่';
+  const from=chosenDoorSpot('cust','in');
+  if(!from)return 'ไม่มีประตูที่เปิดให้ "ลูกค้า" เข้า — แตะประตูในโหมดก่อสร้างเพื่อเปิดสิทธิ์';
   const issue=tankAccessIssue(G.objs);if(issue)return issue;
-  const from=chosenDoorSpot();
   for(const t of G.objs.filter(o=>o.type==='tank')){
     const spots=accessibleTankSpots(t);
     if(!spots.some(s=>!personBlocked(s.x,s.y)&&personRoute(from,s).length))return 'มีตู้ที่เดินจากประตูไปไม่ถึง กรุณาเปิดทางเดิน';
@@ -69,12 +116,25 @@ function shopOpeningIssue(){
 }
 let placingWallDoor=false,wallDoorHover=null,wallDoorDown=null;
 registerMode('doorPlace','floor',()=>placingWallDoor,()=>{placingWallDoor=false;wallDoorHover=null;wallDoorDown=null;});
+/* บานแรกฟรี บานต่อไปบานละ DOOR_PRICE (ผู้เล่นกำหนด 2026-09-20) */
+function doorPrice(){return doorList().length?DOOR_PRICE:0;}
 function placeEntrance(){
-  if(peopleOn){toast('ปิดร้านก่อนย้ายประตู','bad');return;}
+  if(peopleOn){toast('ปิดร้านก่อนวาง/ย้ายประตู','bad');return;}
+  const cost=doorPrice();
+  if(cost&&G.coin<cost){toast('เหรียญไม่พอ ประตูบานต่อไปราคา '+cost,'bad');return;}
   setMode('build');enterExclusiveMode('doorPlace');placingWallDoor=true;wallDoorHover=null;   // วางประตู = เลิกถือของ/เลิกเลือกช่องขยาย
-  toast('คลิกกำแพงเพื่อวางประตู 1×2 เมตร · ใช้ 2 คอลัมน์ · Esc ยกเลิก');
+  toast('คลิกกำแพงเพื่อวางประตู 1×2 เมตร · ใช้ 2 คอลัมน์ · '+(cost?'ราคา '+cost:'บานแรกฟรี')+' · Esc ยกเลิก');
 }
-function removeEntrance(){if(peopleOn){toast('ปิดร้านก่อนเก็บประตู','bad');return;}G.door=null;saveGame();syncPeopleBtn();finishConstruction();}
+/* เก็บประตู — ไม่ส่งบานไหนมา = บานแรก (ของเดิมที่ปุ่มในแผงเรียกอยู่) */
+function removeEntrance(d=G.door){
+  if(peopleOn){toast('ปิดร้านก่อนเก็บประตู','bad');return;}
+  const a=doorList(),i=a.indexOf(d);if(i<0)return;
+  const back=Math.round((d.paid||0)*DECO_REFUND);
+  a.splice(i,1);doorRevision++;
+  if(back)addCoin(back);
+  toast('เก็บประตูแล้ว'+(back?' +'+back:''),'good');
+  saveGame();syncPeopleBtn();syncHUD();finishConstruction();
+}
 function wallPoint(side,u,z){return side==='north'?P(u,0,z):P(0,u,z);}
 function wallDoorHit(sx,sy){
   for(const side of ['north','west']){
@@ -91,15 +151,22 @@ function wallQuad(side,u,width,z,height,fill,stroke){
   ctx.beginPath();q.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();
   if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.stroke();}
 }
-let doorSwing=0,doorSwingTime=0;
+/* บานประตูแกว่งแยกกันทีละบาน (เก็บไว้บน d._swing — ค่ารันไทม์ ไม่ถูกเซฟ)
+   ⚠️ ร้านปิดอยู่ไม่มีใครเดิน ข้ามลูป PEOPLE ทั้งก้อนไปเลย ไม่ต้องวนต่อบาน */
+let doorSwingTime=0;
 function stepDoorSwing(){
   const now=performance.now(),dt=Math.min(.05,(now-(doorSwingTime||now))/1000);doorSwingTime=now;
-  const r=entranceRect();
-  const near=r&&peopleOn&&PEOPLE.some(p=>p.x>r.cx-3&&p.x<r.cx+r.w+3&&p.y>r.cy-3&&p.y<r.cy+r.h+3);
-  const target=near?1:0;doorSwing+=(target-doorSwing)*(1-Math.exp(-dt*(near?9:3)));
+  const rects=doorRects();if(!rects.length)return;
+  const live=peopleOn&&PEOPLE.length>0;
+  for(const r of rects){
+    const d=r.door;
+    const near=live&&PEOPLE.some(p=>p.x>r.cx-3&&p.x<r.cx+r.w+3&&p.y>r.cy-3&&p.y<r.cy+r.h+3);
+    const s=d._swing||0;
+    d._swing=s+((near?1:0)-s)*(1-Math.exp(-dt*(near?9:3)));
+  }
 }
 function drawDoorLeaf(d,preview=false){
-  const {side,offset}=d,width=2*SUB,height=40*ZUNIT,angle=preview?0:doorSwing*Math.PI*.46;
+  const {side,offset}=d,width=2*SUB,height=40*ZUNIT,angle=preview?0:(d._swing||0)*Math.PI*.46;
   const hinge=offset+.8,leafWidth=width-1.6;
   // North swings toward negative Y; west swings toward negative X: both outside.
   const project=(u,z,depth=0)=>{
@@ -144,7 +211,20 @@ function drawDoorLeaf(d,preview=false){
   ctx.restore();
 }
 
-function drawEntrance(){stepDoorSwing();if(entranceRect())drawDoorLeaf(G.door);}
+/* แถบสีบอกทิศทางที่ธรณีประตู — วาดเฉพาะโหมดก่อสร้าง (ผู้เล่นกำลังจัดร้านเท่านั้นที่ต้องเห็น)
+   เขียว = ทางเข้า · ส้ม = ทางออก · ฟ้า = เข้า–ออก · แดง = ไม่ให้ใครผ่านเลย
+   ควอดเดียวต่อบาน ไม่มีลูปต่อเฟรมเพิ่มตอนเล่นปกติ */
+const DOOR_WAY_COLOR={both:'#7fd7e8',in:'#8fe0a8',out:'#f0b775'};
+function drawDoorWayMark(d){
+  const none=ACCESS_KINDS.every(a=>!accessAllows(d.allow,a.k));
+  const col=none?'#f0847c':DOOR_WAY_COLOR[doorWay(d)];
+  wallQuad(d.side,d.offset+.8,2*SUB-1.6,.25*ZUNIT,1.5*ZUNIT,col+'55',col);
+}
+function drawEntrance(){
+  stepDoorSwing();
+  const build=typeof appMode!=='undefined'&&appMode==='build'&&!peopleOn;
+  for(const r of doorRects()){drawDoorLeaf(r.door);if(build)drawDoorWayMark(r.door);}
+}
 function drawWallDoorGrid(){
   if(!placingWallDoor)return;
   if(appMode!=='build'||peopleOn){placingWallDoor=false;return;}
@@ -154,7 +234,7 @@ function drawWallDoorGrid(){
     for(let u=0;u<length;u+=SUB)wallQuad(side,u,SUB,0,ROOM_H,'rgba(201,183,131,.025)','rgba(239,220,162,.45)');
   }
   ctx.setLineDash([]);
-  if(wallDoorHover){const d=wallDoorHover,ok=d.valid&&entranceClear(G.objs,d);const length=d.side==='north'?cellsW():cellsH();
+  if(wallDoorHover){const d=wallDoorHover,ok=d.valid&&entranceClear(G.objs,d)&&!doorOverlapAt(d.side,d.offset);const length=d.side==='north'?cellsW():cellsH();
     wallQuad(d.side,d.offset,Math.min(2*SUB,length-d.offset),0,ROOM_H,ok?'rgba(103,212,163,.22)':'rgba(242,97,87,.28)',ok?'#93dfb3':'#f37a70');
     if(d.valid)drawDoorLeaf(d,true);
   }ctx.restore();
@@ -170,6 +250,23 @@ cv.addEventListener('pointerup',e=>{
   const {sx,sy}=screenXY(e),d=wallDoorHit(sx,sy);
   if(!d||!d.valid){toast('เลือกกำแพงที่มีที่ว่างติดกัน 2 คอลัมน์','bad');return;}
   if(!entranceClear(G.objs,d)){toast('มีของบังหน้าประตู ต้องเว้นทางเข้า 2×2 ช่องใหญ่','bad');return;}
-  G.door={side:d.side,offset:d.offset};placingWallDoor=false;wallDoorHover=null;saveGame();syncPeopleBtn();toast('วางประตู 1×2 เมตรแล้ว','good');finishConstruction();
+  if(doorOverlapAt(d.side,d.offset)){toast('ตรงนี้มีประตูอยู่แล้ว','bad');return;}
+  if(typeof SHELF_W!=='undefined'&&G.shelf&&G.shelf.side===d.side&&
+     d.offset<G.shelf.offset+SHELF_W&&G.shelf.offset<d.offset+2*SUB){toast('ตรงนี้มีชั้นวางติดผนังอยู่','bad');return;}
+  const cost=doorPrice();
+  if(cost&&G.coin<cost){toast('เหรียญไม่พอ ('+cost+')','bad');return;}
+  if(cost)addCoin(-cost);
+  /* บานใหม่เปิดให้ทุกคนผ่านทั้งเข้าและออกไว้ก่อน — ผู้เล่นค่อยไปปิดทีหลัง
+     ตั้งค่าเริ่มต้นแบบ "ห้ามหมด" จะทำให้วางประตูแล้วร้านใช้ไม่ได้ทันทีโดยไม่รู้ตัว */
+  doorList().push({side:d.side,offset:d.offset,dir:'both',allow:accessAll(),paid:cost});
+  doorRevision++;
+  placingWallDoor=false;wallDoorHover=null;saveGame();syncPeopleBtn();syncHUD();
+  toast('วางประตู 1×2 เมตรแล้ว'+(cost?' −'+cost:' (บานแรกฟรี)'),'good');
+  finishConstruction();
+  if(typeof openDoorSettings==='function')openDoorSettings(doorList()[doorList().length-1]);
 },true);
+/* กันวางทับบานเดิม — ประตูกว้าง 2 คอลัมน์ ต้องเช็กช่วงซ้อน ไม่ใช่แค่ offset ตรงกัน */
+function doorOverlapAt(side,offset,ignore=null){
+  return doorList().some(d=>d!==ignore&&d.side===side&&offset<d.offset+2*SUB&&d.offset<offset+2*SUB);
+}
 window.addEventListener('keydown',e=>{if(e.key==='Escape'){placingWallDoor=false;wallDoorHover=null;}});

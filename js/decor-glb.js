@@ -243,7 +243,13 @@ api.endTank=()=>{
  if(ghost&&key&&enabled(key))placeTank({key,fx:ghost.fx,fy:ghost.fy,flip:dragDecor?.flip??placeFlip},'ghost');
  prune();
  const tr=tankCvRect(),r={x:tr.left,y:innerHeight-tr.bottom,w:tr.width,h:tr.height};sizeCanvas();
- const sig=[mode,r.x,r.y,r.w,r.h,tankCam.ox,tankCam.oy,tankCam.zoom,assetRevision,...[...objects.values()].flatMap(e=>[e.key,...e.root.position.toArray(),e.root.rotation.y,e.root.scale.x,e.root.visible]),thumbSignature].join('|');
+ /* ⚠️ 2026-09-20 ผู้เล่น: "เปลี่ยน 3D เป็น 2D แล้วตัวเก่ายังอยู่ ไม่ยอมรีเฟรช"
+    ปิด 3D → slugJobs ว่าง → เงื่อนไขใช้แคชด้านล่างเป็นจริง (`!slugJobs.length`) และ sig ก็ไม่เปลี่ยน
+    เพราะไม่มีอะไรในคีย์ที่บอกว่าโหมดเปลี่ยน → คืนทันทีโดยไม่เรนเดอร์ แคนวาส WebGL เลยค้าง
+    เฟรมสุดท้ายที่ยังมีทาก 3D อยู่ ทับกับสไปรต์ 2D ที่เพิ่งกลับมาวาด
+    (ทางกลับ 2D→3D ไม่เป็น เพราะ slugJobs กลับมามีของ เงื่อนไขแคชเลยไม่ติด)
+    ใส่สถานะ 3D กับจำนวนงานลงคีย์ = พอสวิตช์แล้ว sig เปลี่ยน บังคับเรนเดอร์ล้างครั้งหนึ่ง */
+ const sig=[mode,r.x,r.y,r.w,r.h,tankCam.ox,tankCam.oy,tankCam.zoom,assetRevision,(window.Slug3D?.enabled?1:0),slugJobs.length,...[...objects.values()].flatMap(e=>[e.key,...e.root.position.toArray(),e.root.rotation.y,e.root.scale.x,e.root.visible]),thumbSignature].join('|');
  if(sig===signature&&!thumbDirty&&(!slugJobs.length||performance.now()-lastSlugRender<33)){api.stats.reuses++;return;}signature=sig;
  const start=performance.now();updateBatches();updateSlugCrowd();renderer.info.reset();clear();occluders.visible=false;setViewport(r);renderer.render(scene,camera);renderThumbs();stats(start);
 };
@@ -321,7 +327,8 @@ api.endShop=()=>{
   if(job.position){e.root.position.fromArray(job.position);e.root.rotation.set(0,job.angle,0);e.root.scale.setScalar(1);}
   else{const p=localToFloor(tank.def,tank.rot|0,d.fx,d.fy);e.root.position.set((tank.cx+p[0])*cellM,tankStandH(tank.def)/ZUNIT*cellM,(tank.cy+p[1])*cellM);e.root.rotation.set(0,(d.flip-(tank.rot|0))*Math.PI/2,0);e.root.scale.setScalar(tank.def.decorScale||1);}
   e.root.visible=e.ready;e.root.updateMatrixWorld(true);if(e.ready){e.root.visible=frustum.intersectsBox(e.asset.bounds.clone().applyMatrix4(e.root.matrixWorld));if(!e.root.visible)api.stats.culled++;}}
- prune();sizeCanvas();const layout=shopLayoutKey(),sig=[mode,r.x,r.y,r.w,r.h,cam.x,cam.y,cam.zoom,assetRevision,layout,...[...objects.values()].flatMap(e=>[e.key,...e.root.position.toArray(),e.root.rotation.y,e.root.visible])].join('|');
+ /* สถานะ 3D + จำนวนงานต้องอยู่ในคีย์ด้วย — เหตุผลเดียวกับใน endTank() ด้านบน */
+ prune();sizeCanvas();const layout=shopLayoutKey(),sig=[mode,r.x,r.y,r.w,r.h,cam.x,cam.y,cam.zoom,assetRevision,layout,(window.Slug3D?.enabled?1:0),slugJobs.length,personFaces.length,...[...objects.values()].flatMap(e=>[e.key,...e.root.position.toArray(),e.root.rotation.y,e.root.visible])].join('|');
  if(sig===signature&&((!personFaces.length&&!slugJobs.length)||performance.now()-lastSlugRender<33)){api.stats.reuses++;return;}signature=sig;const start=performance.now();updateBatches();updateSlugCrowd();updateShopOcclusion(layout);renderer.info.reset();clear();occluders.visible=true;setViewport(r);renderer.render(scene,camera);stats(start);
 };
 

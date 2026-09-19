@@ -100,7 +100,7 @@
   if(!p||!p.wantsSell||p.tradeDone||p.tradeOffer||!p.sellSlug) return false;
   if(typeof TRADE_OFFERS==='undefined'||typeof counterFront!=='function') return false;
   if(TRADE_OFFERS.some(function(o){return o.sell;})) return false;
-  var counters=(G.objs||[]).filter(function(c){return c._key==='counter'&&c!==moving;});
+  var counters=countersFor('peddler');   // เฉพาะเคาน์เตอร์ที่เปิดรับพ่อค้าเร่
   for(var i=0;i<counters.length;i++){
    var counter=counters[i];
    /* เข้าคิวหน้าเคาน์เตอร์ได้แล้ว (trade.js) ไม่ต้องรอให้เคาน์เตอร์ว่างเปล่าเหมือนเดิม */
@@ -125,7 +125,7 @@
   if(Date.now()<G.nextPeddlerAt) return false;
   if(typeof traderRoom==='function'&&traderRoom()<1) return false;   // โควตาพ่อค้าแยกจากลูกค้าแล้ว (people.js)
   if(typeof TRADE_OFFERS==='undefined') return false;
-  if(!(G.objs||[]).some(function(o){return o._key==='counter'&&o!==moving;})) return false;   // ไม่มีเคาน์เตอร์ = ไม่มีที่ยื่นขาย
+  if(!countersFor('peddler').length) return false;   // ไม่มีเคาน์เตอร์ = ไม่มีที่ยื่นขาย
   if(TRADE_OFFERS.some(function(o){return o.sell;})) return false;
   if(PEOPLE.some(function(p){return p.wantsSell;})) return false;
   if(spawnVisitors(Math.max(1,capacity),'peddler',[{kid:false,gender:Math.random()<.5?'female':'male'}])){

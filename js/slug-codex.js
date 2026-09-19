@@ -64,28 +64,21 @@
   for(const s of (G.inv||[])) if(s) out.push(s);
   return out;
  }
- /* ⚠️ n = "ตอนนี้มีกี่ตัว" นับใหม่ทุกรอบ ไม่ใช่ยอดสะสม
-    เวอร์ชันแรกเก็บ seen[slugId] ไว้กันนับซ้ำ ซึ่งแปลว่าเซฟจะพอง id ไปเรื่อย ๆ ตามจำนวนทาก
-    ที่เคยผ่านมือทั้งเกม (ผิดกฎหมวด 8 เรื่องขนาดเซฟ) — ยอดสะสมไม่คุ้มกับเซฟที่บวมไม่มีเพดาน */
+ /* ⚠️ หนึ่งช่องเก็บแค่ "ตัวแรกที่เจอ" เท่านั้น — เวลาที่พบ + ยีนของมัน จบ
+    ตัวที่เจอทีหลังไม่บันทึกอะไรเลย แม้จะตัวใหญ่กว่า/สวยกว่า ช่องเป็นของตัวแรกตลอดไป
+    (เวอร์ชันก่อนเก็บสถิติ "ตัวใหญ่สุดที่เคยได้" กับจำนวนที่มีอยู่ด้วย = ข้อมูลของตัวอื่น ตัดทิ้งแล้ว)
+    ขนาด ซม. ไม่ต้องเก็บ คำนวณสดจากยีนได้ตลอดด้วย slugRealCm() */
+ const LEGACY=['seen','best','n'];
  function scan(){
   let dirty=false;
-  const live={};
   for(const s of ownedSlugs()){
-   const k=keyOf(s); if(!k) continue;
-   live[k]=(live[k]||0)+1;
-   let e=G.codex[k];
-   if(!e){ e=G.codex[k]={at:Date.now(),n:0,g:sane(s.genes),best:null}; dirty=true; }
-   let cm=null; try{ if(typeof slugRealCm==='function') cm=slugRealCm(s,s.genes); }catch(err){}
-   if(cm){
-    const b=e.best||(e.best={len:0,girth:0,gill:0,tent:0});
-    for(const f of ['len','girth','gill','tent'])
-     if(Number.isFinite(cm[f])&&cm[f]>(b[f]||0)+1e-6){ b[f]=+cm[f].toFixed(2); dirty=true; }
-   }
+   const k=keyOf(s); if(!k||G.codex[k]) continue;
+   G.codex[k]={at:Date.now(), g:sane(s.genes)};
+   dirty=true;
   }
-  for(const k of Object.keys(G.codex)){
-   const e=G.codex[k], n=live[k]||0;
-   if(e.seen){ delete e.seen; dirty=true; }                 // ล้างของเวอร์ชันเก่าที่ทำเซฟบวม
-   if(e.n!==n){ e.n=n; dirty=true; }
+  for(const k of Object.keys(G.codex)){                     // ล้างฟิลด์ของเวอร์ชันเก่าออกจากเซฟ
+   const e=G.codex[k];
+   for(const f of LEGACY) if(f in e){ delete e[f]; dirty=true; }
   }
   if(dirty&&typeof saveGame==='function') saveGame();
   return dirty;
@@ -334,14 +327,13 @@
   const head='<b style="color:#f1c66d">'+BN()[i].n+' / '+GN()[j].n+' · '+LAD[k]+' หงอน</b>';
   if(!e){ box.innerHTML=head+' <span style="color:#6d8a8e">— ยังไม่เคยเจอ'
     +(k>=4?' · ขั้นนี้ไม่มีในกล่องสุ่มทุกระดับ ต้องเพาะเอง':'')+'</span>'; return; }
-  const d=new Date(e.at), g=e.g, b=e.best||{};
-  const D=SlugEngine.derived(g);
+  const d=new Date(e.at), g=e.g, D=SlugEngine.derived(g);
+  let m=null; try{ if(typeof slugRealCm==='function') m=slugRealCm({genes:g},g); }catch(err){}
   const cm=v=>Number.isFinite(v)?v.toFixed(1)+' ซม.':'—';
   box.innerHTML=head
-   +' <span style="color:#8fa8a4">· พบเมื่อ '+(d.getFullYear()+543)+'-'+D2(d.getMonth()+1)+'-'+D2(d.getDate())
-   +' · ตอนนี้มี '+(e.n||0)+' ตัว</span><br>'
-   +'<span style="color:#cfe0dc">ยาวสุด '+cm(b.len)+' · ตัวใหญ่สุด '+cm(b.girth)+' · หงอนสูงสุด '+cm(b.gill)+' · หนวดยาวสุด '+cm(b.tent)+'</span><br>'
-   +'<span style="color:#7d9ca1;font-size:11.5px">ยีนตัวที่บันทึก — สีตัว '+Math.round(g.mainC)+' · สีหงอน '+Math.round(g.accC)
+   +' <span style="color:#8fa8a4">· พบเมื่อ '+(d.getFullYear()+543)+'-'+D2(d.getMonth()+1)+'-'+D2(d.getDate())+'</span><br>'
+   +(m?'<span style="color:#cfe0dc">ยาว '+cm(m.len)+' · ตัว '+cm(m.girth)+' · หงอนสูง '+cm(m.gill)+' · หนวดยาว '+cm(m.tent)+'</span><br>':'')
+   +'<span style="color:#7d9ca1;font-size:11.5px">สีตัว '+Math.round(g.mainC)+' · สีหงอน '+Math.round(g.accC)
    +' · ความสมบูรณ์ '+Math.round(g.vigor)+' · ลาย '+D.nSpot+' ดวง · ร่องตัว '+Math.round(g.bodyDepth)+' · ร่องหงอน '+Math.round(g.gillDepth)+'</span>';
  }
 

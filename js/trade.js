@@ -44,6 +44,17 @@ function counterQueueSpots(c){
   for(let i=0;i<COUNTER_QUEUE;i++)out.push({x:f.x+d.x*gap*i,y:f.y+d.y*gap*i});
   return out;
 }
+/* ---- สิทธิ์เข้าติดต่อเคาน์เตอร์ (ผู้เล่นกำหนด 2026-09-20) ----
+   o.allow = {cust,peddler,wholesale,challenger} · ไม่มีฟิลด์นี้ (เซฟเก่า) = รับทุกคน
+   ผู้ท้าแข่งไม่ได้มาที่เคาน์เตอร์อยู่แล้ว แต่เก็บช่องไว้ในตารางเดียวกับประตูเพื่อไม่ต้องมีคำศัพท์สองชุด */
+const counterAllows=(c,kind)=>accessAllows(c&&c.allow,kind);
+/* เคาน์เตอร์ที่เปิดรับคนประเภทนี้ และวางอยู่บนพื้นจริง (ไม่ใช่ตัวที่กำลังถูกยก) */
+function countersFor(kind){return G.objs.filter(c=>c._key==='counter'&&c!==moving&&counterAllows(c,kind));}
+/* ไม่มีเคาน์เตอร์สักตัวที่เปิดให้ "ลูกค้า" เข้ามาเสนอซื้อ — ใช้ขึ้นไอคอนเตือนมุมขวาล่าง */
+function noCounterForCustomers(){
+  const all=G.objs.filter(c=>c._key==='counter'&&c!==moving);
+  return all.length>0&&!all.some(c=>counterAllows(c,'cust'));
+}
 function counterOfferCount(counter,onlyBuyers){
   return TRADE_OFFERS.filter(o=>o.counter===counter&&(!onlyBuyers||(!o.sell&&!o.wholesale))).length;
 }
@@ -71,7 +82,7 @@ function tryCustomerOffer(p,tank){
     if(bid.price&&(!best||bid.price>best.price))best={slug,...bid};
   }
   if(!best)return false;
-  for(const counter of G.objs.filter(c=>c._key==='counter'&&c!==moving)){
+  for(const counter of countersFor('cust')){
     /* ลูกค้าซื้อกินคิวได้ไม่เกิน COUNTER_QUEUE-1 — กันช่องสุดท้ายไว้ให้พ่อค้าเร่/พ่อค้ารับเหมา
        ซึ่งมานาน ๆ ครั้ง (8–16 นาที / 10 นาที) ถ้าปล่อยให้ลูกค้าซื้อจองเต็มคิว พวกนี้จะเข้าไม่ได้เลย */
     if(counterOfferCount(counter,true)>=COUNTER_QUEUE-1||counterOfferCount(counter)>=COUNTER_QUEUE)continue;

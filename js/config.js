@@ -220,11 +220,41 @@ const G = {
   stats: {earned:0,spent:0,sec:0,sold:0,fed:0,cleaned:0,bred:0,ordered:0},   // สถิติเศรษฐกิจ (econ-stats.js)               // สต็อกกล่องสุ่มทาก {n, at} — ดู slug-box-shop.js
   bw: START_BW, bh: START_BH,   // พื้นที่ปัจจุบัน (ช่องใหญ่)
   objs: [],                     // ของที่วางบนพื้น {id,type,_key,cx,cy,def,slugs:[]}
+  doors: [],                    // ประตูบนกำแพง {side,offset,dir,allow,paid} — entrance.js (G.door = บานแรก)
   shelf: null,                  // ชั้นวางติดผนัง {side,offset} — ทากที่ลงขายตลาดโลกไปโชว์บนนี้ (wall-shelf.js)
   shelter: [],                  // ตู้ที่ถอดมาพักชั่วคราว
   inv: [],                      // ทากในคลัง (ยังไม่ลงตู้)
   seq: 1,
 };
+
+/* ============================================================
+   สิทธิ์ผ่านเข้า-ออก — ใช้ร่วมกันระหว่าง "ประตู" (entrance.js) กับ "เคาน์เตอร์" (trade.js)
+   ประตูกำหนดว่าใครเดินผ่านบานนี้ได้ · เคาน์เตอร์กำหนดว่าใครเดินมาติดต่อตรงนี้ได้
+   ⚠️ เซฟเก่าไม่มีฟิลด์ allow — accessAllows() ต้องตีเป็น "ผ่านได้หมด" ไม่ใช่ "ห้ามหมด"
+      ไม่งั้นอัปเดตปุ๊บร้านเก่าจะไม่มีใครเข้าได้เลยทันที
+   ============================================================ */
+/* counter:true = คนประเภทนี้เดินมาที่เคาน์เตอร์จริง จึงโผล่ในหน้าตั้งค่าเคาน์เตอร์
+   ผู้ท้าแข่งไปที่ตู้แข่งอย่างเดียว ไม่เคยเข้าคิวเคาน์เตอร์ — มีเฉพาะในหน้าตั้งค่าประตู */
+const ACCESS_KINDS = [
+  {k:'cust',       label:'ลูกค้า',    icon:'🧍', counter:true,  desc:'คนทั่วไป เข้ามาดูตู้และขอซื้อทาก'},
+  {k:'peddler',    label:'พ่อค้าเร่',  icon:'🧺', counter:true,  desc:'หอบทากมาเสนอขายให้ร้าน'},
+  {k:'wholesale',  label:'พ่อค้าส่ง',  icon:'📦', counter:true,  desc:'มารับซื้อทากยกล็อต'},
+  {k:'challenger', label:'ผู้ท้าแข่ง', icon:'🏁', counter:false, desc:'มาท้าแข่งที่ตู้แข่ง (วิ่ง ชักเย่อ กินจุ ปาหิน)'},
+];
+const accessAll   = () => Object.fromEntries(ACCESS_KINDS.map(a => [a.k, true]));
+const accessLabel = k => (ACCESS_KINDS.find(a => a.k === k) || {}).label || k;
+function accessAllows(rule, kind){ return !rule || rule[kind] !== false; }
+/* p.access ถูกตั้งตอนสปอน (spawnVisitors) · ธงบนตัวคนเป็นทางสำรองสำหรับคนที่เกิดก่อนอัปเดตนี้ */
+function personAccessKind(p){
+  if(!p) return 'cust';
+  if(p.access) return p.access;
+  if(p.wholesaleBuyer) return 'wholesale';
+  if(p.wantsSell) return 'peddler';
+  if(p.raceChallenger || p.tugChallenger || p.eatChallenger || p.throwChallenger) return 'challenger';
+  return 'cust';
+}
+/* ราคาประตู/เคาน์เตอร์: อันแรกฟรี อันต่อไปอันละเท่านี้ (ผู้เล่นกำหนด 2026-09-20) */
+const DOOR_PRICE = 500, COUNTER_PRICE = 500;
 /* ⚠️ 2026-09-16 เกมนี้ "เล่นเอฟเฟคเสมอ" ไม่อ่าน prefers-reduced-motion ของระบบ
    เครื่องที่ปิด Animation effects ของ Windows (MinAnimate=0) Chrome จะรายงาน reduce มา
    แล้วเอฟเฟคทุกตัวข้ามหมด: ไฟชาร์จชักเย่อ · พลุชนะ · พลุทากใหม่/ของขวัญ/กล่องสุ่ม · พลุแข่ง · หินหล่นตอนแพ้ · จอสั่น

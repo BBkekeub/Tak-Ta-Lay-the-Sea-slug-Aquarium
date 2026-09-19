@@ -149,13 +149,24 @@
    if(!b){b=document.createElement('button');b.type='button';b.className='item';b.dataset.k=k;
     const icon=document.createElement('canvas');icon.className='productImage';icon.width=256;icon.height=176;icon.dataset.product=k;icon.setAttribute('aria-hidden','true');previewObserver.observe(icon);
     const name=document.createElement('span');name.className='nm';name.textContent=d.name;
-    const price=document.createElement('b');price.className='pr';price.textContent=d.price?'● '+d.price.toLocaleString():'ฟรี';b.append(icon,name,price);
-    b.title=d.name+' · '+d.w*CM_PER_CELL+'×'+d.h*CM_PER_CELL+' ซม.';b.setAttribute('aria-label',b.title+' · '+(d.price?d.price+' เหรียญ':'ฟรี'));
+    const price=document.createElement('b');price.className='pr';b.append(icon,name,price);
+    b._price=price;
+    b.title=d.name+' · '+d.w*CM_PER_CELL+'×'+d.h*CM_PER_CELL+' ซม.';
     b.onclick=()=>{buyKey=buyKey===k?null:k;if(buyKey)enterExclusiveMode('holding');buyRot=0;if(buyKey)setTool('place');buildShop();};
     cards.set(k,b);shop.append(b);
    }
+   /* ราคาบางอย่างไม่คงที่ (เคาน์เตอร์ตัวแรกฟรี ตัวต่อไป 500) จึงอ่านจาก objPrice() ทุกครั้งที่เปิดแผง
+      ⚠️ เขียน DOM เฉพาะตอนค่าเปลี่ยนจริง — buildShop() ถูกเรียกบ่อย (ทุกครั้งที่เลือก/ยกเลิกของ) */
+   const cost=typeof objPrice==='function'?objPrice(k,d):(d.price||0);
+   const priceText=cost?'● '+cost.toLocaleString():'ฟรี';
+   if(b._price&&b._price.textContent!==priceText){
+    b._price.textContent=priceText;
+    b.setAttribute('aria-label',b.title+' · '+(cost?cost+' เหรียญ':'ฟรี'));
+   }
    b.classList.toggle('on',buyKey===k);b.setAttribute('aria-pressed',String(buyKey===k));
   }
+  /* ปุ่มของติดกำแพง (ประตู/ชั้นวาง) ไม่ได้อยู่ใน CATALOG จึงไม่ผ่านลูปข้างบน — รีเฟรชราคาแยก */
+  for(const b of shop.querySelectorAll('.item')) if(b._syncPrice) b._syncPrice();
   const d=CATALOG[buyKey];if(d)active=category(buyKey,d);selectCategory(active);
   selection.textContent=d?d.name+' · '+d.w*CM_PER_CELL+'×'+d.h*CM_PER_CELL+' ซม.':'เลือกของเพื่อวาง';cancel.hidden=!buyKey;
   for(const canvas of visiblePreviews)updatePreview(canvas);
@@ -205,7 +216,15 @@
    const b=document.createElement('button');b.type='button';b.className='item';b.dataset.k=key;
    const icon=document.createElement('canvas');icon.className='productImage';icon.width=256;icon.height=176;icon.dataset.product=key;icon.setAttribute('aria-hidden','true');
    const title=document.createElement('span');title.className='nm';title.textContent=label;
-   const price=document.createElement('b');price.className='pr';price.textContent='ฟรี · ติดกำแพง';b.append(icon,title,price);
+   const price=document.createElement('b');price.className='pr';b.append(icon,title,price);
+   /* ราคาประตูเปลี่ยนตามจำนวนที่มีอยู่ (บานแรกฟรี บานต่อไป 500) — อัปเดตข้อความตอนเปิดแผงทุกครั้ง
+      ⚠️ เขียนเฉพาะตอนข้อความต่างจริง ไม่ใช่ทุกครั้งที่ buildShop() ถูกเรียก */
+   const syncPrice=()=>{
+    const cost=key==='wall-door'&&typeof doorPrice==='function'?doorPrice():0;
+    const text=cost?'● '+cost.toLocaleString()+' · ติดกำแพง':'ฟรี · ติดกำแพง';
+    if(price.textContent!==text)price.textContent=text;
+   };
+   syncPrice();b.dataset.k=key;b._syncPrice=syncPrice;
    b.onclick=()=>{setTool('place');start();selectCategory('อุปกรณ์สำคัญ');selection.textContent=label+' · แตะกำแพงเพื่อวาง';};shop.append(b);previewObserver.observe(icon);
   }
   for(const b of document.querySelectorAll('.rail button[onclick*="Entrance"],.rail button[onclick*="WallShelf"],.rail button[onclick*="TradeCounter"]'))b.remove();
@@ -213,24 +232,35 @@
  });
  // Pick wall fixtures on their actual wall footprint; empty wall drags still pan the camera.
  let wallPress=null;
+ /* คืนว่าแตะโดนอะไรบนกำแพง — ประตูมีได้หลายบาน จึงต้องบอกด้วยว่า "บานไหน" (door) ไม่ใช่แค่ชนิด */
  function wallFixtureAt(e){
   const {sx,sy}=screenXY(e);
-  for(const [key,d,w,lo,hi]of [['shelf',G.shelf,typeof SHELF_W==='undefined'?0:SHELF_W,typeof SHELF_Z==='undefined'?0:SHELF_Z[0],typeof SHELF_Z==='undefined'?0:SHELF_Z[1]+SHELF_BOX_H+SHELF_T],['door',G.door,2*SUB,0,40*ZUNIT]]){
+  const items=[['shelf',G.shelf,typeof SHELF_W==='undefined'?0:SHELF_W,typeof SHELF_Z==='undefined'?0:SHELF_Z[0],typeof SHELF_Z==='undefined'?0:SHELF_Z[1]+SHELF_BOX_H+SHELF_T]];
+  for(const d of (typeof doorList==='function'?doorList():[]))items.push(['door',d,2*SUB,0,40*ZUNIT]);
+  for(const [key,d,w,lo,hi]of items){
    if(!d)continue;
    const a=wallPoint(d.side,d.offset,0),b=wallPoint(d.side,d.offset+w,0),f=(sx-a.x)/(b.x-a.x);
    if(f<0||f>1)continue;
-   const z=(a.y+(b.y-a.y)*f-sy)/cam.zoom;if(z>=lo&&z<=hi)return key;
+   const z=(a.y+(b.y-a.y)*f-sy)/cam.zoom;if(z>=lo&&z<=hi)return {key,door:key==='door'?d:null};
   }return null;
  }
  cv.addEventListener('pointerdown',e=>{
   wallPress=null;if(appMode!=='build'||buyKey||moving||placingWallDoor||typeof placingShelf==='undefined'||placingShelf||[...APP_MODES.values()].some(m=>m.group==='floor'&&m.isOn()))return;
-  const key=wallFixtureAt(e);if(key)wallPress={key,x:e.clientX,y:e.clientY};
+  const hit=wallFixtureAt(e);if(hit)wallPress={...hit,x:e.clientX,y:e.clientY};
  },true);
  cv.addEventListener('pointerup',e=>{
-  const press=wallPress;wallPress=null;if(!press||Math.hypot(e.clientX-press.x,e.clientY-press.y)>6||wallFixtureAt(e)!==press.key)return;
+  const press=wallPress;wallPress=null;if(!press||Math.hypot(e.clientX-press.x,e.clientY-press.y)>6)return;
+  const now=wallFixtureAt(e);
+  if(!now||now.key!==press.key||now.door!==press.door)return;      // ปล่อยคนละชิ้นกับที่กดลง = ไม่นับ
   e.stopImmediatePropagation();dragging=false;grab=null;cv.classList.remove('panning','placing');
-  if(tool==='remove'||tool==='sell'){if(press.key==='door')removeEntrance();else removeWallShelf();}
-  else if(press.key==='door')placeEntrance();else placeWallShelf();
+  if(tool==='remove'||tool==='sell'){if(press.key==='door')removeEntrance(press.door);else removeWallShelf();}
+  /* แตะประตูที่วางแล้ว = เปิดหน้าตั้งค่า (ทางเข้า/ทางออก · ใครผ่านได้ · ย้าย · เก็บ)
+     เดิมแตะแล้วเด้งเข้าโหมดย้ายทันที ซึ่งตอนนี้ไม่ใช่สิ่งที่ผู้เล่นอยากทำบ่อยที่สุดแล้ว
+     ปุ่ม "ย้ายประตูบานนี้" อยู่ในหน้าตั้งค่า จึงยังย้ายได้เหมือนเดิม */
+  else if(press.key==='door'){
+   if(typeof openDoorSettings==='function')openDoorSettings(press.door);else placeEntrance();
+  }
+  else placeWallShelf();
  },true);
  cv.addEventListener('pointercancel',()=>{wallPress=null;});
 

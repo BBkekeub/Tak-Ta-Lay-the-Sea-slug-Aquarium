@@ -35,7 +35,7 @@
   if(!p||!p.wholesaleBuyer||p.tradeDone||p.tradeOffer) return false;
   if(typeof TRADE_OFFERS==='undefined'||typeof counterFront!=='function') return false;
   if(TRADE_OFFERS.some(function(o){return o.wholesale;})) return false;
-  var counters=(G.objs||[]).filter(function(c){return c._key==='counter'&&c!==moving;});
+  var counters=countersFor('wholesale');   // เฉพาะเคาน์เตอร์ที่เปิดรับพ่อค้าส่ง
   for(var i=0;i<counters.length;i++){
    var counter=counters[i];
    /* เข้าคิวหน้าเคาน์เตอร์ได้แล้ว (trade.js) ไม่ต้องรอให้เคาน์เตอร์ว่างเปล่าเหมือนเดิม */
@@ -59,10 +59,10 @@
   if(Date.now()<G.nextWholesalerAt) return false;
   if(typeof traderRoom==='function'&&traderRoom()<1) return false;   // โควตาพ่อค้าแยกจากลูกค้าแล้ว (people.js)
   if(typeof TRADE_OFFERS==='undefined') return false;
-  if(!(G.objs||[]).some(function(o){return o._key==='counter'&&o!==moving;})) return false;   // ไม่มีเคาน์เตอร์ = ไม่มีที่ยื่นซื้อ
+  if(!countersFor('wholesale').length) return false;   // ไม่มีเคาน์เตอร์ = ไม่มีที่ยื่นซื้อ
   if(TRADE_OFFERS.some(function(o){return o.wholesale;})) return false;
   if(PEOPLE.some(function(p){return p.wantsSell;})) return false;   // เว้นคิวให้พ่อค้าเร่/รับเหมาไม่ชนกัน
-  if(spawnVisitors(Math.max(1,capacity),'solo',[{kid:false,gender:Math.random()<.5?'female':'male'}])){
+  if(spawnVisitors(Math.max(1,capacity),'solo',[{kid:false,gender:Math.random()<.5?'female':'male'}],'wholesale')){
    var p=PEOPLE[PEOPLE.length-1];
    makeWholesaler(p);
    G.nextWholesalerAt=Date.now()+WHOLESALE_GAP_MS;   // นับ "ทุก 10 นาที" จากรอบที่มา ไม่ใช่รอบที่คุยจบ

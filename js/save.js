@@ -22,6 +22,8 @@ function _saveSlug(s){
 }
 function _saveObj(o){
   const t={ id:o.id, type:o.type, _key:o._key, cx:o.cx, cy:o.cy, rot:heldRotations.has(o)?heldRotations.get(o):(o.rot|0) };
+  if(Number.isFinite(o.paid))t.paid=o.paid;                                  // ราคาที่จ่ายจริง — ใช้คิดเงินคืนตอนเก็บ (เคาน์เตอร์ตัวแรกฟรี ตัวต่อไป 500)
+  if(o._key==='counter'&&o.allow)t.allow=Object.fromEntries(ACCESS_KINDS.map(a=>[a.k,o.allow[a.k]!==false]));   // ใครมาติดต่อเคาน์เตอร์ตัวนี้ได้
   if(o._key==='counter'&&o.showcase)t.showcase={slugId:o.showcase.slugId||null,decorKey:o.showcase.decorKey||''};
   if(o.type==='tank'){
     t.slugs=(o.slugs||[]).map(_saveSlug);
@@ -38,7 +40,7 @@ function saveGame(){
   if(!_saveOK) return;
   try{
     const data={
-      v:1, racing:G.racing||null, tug:G.tug||null, eat:G.eat||null, throwing:G.throwing||null, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||{}, floorTiles:G.floorTiles||null, floorPaint:G.floorPaint||{}, wallPaint:G.wallPaint||{}, coin:G.coin, ck:CoinGuard.ck(), boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, codex:G.codex||{}, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, orders:G.orders||[], nextOrderAt:G.nextOrderAt||0, orderSeq:G.orderSeq||0, nextPeddlerAt:G.nextPeddlerAt||0, nextWholesalerAt:G.nextWholesalerAt||0, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, shopOpen:peopleOn,
+      v:1, racing:G.racing||null, tug:G.tug||null, eat:G.eat||null, throwing:G.throwing||null, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||{}, floorTiles:G.floorTiles||null, floorPaint:G.floorPaint||{}, wallPaint:G.wallPaint||{}, coin:G.coin, ck:CoinGuard.ck(), boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, codex:G.codex||{}, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, orders:G.orders||[], nextOrderAt:G.nextOrderAt||0, orderSeq:G.orderSeq||0, nextPeddlerAt:G.nextPeddlerAt||0, nextWholesalerAt:G.nextWholesalerAt||0, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, doors:(G.doors||[]).map(d=>({side:d.side,offset:d.offset,dir:d.dir||'both',allow:d.allow||null,paid:d.paid||0})), shopOpen:peopleOn,
       newSlugNotices:G.newSlugNotices||[],
       objs:(G.objs||[]).map(_saveObj),
       shelter:(G.shelter||[]).map(_saveObj),
@@ -106,6 +108,10 @@ function _loadObj(o){
   if(!def) return null;                         // ของที่ไม่รู้จักแล้ว = ข้าม
   const t={ id:o.id, type:o.type, _key:o._key, def,
             cx:_NUM(o.cx,0), cy:_NUM(o.cy,0), rot:(_NUM(o.rot,0)|0), slugs:[] };
+  if(Number.isFinite(o.paid))t.paid=Math.max(0,o.paid);
+  /* เซฟเก่าไม่มี allow → ปล่อยเป็น undefined ให้ accessAllows() ตีว่า "รับทุกคน" ห้ามเติม accessAll() ทิ้งไว้
+     เพราะจะกลายเป็นข้อมูลจริงที่ผู้เล่นไม่ได้ตั้งเอง และกลบเจตนาเดิมถ้าเราเปลี่ยนค่าเริ่มต้นทีหลัง */
+  if(o._key==='counter'&&o.allow&&typeof o.allow==='object')t.allow=Object.fromEntries(ACCESS_KINDS.map(a=>[a.k,o.allow[a.k]!==false]));
   if(o._key==='counter'&&o.showcase)t.showcase={slugId:typeof o.showcase.slugId==='string'?o.showcase.slugId:null,decorKey:typeof o.showcase.decorKey==='string'?o.showcase.decorKey:''};
   if(o.type==='tank'){
     t.slugs=(o.slugs||[]).map(_loadSlug);
@@ -205,7 +211,28 @@ function loadGame(){
     G.bh=Math.max(1, _NUM(d.bh, G.bh)|0);
     G.floorTiles=Array.isArray(d.floorTiles)&&d.floorTiles.length?d.floorTiles.filter(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isInteger)&&p[0]>=0&&p[1]>=0&&p[0]<G.bw&&p[1]<G.bh):null;floorRevision++;
     G.seq=Math.max(1, _NUM(d.seq, G.seq)|0);
-    G.door=entranceRect(d.door||null)?{side:d.door.side,offset:d.door.offset}:null;
+    /* ---- ประตู: เซฟใหม่เป็นอาเรย์ G.doors · เซฟเก่าเป็นบานเดียว G.door ----
+       ⚠️ ต้องอ่านเซฟเก่าได้ และแปลงซ้ำได้อย่างปลอดภัย (โหลดกี่รอบก็ได้ผลเดิม)
+          บานเก่าไม่มี dir/allow → ตั้งเป็น "เข้า–ออก ทุกคนผ่านได้" ซึ่งตรงกับพฤติกรรมเดิมเป๊ะ
+          paid=0 ให้บานที่มีอยู่ก่อนอัปเดต เพราะตอนนั้นประตูยังฟรี จะได้ไม่คืนเงินที่ไม่เคยจ่าย
+       ตรวจ entranceRect() ซ้ำทุกบาน เผื่อร้านหดจนประตูเลยขอบกำแพง และกันบานซ้อนกันเอง */
+    {
+      const raw=Array.isArray(d.doors)?d.doors:(d.door?[d.door]:[]);
+      const out=[];
+      for(const s of raw){
+        if(!s||!['north','west'].includes(s.side)||!Number.isInteger(s.offset))continue;
+        if(!entranceRect({side:s.side,offset:s.offset}))continue;
+        if(out.some(q=>q.side===s.side&&s.offset<q.offset+2*SUB&&q.offset<s.offset+2*SUB))continue;
+        const allow=(s.allow&&typeof s.allow==='object')
+          ?Object.fromEntries(ACCESS_KINDS.map(a=>[a.k,s.allow[a.k]!==false]))
+          :accessAll();
+        out.push({side:s.side,offset:s.offset,
+                  dir:['both','in','out'].includes(s.dir)?s.dir:'both',
+                  allow,paid:Math.max(0,_NUM(s.paid,0))});
+      }
+      G.doors=out;
+      if(typeof doorRevision!=='undefined')doorRevision++;
+    }
     /* ชั้นวางติดผนัง — ตรวจซ้ำด้วย shelfRect() เผื่อพื้นที่ร้านหดลงจนชั้นเลยขอบกำแพง */
     G.shelf=(typeof shelfRect==='function'&&shelfRect(d.shelf||null))?{side:d.shelf.side,offset:d.shelf.offset}:(d.shelf&&['north','west'].includes(d.shelf.side)&&Number.isInteger(d.shelf.offset)?{side:d.shelf.side,offset:d.shelf.offset}:null);
     G.objs   =(Array.isArray(d.objs)?d.objs:[]).map(_loadObj).filter(Boolean);

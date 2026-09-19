@@ -732,9 +732,18 @@ function finishConstruction(){
   if(typeof placingWallDoor!=='undefined'){placingWallDoor=false;wallDoorHover=null;}
   setMode('view');syncRotateBtn();saveGame();
 }
+/* ราคาจริงของชิ้นนี้ ณ ตอนนี้ — เคาน์เตอร์ตัวแรกฟรี ตัวต่อไปตัวละ COUNTER_PRICE (ผู้เล่นกำหนด 2026-09-20)
+   ⚠️ แก้ def.price ตรง ๆ ไม่ได้ เพราะ def ใช้ร่วมกันทุกตัวและเป็นฐานของราคาคืนตอนเก็บ
+      เก็บราคาที่จ่ายจริงไว้บนวัตถุ (o.paid) แทน แล้วคืนเงินตามนั้น */
+function objPrice(key,def){
+  if(key==='counter')return [...G.objs,...G.shelter].some(o=>o&&o._key==='counter')?COUNTER_PRICE:0;
+  return def.price||0;
+}
+const objPaid=o=>Number.isFinite(o&&o.paid)?o.paid:(o&&o.def&&o.def.price)||0;
 function placeBuy(cell){
-  const def=CATALOG[buyKey]; if(!def) return;
-  if(G.coin<def.price){ toast('เหรียญไม่พอ ('+def.price+')','bad'); return; }
+  const key=buyKey,def=CATALOG[key]; if(!def) return;   // finishConstruction() ล้าง buyKey ทิ้ง จำไว้ก่อน
+  const price=objPrice(key,def);
+  if(G.coin<price){ toast('เหรียญไม่พอ ('+price+')','bad'); return; }
   const o=snapFootprint(cell,def,buyRot);
   if(!canPlace(o.cx,o.cy,def,null,buyRot)){ toast('วางไม่ได้: ของทับกัน บังประตู หรือเหลือทางเข้าตู้ไม่พอ','bad'); return; }
   if(def.race&&[...G.objs,...G.shelter].some(t=>t.def.race)){toast('มีตู้แข่งได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
@@ -743,13 +752,18 @@ function placeBuy(cell){
   if(def.throwing&&[...G.objs,...G.shelter].some(t=>t.def.throwing)){toast('มีตู้ปาหินได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   /* ⚙️ ตู้เพาะพันธุ์มีได้ 5 ตู้ (ผู้เล่นกำหนด 2026-09-18) — ไม่งั้นปูพรมทั้งร้านแล้วปั๊มลูกทากได้ไม่จำกัด */
   if(def.breeder&&[...G.objs,...G.shelter].filter(t=>t.def.breeder).length>=BREEDER_MAX){toast('มีตู้เพาะพันธุ์ได้ '+BREEDER_MAX+' ตู้ รวมตู้ที่เก็บไว้','bad');return;}
-  addCoin(-def.price);
-  G.objs.push({ id:'o'+(G.seq++), type:def.kind, _key:buyKey, cx:o.cx, cy:o.cy, def, rot:buyRot, slugs:[] });
+  addCoin(-price);
+  const placed={ id:'o'+(G.seq++), type:def.kind, _key:key, cx:o.cx, cy:o.cy, def, rot:buyRot, slugs:[], paid:price };
+  /* เคาน์เตอร์ใหม่เปิดรับทุกคนไว้ก่อน แล้วเด้งหน้าตั้งค่าให้เลือกทันที
+     (ตั้งต้นเป็น "ไม่รับใคร" = วางแล้วร้านใช้งานไม่ได้โดยผู้เล่นไม่รู้ตัว) */
+  if(key==='counter')placed.allow=accessAll();
+  G.objs.push(placed);
   if(def.race&&window.SlugRace)SlugRace.purchased();
   if(def.tug&&window.SlugTug)SlugTug.purchased();
   if(def.eat&&window.SlugEat)SlugEat.purchased();
   if(def.throwing&&window.SlugThrow)SlugThrow.purchased();
-  toast('วาง'+def.name+' −'+def.price,'good'); syncHUD();finishConstruction();
+  toast('วาง'+def.name+(price?' −'+price:' (ตัวแรกฟรี)'),'good'); syncHUD();finishConstruction();
+  if(key==='counter'&&typeof openCounterSettings==='function')openCounterSettings(placed);
 }
 function objAt(cell){
   let best=null;
@@ -817,7 +831,7 @@ function fromShelter(idx){
 function removeObj(o){
   if(o.type==='tank'){ toShelter(o); return; }
   G.objs=G.objs.filter(x=>x!==o);
-  const back=Math.round(o.def.price*DECO_REFUND); addCoin(back);
+  const back=Math.round(objPaid(o)*DECO_REFUND); addCoin(back);
   toast('เก็บ'+o.def.name+' +'+back,'good'); syncHUD();finishConstruction();
 }
 function sellObj(o){
@@ -831,7 +845,7 @@ function sellObj(o){
     addCoin(val); toast('ขายตู้'+o.def.name+' +'+val+' เหรียญ','good'); syncHUD(); finishConstruction();
   } else {
     G.objs=G.objs.filter(x=>x!==o);
-    const back=Math.round((o.def.price||0)*DECO_REFUND); addCoin(back);
+    const back=Math.round(objPaid(o)*DECO_REFUND); addCoin(back);
     toast('ขายทิ้ง'+o.def.name+' +'+back+' เหรียญ','good'); syncHUD(); finishConstruction();
   }
 }
@@ -887,6 +901,12 @@ cv.addEventListener('pointerup', e=>{
   /* คลิกเฉย ๆ บนของ (โหมดก่อสร้างเท่านั้น — grab ถูกตั้งเฉพาะโหมดนี้)
      = "ยกขึ้นมา" คลิกอีกครั้งเพื่อวาง · ไม่เข้าตู้ ไม่งั้นจะย้ายของไม่ได้เลย */
   if(grab){
+    /* เคาน์เตอร์: แตะ = เปิดหน้าตั้งค่า "ใครเข้ามาติดต่อได้" (ผู้เล่นสั่ง 2026-09-20)
+       แบบเดียวกับประตู — ปุ่มยกย้ายอยู่ในหน้านั้น จึงยังย้ายได้ครบเหมือนเดิม
+       ⚠️ ลากค้างเพื่อย้ายยังทำได้ปกติ เพราะ dragMoved ตัดออกไปก่อนหน้านี้แล้ว */
+    if(grab._key==='counter'&&typeof openCounterSettings==='function'){
+      const c=grab;grab=null;openCounterSettings(c);return;
+    }
     moving=grab; movingByClick=true; grab=null; cv.classList.add('placing');
     toast('ยก'+moving.def.name+' — คลิกอีกครั้งเพื่อวาง · R หมุน · Esc ยกเลิก','good');
     return;
@@ -980,6 +1000,7 @@ function toast(msg,kind){
 }
 function syncHUD(){
   if(typeof syncVisitorHUD==='function')syncVisitorHUD();
+  if(typeof syncAccessWarning==='function')syncAccessWarning();   // ไอคอนเตือน "ลูกค้าเข้าใช้บริการไม่ได้" มุมขวาล่าง (access-ui.js)
   document.getElementById('hCoin').textContent=G.coin;
   document.getElementById('hTanks').textContent=G.objs.filter(o=>o.type==='tank').length + G.shelter.length;
   document.getElementById('hSlugs').textContent=G.objs.reduce((n,o)=>n+(o.slugs?o.slugs.length:0),0);

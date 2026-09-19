@@ -60,7 +60,22 @@
   /* ===== บทที่ 1 (0–14) — ห้ามแก้ id/ลำดับ เพื่อรักษารางวัลที่ผู้เล่นเคยรับ ===== */
   {t:'ให้อาหารทากทะเล', h:'คลิกเข้าตู้ → กดปุ่มที่ไฟกะพริบ (เปิดโหมดวางอาหาร) → คลิกพื้นที่ว่างในตู้เพื่อวางอาหาร', cond:b=>S().fed>b.fed, reward:{coin:50, rep:0, txt:'ปลดล็อกอาหารที่ดีขึ้น'}, btn:['#foodChoose','#ovFeedBtn','canvas:anytank'],
    force:()=>{ try{ if(typeof foodMode!=='undefined'&&foodMode) return; if(typeof tankMode!=='undefined'&&!tankMode) return; const det=document.getElementById('foodBar')&&document.getElementById('foodBar').closest('details'); if(det&&!det.open) det.open=true; }catch(e){} }},
-  {t:'ทำความสะอาดตู้', h:'ในตู้มีปุ่มทำความสะอาด ลองขัดคราบสาหร่ายให้เอี่ยม', cond:b=>S().cleaned>b.cleaned, reward:{coin:50, rep:0, txt:'ได้แปรงขัดตู้'}, btn:'#mView'},
+  {t:'ทำความสะอาดตู้', h:'เข้าตู้ → กดปุ่มที่ไฟกะพริบ "🧹 ทำความสะอาด" แล้วลากแปรงถูคราบสาหร่ายให้หมด', cond:b=>S().cleaned>b.cleaned, reward:{coin:50, rep:0, txt:'ได้แปรงขัดตู้'}, btn:['#tankBrush','canvas:anytank'],
+   /* ⚠️ 2026-09-20 ผู้เล่น: "คำสั่งให้ตะไคร่ขึ้นไม่ทำงาน"
+      ตะไคร่ไม่ขึ้นเลยใน 15 นาทีแรก (ALGAE_GRACE ใน tank-hygiene.js) แล้วเควสนี้ย้ายจากอันดับ 17
+      มาเป็นอันดับ 2 ซึ่งผู้เล่นถึงภายใน 1–2 นาที ตู้จึงเอี่ยมสนิท scrubTank() คืน false ทันที
+      (`if(before<=.0001) return false`) ตัวนับ cleaned ไม่ขยับ = เควสค้างถาวร
+      จึงเร่งอายุคราบของตู้ให้พอเห็น (~45% ของเต็ม) ตอนถึงเควสนี้เท่านั้น
+      เช็ก dirt ก่อนทุกครั้ง — มีคราบอยู่แล้ว (หรือกำลังขัดค้างไว้) จะไม่ไปยุ่งซ้ำ */
+   force:()=>{ try{
+    if(typeof tankHygiene!=='function'||typeof ALGAE_CELLS==='undefined') return;
+    const tanks=(G.objs||[]).filter(o=>o&&o.type==='tank'&&!isContest(o));
+    if(!tanks.length) return;
+    const now=Date.now();
+    if(tanks.some(o=>tankHygiene(o,now).dirt>0.01)) return;
+    tanks[0].hygiene={cleaned:Array(ALGAE_CELLS).fill(now-ALGAE_GRACE-ALGAE_STEP*20)};
+    tankHygiene(tanks[0],now);
+   }catch(e){} }},
   {t:'แต่งร้านสักหน่อย', h:'เข้าโหมดก่อสร้าง (🔧) ซื้อของตกแต่งมาวางในร้าน 1 ชิ้น', cond:b=>decorCount()>b.decor, reward:{coin:150, rep:0, txt:'ปลดล็อกชุดตกแต่งใหม่'}, btn:'#mBuild'},
   {t:'ทำประตูเข้าร้าน', h:'กด 🔧 ก่อสร้าง → แท็บ "อุปกรณ์สำคัญ" → เลือก 🚪 ประตู แล้วแตะบนกำแพงเพื่อวาง', cond:b=>!!G.door, reward:{coin:100, rep:0, txt:'ลูกค้าเดินเข้าร้านได้แล้ว'}, btn:['#shop .item[data-k="wall-door"]','#floorBuildDock .decorTabs [data-cat="อุปกรณ์สำคัญ"]','#mBuild']},
   {t:'เพิ่มความดึงดูดของร้าน', h:'ซื้อของตกแต่งเพิ่ม (และมีทากอยู่ในตู้) ให้ค่าความดึงดูดแตะ 6', cond:b=>attraction()>=6, reward:{coin:200, rep:0, tank:'tank_breed', txt:'รับตู้เพาะพันธุ์ฟรีในที่พักพิง แล้วนำมาวางในร้านได้เลย'}, btn:'#mBuild'},
@@ -215,9 +230,28 @@
  const card=document.createElement('div'); card.id='questCard';
  card.style.cssText='position:fixed;left:14px;top:58px;z-index:40;width:min(300px,78vw);background:rgba(20,40,44,.94);color:#eadcc4;border:1px solid #b59859;border-radius:12px;padding:10px 12px;font:500 13px/1.5 "IBM Plex Sans Thai",system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.35)';
  document.body.appendChild(card);
- function placeCard(){ const bar=document.querySelector('.topbar'); const b=bar?Math.ceil(bar.getBoundingClientRect().bottom):48; card.style.top=(Math.max(8,b)+10)+'px'; }
+ function placeCard(){ if(card._docked) return; const bar=document.querySelector('.topbar'); const b=bar?Math.ceil(bar.getBoundingClientRect().bottom):48; card.style.top=(Math.max(8,b)+10)+'px'; }
  placeCard(); window.addEventListener('resize',placeCard);
- function updateCardVisibility(){ if(G.questDone){ card.style.display='none'; return; } const ov=document.getElementById('ov'); card.style.display=(ov&&ov.classList.contains('on'))?'none':'block'; }
+ /* ⚠️ 2026-09-20 ผู้เล่น: "โหมดดูตู้แท็บภารกิจหาย"
+    เดิมซ่อนการ์ดทิ้งตอนเปิดตู้ ซึ่งเคยไม่เป็นไรเพราะเควสในตู้อยู่ท้าย ๆ ลำดับ
+    แต่ลำดับใหม่ให้เควส 1–4 (ให้อาหาร ขัดตู้ ตกแต่งในตู้ ดูยีน) อยู่ในตู้ทั้งหมด
+    ผู้เล่นเข้าตู้ปุ๊บคำสั่งหายพอดี — ย้ายการ์ดไปเสียบหัวแถบข้างซ้ายของตู้แทนการซ่อน
+    ใช้ผังเดิมของแถบข้างเลย จึงไม่ทับปุ่มไหน และเลื่อนตามแถบได้
+    (ตู้แข่งซ่อน .tank-side อยู่แล้ว การ์ดจึงหายไปพร้อมกันตอนแข่ง ซึ่งถูกต้อง) */
+ function dock(inSide){
+  if(card._docked===inSide) return;
+  card._docked=inSide;
+  if(inSide){ card.style.position='static'; card.style.width='auto'; card.style.left=''; card.style.top=''; card.style.boxShadow='none'; }
+  else { card.style.position='fixed'; card.style.left='14px'; card.style.width='min(300px,78vw)'; card.style.boxShadow='0 6px 24px rgba(0,0,0,.35)'; placeCard(); }
+ }
+ function updateCardVisibility(){
+  if(G.questDone){ card.style.display='none'; return; }
+  const ov=document.getElementById('ov'), inTank=!!(ov&&ov.classList.contains('on'));
+  const side=inTank?document.querySelector('#ov .tank-side.left'):null;
+  if(side){ if(card.parentNode!==side) side.insertBefore(card,side.firstChild); dock(true); }
+  else { if(card.parentNode!==document.body) document.body.appendChild(card); dock(false); }
+  card.style.display='block';
+ }
  const _ovEl=document.getElementById('ov'); if(_ovEl&&typeof MutationObserver!=='undefined') new MutationObserver(updateCardVisibility).observe(_ovEl,{attributes:true,attributeFilter:['class']});
  updateCardVisibility();
  let questCollapsed=false; try{ questCollapsed=localStorage.getItem('questCardCollapsed')==='1'; }catch(e){}
