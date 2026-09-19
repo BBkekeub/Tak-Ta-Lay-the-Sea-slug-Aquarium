@@ -122,6 +122,7 @@ function restoreHeldRotation(){if(moving&&heldRotations.has(moving)){moving.rot=
 let moving = null;        // object กำลังย้าย
 let movingByClick=false;  // ยกด้วยการคลิก (ปล่อยที่คลิกถัดไป) ต่างจากลากค้าง (ปล่อยตอนปล่อยเมาส์)
 let hoverCell = null;
+let hoverObj  = null;      // ตู้/ของที่เมาส์ชี้อยู่ — ใช้โชว์ป้ายจำนวนทากเฉพาะตู้นั้น
 let appMode = 'view';     // 'view' = ดู/เล่น (คลิกตู้=เข้าไปดู) · 'build' = ก่อสร้าง
 let shopAnim = true;      // เปิด/ปิดการเคลื่อนไหวทากในหน้าร้าน
 let floorLastT = 0;
@@ -408,10 +409,12 @@ function drawFloor(){
 
   syncRotateBtn();
   if(ghost) drawGhost(ghost);
-  drawAreaBadges();
+  /* ป้ายบอกขนาดพื้นที่ที่มุมพื้นถูกถอดออก 2026-09-18 (ผู้เล่น: "ตรงนี้ไม่ต้องโชว์")
+     ขนาดร้านยังดูได้ที่แถบสถิติด้านบน (hArea) และหน้าขยายร้าน */
   if(window.SlugRace)SlugRace.drawChallengers();
   if(window.SlugTug)SlugTug.drawChallengers();
   if(window.SlugEat)SlugEat.drawChallengers();
+  if(window.SlugThrow)SlugThrow.drawChallengers();
   window.DecorGLB?.endShop();
 }
 
@@ -546,6 +549,7 @@ function drawObject(o){
   /* ตู้ชักเย่อ: วาดเลน/เส้นชนะ-แพ้บนพื้นทรายให้เห็นจากหน้าร้านด้วย แบบเดียวกับสนามตู้แข่งวิ่งบรรทัดบน (เดิมเห็นแค่ตอนเข้าตู้) */
   if(d.tug&&window.SlugTug)SlugTug.drawLane(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);});
   if(d.eat&&window.SlugEat)SlugEat.drawArena(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);},o);
+  if(d.throwing&&window.SlugThrow)SlugThrow.drawField(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);},o);
   // ทากอยู่ก้นตู้ (ในน้ำ) — clip ให้อยู่ในกรอบตู้ (หัวไม่ทะลุกระจก) · ขนาด = ความยาวลำตัวจริง
   const displaySlugs=[...o.slugs,...breederVisualSlugs(o)];
   const pxPerCm=TW/CM_PER_CELL, shown=window.Slug3D?.ready&&Slug3D.enabled&&Slug3D.all?displaySlugs.length:Math.min(displaySlugs.length,isBreeder(o)?70:20);   // ระยะแนวนอนต่อ 1 ช่อง (ตรงกับในตู้)
@@ -676,15 +680,21 @@ function drawObject(o){
   const T1=P(cx,cy,tz),T2=P(cx+w,cy,tz),T3=P(cx+w,cy+h,tz),T4=P(cx,cy+h,tz);
   ctx.strokeStyle='rgba(220,245,250,0.6)'; ctx.lineWidth=1.4;
   ctx.beginPath(); ctx.moveTo(T1.x,T1.y);ctx.lineTo(T2.x,T2.y);ctx.lineTo(T3.x,T3.y);ctx.lineTo(T4.x,T4.y);ctx.closePath(); ctx.stroke();
-  // ป้ายจำนวน
-  if(o.slugs.length){
-    const pc=P(cx+w/2,cy+h/2,tz+10);
-    ctx.font='600 '+(10*cam.zoom).toFixed(0)+'px "IBM Plex Mono",monospace';
-    const txt=o.slugs.length+'/'+tankCap(d), twd=ctx.measureText(txt).width+10*cam.zoom;
-    ctx.fillStyle='rgba(12,29,34,0.85)'; ctx.strokeStyle='rgba(95,168,174,0.6)'; ctx.lineWidth=1;
-    roundRect(pc.x-twd/2,pc.y-9*cam.zoom,twd,15*cam.zoom,4*cam.zoom); ctx.fill(); ctx.stroke();
-    ctx.fillStyle='#cfe8ea'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(txt,pc.x,pc.y-1*cam.zoom);
+  /* ป้ายจำนวนทาก — โชว์เฉพาะตอนชี้ที่ตู้นั้น และย้ายมาแปะที่ "หน้าขาตั้ง" ไม่ลอยบังตัวทากในตู้
+     (ผู้เล่น 2026-09-18: "เกะกะ · ไม่ hover ก็ไม่ต้องแสดง · ทำให้ดูชัดกว่านี้") */
+  if(o.slugs.length&&o===hoverObj){
+    const pc=P(cx+w/2,cy+h,standH*0.52);
+    const fs=Math.max(11,13*cam.zoom);
+    ctx.font='700 '+fs.toFixed(0)+'px "IBM Plex Sans Thai",sans-serif';
+    const txt='🐌 '+o.slugs.length+' / '+tankCap(d), twd=ctx.measureText(txt).width+16*cam.zoom, th=fs+12*cam.zoom;
+    ctx.save();
+    ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=8*cam.zoom; ctx.shadowOffsetY=2*cam.zoom;
+    ctx.fillStyle='rgba(10,26,30,0.94)'; roundRect(pc.x-twd/2,pc.y-th/2,twd,th,th/2); ctx.fill();
+    ctx.shadowColor='transparent';
+    ctx.strokeStyle=o.slugs.length>=tankCap(d)?'#e8b06a':'#8fe0e8'; ctx.lineWidth=Math.max(1.4,1.8*cam.zoom); ctx.stroke();
+    ctx.fillStyle='#eaffff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(txt,pc.x,pc.y+1);
+    ctx.restore();
   }
 }
 function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
@@ -700,12 +710,6 @@ function drawGhost(g){
     isoBox(g.cx+0.15,g.cy+0.15,gw-0.3,gh-0.3,0,sH, col+'0.25)', col+'0.15)', col+'0.15)');
     isoBox(g.cx,g.cy,gw,gh,sH,tH, col+'0.25)', col+'0.15)', col+'0.15)');
   }
-}
-function drawAreaBadges(){
-  const p=P(G.bw*SUB, G.bh*SUB, 6);
-  ctx.fillStyle='rgba(95,168,174,0.9)'; ctx.font='500 12px "IBM Plex Mono",monospace';
-  ctx.textAlign='center'; ctx.textBaseline='top';
-  ctx.fillText(G.bw+' × '+G.bh+' ช่องใหญ่  ('+(G.bw*CM_PER_BIG/100)+'×'+(G.bh*CM_PER_BIG/100)+' ม.)', p.x, p.y+4);
 }
 
 /* ============================================================
@@ -736,11 +740,15 @@ function placeBuy(cell){
   if(def.race&&[...G.objs,...G.shelter].some(t=>t.def.race)){toast('มีตู้แข่งได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   if(def.tug&&[...G.objs,...G.shelter].some(t=>t.def.tug)){toast('มีตู้ชักเย่อได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   if(def.eat&&[...G.objs,...G.shelter].some(t=>t.def.eat)){toast('มีตู้แข่งกินจุได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
+  if(def.throwing&&[...G.objs,...G.shelter].some(t=>t.def.throwing)){toast('มีตู้ปาหินได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
+  /* ⚙️ ตู้เพาะพันธุ์มีได้ 5 ตู้ (ผู้เล่นกำหนด 2026-09-18) — ไม่งั้นปูพรมทั้งร้านแล้วปั๊มลูกทากได้ไม่จำกัด */
+  if(def.breeder&&[...G.objs,...G.shelter].filter(t=>t.def.breeder).length>=BREEDER_MAX){toast('มีตู้เพาะพันธุ์ได้ '+BREEDER_MAX+' ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   addCoin(-def.price);
   G.objs.push({ id:'o'+(G.seq++), type:def.kind, _key:buyKey, cx:o.cx, cy:o.cy, def, rot:buyRot, slugs:[] });
   if(def.race&&window.SlugRace)SlugRace.purchased();
   if(def.tug&&window.SlugTug)SlugTug.purchased();
   if(def.eat&&window.SlugEat)SlugEat.purchased();
+  if(def.throwing&&window.SlugThrow)SlugThrow.purchased();
   toast('วาง'+def.name+' −'+def.price,'good'); syncHUD();finishConstruction();
 }
 function objAt(cell){
@@ -789,7 +797,7 @@ function tankHit(sx,sy){
 function screenXY(e){ const r=cv.getBoundingClientRect(); return { sx:e.clientX-r.left, sy:e.clientY-r.top }; }
 function expand(dir){
   const cur = dir==='w'? G.bw : G.bh;
-  if(cur>=MAX_B){ toast('พื้นที่เต็มขนาดสูงสุดแล้ว (32×32)','bad'); return; }
+  if(cur>=MAX_B){ toast('พื้นที่เต็มขนาดสูงสุดแล้ว ('+MAX_B+'×'+MAX_B+')','bad'); return; }
   const n = dir==='w'? G.bh : G.bw, cost = expandCost(n, floorArea());   // ขยายทั้งแถว = คิดทีละช่อง
   if(G.coin<cost){ toast('เหรียญไม่พอ ('+cost.toLocaleString()+')','bad'); return; }
   addCoin(-cost); if(dir==='w') G.bw++; else G.bh++;
@@ -851,6 +859,8 @@ cv.addEventListener('pointerdown', e=>{
 });
 cv.addEventListener('pointermove', e=>{
   hoverCell=cellUnder(e);
+  /* ชี้โดนตัวตู้ (กระจก) หรือช่องพื้นใต้ตู้ก็นับว่าชี้ตู้นั้น — ตู้สูงกว่าช่องพื้นของมัน */
+  {const {sx,sy}=screenXY(e);hoverObj=(appMode==='view'&&!moving&&!buyKey)?(tankHit(sx,sy)?.o||objAt(hoverCell)):null;}
   if(!dragging) return;
   const dx=e.clientX-lastX, dy=e.clientY-lastY;
   if(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)>DRAG_TH) dragMoved=true;
@@ -905,7 +915,7 @@ cv.addEventListener('pointerup', e=>{
      ไม่งั้นคลิกตู้เพื่อจะย้าย กลายเป็นหลุดเข้าไปข้างในทุกที */
   if(th || (o && o.type==='tank')){ toast('อยากเข้าไปในตู้ ให้สลับไปโหมด ดู/เล่น ก่อน','bad'); return; }
 });
-cv.addEventListener('pointerleave', ()=>{ hoverCell=null; });
+cv.addEventListener('pointerleave', ()=>{ hoverCell=null; hoverObj=null; });
 cv.addEventListener('wheel', e=>{
   e.preventDefault();
   const before=pick(e.offsetX, e.offsetY);

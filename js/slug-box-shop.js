@@ -71,15 +71,33 @@ document.body.append(slugShopDialog);
 function refreshSlugShop(){if(slugShopDialog.open)renderSlugShop();}
 function renderSlugShop(){
  const s=slugBoxStock();
- const boxesHtml=SLUG_BOXES.map((b,i)=>'<section style="padding:12px 0;border-bottom:1px solid #ffffff22"><b>'+b.name+'</b> · สี '+b.colorLo+'–'+b.colorHi+' · ยีนอื่น '+b.lo+'–'+b.hi+'<br><button class="tbtn" data-order="'+i+'" '+(s.n<1||G.coin<b.price?'disabled':'')+'>สั่งซื้อ · '+b.price+' เหรียญ</button></section>').join('');
- const list=slugDeliveries();
- const delHtml=list.length?list.map(d=>'<div style="padding:10px;margin:6px 0;border:1px solid #526663;border-radius:8px">📦 กล่อง'+d.name+' · '+(slugDeliveryReady(d)?'<b>ถึงแล้ว</b>':slugDeliveryWaitText(d))+'<br><button class="tbtn" data-open="'+d.id+'" '+(slugDeliveryReady(d)?'':'disabled')+'>เปิดกล่อง</button></div>').join(''):'<p style="font-size:12px">ยังไม่มีพัสดุกำลังส่ง</p>';
- slugShopDialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><b>สั่งซื้อกล่องสุ่มทาก</b><button class="tbtn" data-close>✕</button></div>'
-  +'<p style="font-size:12px">สต็อกร้าน <b>'+s.n+' / '+SLUG_BOX_MAX+'</b> กล่อง · เข้าใหม่ชั่วโมงละ 1 · '+slugBoxWaitText()+'<br>สั่งแล้วส่งถึงเคาน์เตอร์ในอีก ~1 นาที มาเป็นกล่องของขวัญให้กดเปิด</p>'
-  +boxesHtml+'<h3 style="margin-top:16px">พัสดุ</h3>'+delHtml;
- slugShopDialog.querySelectorAll('[data-order]').forEach(b=>b.onclick=()=>orderSlugBox(+b.dataset.order));
- slugShopDialog.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openSlugDelivery(b.dataset.open));
- slugShopDialog.querySelector('[data-close]').onclick=()=>slugShopDialog.close();
+ const text=(node,value)=>{if(node.textContent!==value)node.textContent=value;};
+ if(!slugShopDialog.querySelector('[data-deliveries]')){
+  slugShopDialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><b>สั่งซื้อกล่องสุ่มทาก</b><button class="tbtn" data-close>✕</button></div>'
+   +'<p style="font-size:12px">สต็อกร้าน <b data-stock></b> กล่อง · เข้าใหม่ชั่วโมงละ 1 · <span data-stock-wait></span><br>สั่งแล้วส่งถึงเคาน์เตอร์ในอีก ~1 นาที มาเป็นกล่องของขวัญให้กดเปิด</p>'
+   +SLUG_BOXES.map((b,i)=>'<section style="padding:12px 0;border-bottom:1px solid #ffffff22"><b>'+b.name+'</b> · สี '+b.colorLo+'–'+b.colorHi+' · ยีนอื่น '+b.lo+'–'+b.hi+'<br><button class="tbtn" data-order="'+i+'">สั่งซื้อ · '+b.price+' เหรียญ</button></section>').join('')
+   +'<h3 style="margin-top:16px">พัสดุ</h3><p data-empty style="font-size:12px">ยังไม่มีพัสดุกำลังส่ง</p><div data-deliveries></div>';
+  slugShopDialog.querySelectorAll('[data-order]').forEach(b=>b.onclick=()=>orderSlugBox(+b.dataset.order));
+  slugShopDialog.querySelector('[data-close]').onclick=()=>slugShopDialog.close();
+ }
+ text(slugShopDialog.querySelector('[data-stock]'),s.n+' / '+SLUG_BOX_MAX);
+ text(slugShopDialog.querySelector('[data-stock-wait]'),slugBoxWaitText());
+ slugShopDialog.querySelectorAll('[data-order]').forEach(b=>{b.disabled=s.n<1||G.coin<SLUG_BOXES[+b.dataset.order].price;});
+ const list=slugDeliveries(),host=slugShopDialog.querySelector('[data-deliveries]');
+ const existing=new Map([...host.children].map(n=>[n.dataset.delivery,n]));
+ slugShopDialog.querySelector('[data-empty]').hidden=!!list.length;
+ list.forEach((d,i)=>{
+  const id=String(d.id);let row=existing.get(id);existing.delete(id);
+  if(!row){row=document.createElement('div');row.dataset.delivery=id;row.style.cssText='padding:10px;margin:6px 0;border:1px solid #526663;border-radius:8px';
+   row.innerHTML='<span data-label></span> · <span data-wait></span><br><button class="tbtn" data-open>เปิดกล่อง</button>';
+   const button=row.querySelector('[data-open]');button.dataset.open=id;button.onclick=()=>openSlugDelivery(id);
+  }
+  const ready=slugDeliveryReady(d),wait=row.querySelector('[data-wait]');
+  text(row.querySelector('[data-label]'),'📦 กล่อง'+d.name);text(wait,ready?'ถึงแล้ว':slugDeliveryWaitText(d));wait.style.fontWeight=ready?'bold':'';
+  row.querySelector('[data-open]').disabled=!ready;
+  if(host.children[i]!==row)host.insertBefore(row,host.children[i]||null);
+ });
+ for(const row of existing.values())row.remove();
 }
 function openSlugShopDialog(){renderSlugShop();if(!slugShopDialog.open)slugShopDialog.showModal();}
 slugShopDialog.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape'){e.preventDefault();slugShopDialog.close();}},true);

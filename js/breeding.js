@@ -69,12 +69,13 @@ function breederVisualSlugs(o){
  b.parents.forEach(s=>{if(!o.slugs.includes(s)){s.breedZone=true;o.slugs.push(s);}});
  b.larvae.forEach((l,i)=>{const s=l.slug;if(!Number.isFinite(s.fx)||s.fx<25||s.fx>=30){s.fx=25.5+i%5;s.fy=.5+Math.floor(i/5);}s._breedVisual=true;s._breedScale=.5;out.push(s);});return out;
 }
+/* ⚠️ 2026-09-18 สายไข่เคยวาดรวมอยู่ในนี้ ซึ่งถูกเรียกหลัง DecorGLB.splitTankBackground()
+   = วาดบนแคนวาสชั้นหน้า ซึ่งอยู่ "เหนือ" ทาก 3D → สายไข่ทับตัวทากในโซนผสม (ผู้เล่นทัก)
+   ตอนนี้แยกเป็น drawBreederEggs() ที่ tank-view เรียกก่อนแยกชั้น (อยู่ใต้ตัวทาก แบบเชือกชักเย่อ)
+   ส่วนนี้เหลือแต่ผนังกั้นกับป้ายนับตัว ซึ่งเป็น UI ควรอยู่ชั้นบนสุดตามเดิม */
 function drawBreederInterior(o){
  if(!isBreeder(o))return;const b=breederState(o),sandT=SAND_CELLS;
  for(const x of [20,25]){const q=[[x,0,sandT],[x,10,sandT],[x,10,wallCells()*.9],[x,0,wallCells()*.9]].map(v=>S(...v));tctx.beginPath();q.forEach((p,i)=>i?tctx.lineTo(p.x,p.y):tctx.moveTo(p.x,p.y));tctx.closePath();tctx.fillStyle='rgba(180,224,230,.15)';tctx.fill();tctx.strokeStyle='rgba(210,244,250,.7)';tctx.stroke();}
-
- // A continuous gelatinous cord: each hatchable section shares its endpoints
- // with its neighbours. Small ova sit inside the cord, without UI markers.
 
  // Fixed-size badge at the back of the breeding compartment, above the cord.
  const occupants=new Set([...o.slugs.filter(s=>s.breedZone),...b.parents].map(s=>s.id)).size;
@@ -83,6 +84,11 @@ function drawBreederInterior(o){
  tctx.fillStyle='rgba(13,32,35,.86)';tctx.strokeStyle=occupants===2?'#d9be77':'rgba(200,221,217,.6)';tctx.lineWidth=1;
  tctx.beginPath();tctx.roundRect(badge.x-23,badge.y-13,46,26,8);tctx.fill();tctx.stroke();
  tctx.fillStyle=occupants===2?'#ffe2a0':'#ecf3ed';tctx.fillText(label,badge.x,badge.y);tctx.restore();
+}
+/* สายไข่ต่อเนื่อง: แต่ละฟองใช้ปลายร่วมกับฟองข้าง ๆ · ไข่เม็ดเล็กอยู่ในสาย
+   วาดในชั้นพื้นหลัง (ก่อน splitTankBackground) จึงอยู่ใต้ตัวทากเสมอ */
+function drawBreederEggs(o){
+ if(!isBreeder(o))return;const b=breederState(o),sandT=SAND_CELLS;
  const count=b.eggs.length;if(!count)return;
  const scale=depthPxPerCm(22.5,5),width=Math.max(1.8,scale*.45);
  const point=t=>{const a=t*Math.PI*2;return S(22.5+1.15*Math.sin(a*6)+.34*Math.sin(a*29+.3),2+6*t+.35*Math.cos(a*6)+.14*Math.sin(a*23),sandT+.025);};

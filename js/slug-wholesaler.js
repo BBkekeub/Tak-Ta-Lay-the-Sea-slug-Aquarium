@@ -57,12 +57,12 @@
  function stepWholesalerArrival(capacity){
   if(!Number.isFinite(G.nextWholesalerAt)||G.nextWholesalerAt<=0){ G.nextWholesalerAt=Date.now()+WHOLESALE_FIRST_MS; return false; }
   if(Date.now()<G.nextWholesalerAt) return false;
-  if(!capacity||PEOPLE.length>=capacity) return false;
+  if(typeof traderRoom==='function'&&traderRoom()<1) return false;   // โควตาพ่อค้าแยกจากลูกค้าแล้ว (people.js)
   if(typeof TRADE_OFFERS==='undefined') return false;
   if(!(G.objs||[]).some(function(o){return o._key==='counter'&&o!==moving;})) return false;   // ไม่มีเคาน์เตอร์ = ไม่มีที่ยื่นซื้อ
   if(TRADE_OFFERS.some(function(o){return o.wholesale;})) return false;
   if(PEOPLE.some(function(p){return p.wantsSell;})) return false;   // เว้นคิวให้พ่อค้าเร่/รับเหมาไม่ชนกัน
-  if(spawnVisitors(capacity-PEOPLE.length,'solo',[{kid:false,gender:Math.random()<.5?'female':'male'}])){
+  if(spawnVisitors(Math.max(1,capacity),'solo',[{kid:false,gender:Math.random()<.5?'female':'male'}])){
    var p=PEOPLE[PEOPLE.length-1];
    makeWholesaler(p);
    G.nextWholesalerAt=Date.now()+WHOLESALE_GAP_MS;   // นับ "ทุก 10 นาที" จากรอบที่มา ไม่ใช่รอบที่คุยจบ

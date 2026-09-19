@@ -70,8 +70,16 @@ body.eat-in-tank{overflow:hidden}
 .eat-buff{padding:3px 10px;border-radius:999px;background:#2c5a3fe6;border:1px solid #9fe3a6;color:#eaffea;font-size:12px;font-weight:600;white-space:nowrap}
 
 .eat-result .eat-podium{max-width:460px}
-.place-4 .race-podium-block{height:40px;background:linear-gradient(#9fb2b0,#667a7a)}
-.eat-result .race-podium-block b{font-size:14px}
+/* ⚠️ 2026-09-18 แท่นที่ 4 เตี้ยแค่ 40px แต่ข้างในมีเหรียญ 29px + คะแนนอีกบรรทัด → ข้อความตกนอกแท่น (ผู้เล่นทัก)
+   แท่นทั้งชุดในหน้านี้จึงยืดตามเนื้อหาได้ (min-height แทน height ตายตัว) และย่อเหรียญลงหน่อย */
+.place-4 .race-podium-block{background:linear-gradient(#9fb2b0,#667a7a)}
+.eat-result .race-podium-block{height:auto;justify-content:flex-end;padding:4px 4px 6px;box-sizing:border-box;overflow:hidden}
+.eat-result .place-1 .race-podium-block{min-height:100px}
+.eat-result .place-2 .race-podium-block{min-height:76px}
+.eat-result .place-3 .race-podium-block{min-height:62px}
+.eat-result .place-4 .race-podium-block{min-height:56px}
+.eat-result .race-medal{font-size:22px;line-height:1.1}
+.eat-result .race-podium-block b{font-size:13px;line-height:1.25;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* จอสัมผัส: โชว์จอย ซ่อนคำอธิบายคีย์บอร์ด */
 @media (pointer:coarse){
@@ -87,3 +95,18 @@ body.eat-in-tank{overflow:hidden}
   .eat-chew{min-width:64px;height:68px}
 }
 @media (prefers-reduced-motion:reduce){.eat-chew,.eat-time.is-urgent,.eat-bigcount.pop{animation:none}}
+
+/* โหมดซ้อม (js/slug-practice.js) — ปุ่มลอยในตู้ + หน้าต่างเลือกคู่ซ้อม */
+.practice-bar{display:flex;flex-direction:column;align-items:stretch;gap:4px;margin-top:6px}
+.practice-bar.is-floating{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:40;align-items:center;pointer-events:none;margin:0}
+.practice-bar .tbtn{pointer-events:auto;margin:0;padding:12px 22px;font-size:16px;font-weight:700;color:#1d2f31;background:linear-gradient(180deg,#f6dc98,#d6ae5c);border:1px solid #ffe2a0;box-shadow:0 3px 0 #8a6a2c,0 8px 20px #0007}
+.practice-bar small{padding:2px 10px;border-radius:999px;background:#0e262bcc;color:#cfe3d8;font-size:11px}
+.practice-dialog .practice-head{margin:12px 0 4px;font-size:15px;color:#ffe1a0}
+.practice-dialog .practice-note{font-size:13px;color:#c9ddd1}
+.practice-dialog .practice-warn{min-height:18px;font-size:13px;color:#ffb3a7}
+.practice-dialog .practice-start{background:linear-gradient(180deg,#f6dc98,#d6ae5c);color:#1d2f31;border-color:#ffe2a0;font-weight:700}
+.practice-dialog .practice-start:disabled{opacity:.45}
+
+/* ⚠️ 2026-09-18 ปุ่ม F ตอนยืนในฐานคนอื่นที่ปล้นได้ = เปลี่ยนเป็น "ขโมย" สีแดงกะพริบ ไม่ให้พลาดจังหวะ */
+.eat-bite.is-loot{border-color:#ff8a7a;background:linear-gradient(#5c2c2c,#3a1d1d);color:#ffd9d2;animation:eatLootPulse .8s ease-in-out infinite}
+@keyframes eatLootPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,138,122,.55)}50%{box-shadow:0 0 0 7px rgba(255,138,122,0)}}

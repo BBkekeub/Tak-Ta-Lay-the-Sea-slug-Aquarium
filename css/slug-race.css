@@ -17,3 +17,19 @@ body.race-in-tank{overflow:hidden}.race-in-tank #ov{position:fixed!important;ins
 .race-bet-quick{display:flex;flex-wrap:wrap;gap:8px;margin:-4px 0 6px}
 .slug-race-dialog .race-bet-quick .tbtn{margin:0;min-height:40px;padding:8px 14px;font-size:14px;font-weight:600}
 .slug-race-dialog .race-bet-quick .tbtn[aria-pressed=true]{background:linear-gradient(180deg,#f6dc98,#d6ae5c);color:#1d2f31;border-color:#f6dc98}
+/* เกจพลัง + ปุ่ม J บล็อค / K วิ่งเร็ว (กลางระหว่างปุ่ม A กับ D) — 2026-09-18 */
+.race-powers{flex:1;min-width:0;max-width:340px;align-self:flex-end;display:flex;flex-direction:column;gap:6px;padding:6px 8px;background:#10292ed9;border:1px solid #b69c6680;border-radius:12px;pointer-events:none}
+.race-power-bar{height:10px;border-radius:5px;background:#0007;overflow:hidden}
+.race-power-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#6fc2cf,#ffd36b);transition:width .08s linear}
+.race-powers.is-full{border-color:#ffd36b;box-shadow:0 0 0 2px #ffd36b55}
+.race-powers.is-full .race-power-bar i{background:#ffd36b;animation:racePowerGlow .5s ease-in-out infinite alternate}
+@keyframes racePowerGlow{to{filter:brightness(1.35)}}
+.race-power-row{display:flex;gap:6px}
+.race-controls button.race-power{flex:1;width:auto;height:48px;min-width:0;padding:0 6px;border-radius:10px;font:600 13px "IBM Plex Sans Thai",sans-serif;display:flex;align-items:center;justify-content:center;gap:6px}
+.race-controls button.race-power b{font-size:20px}
+.race-controls button.race-power-block:not(:disabled){background:linear-gradient(#b0473d,#7c2a24);border-color:#ffb0a0}
+.race-controls button.race-power-boost:not(:disabled){background:linear-gradient(#3f9aa8,#256772);border-color:#9fe3ee}
+.race-controls button.race-power.is-on{box-shadow:0 0 0 3px #9fe3ee88}
+.race-controls button.race-power:disabled{opacity:.4}
+@media(max-width:560px){.race-controls{gap:8px}.race-controls button.race-power span{display:none}.race-controls button.race-power{height:44px}}
+@media(prefers-reduced-motion:reduce){.race-powers.is-full .race-power-bar i{animation:none}}

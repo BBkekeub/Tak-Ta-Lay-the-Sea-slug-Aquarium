@@ -24,5 +24,5 @@
   for(const [key,[x,y]] of candidates)drawBigDiamond(x,y,1,1,selected.has(key)?'rgba(220,180,85,.5)':'rgba(90,200,190,.12)',selected.has(key)?'#e1bc6a':'#6aa7a6',true);
   for(const [key,[x,y]] of selected)if(!candidates.has(key))drawBigDiamond(x,y,1,1,'rgba(220,90,75,.35)','#e67b69',true);
  };
- const help=document.querySelector('.help-dialog');const info=document.createElement('details');info.innerHTML='<summary>ขยายร้านและเริ่มใหม่</summary><p>ก่อสร้าง → เลือกช่องขยายร้าน คลิกหรือลากเลือก แล้วกดซื้อ ช่องใหม่ต้องเชื่อมด้านข้างกับพื้นเดิม ภายในกริด 32 × 32 ช่อง ประตูและกำแพงเดิมอยู่ด้านหลังร้าน ราคาช่องถัดไป '+expandTileCost(floorArea())+' เหรียญ และแพงขึ้นเรื่อย ๆ ตามขนาดร้าน<br>ตั้งค่า → รีเซตร้าน ต้องยืนยัน 3 ครั้ง ล้างเฉพาะเซฟเกมนี้</p>';help.append(info);
+ const help=document.querySelector('.help-dialog');const info=document.createElement('details');info.innerHTML='<summary>ขยายร้านและเริ่มใหม่</summary><p>ก่อสร้าง → เลือกช่องขยายร้าน คลิกหรือลากเลือก แล้วกดซื้อ ช่องใหม่ต้องเชื่อมด้านข้างกับพื้นเดิม ภายในกริด '+MAX_B+' × '+MAX_B+' ช่อง ประตูและกำแพงเดิมอยู่ด้านหลังร้าน ราคาช่องถัดไป '+expandTileCost(floorArea())+' เหรียญ และแพงขึ้นเรื่อย ๆ ตามขนาดร้าน<br>ตั้งค่า → รีเซตร้าน ต้องยืนยัน 3 ครั้ง ล้างเฉพาะเซฟเกมนี้</p>';help.append(info);
 })();

@@ -1,0 +1,180 @@
+{
+  "capturedAt": "2026-09-18T20:50:24.532Z",
+  "game": "Two Point Campus",
+  "gameRoot": "C:/Program Files (x86)/Steam/steamapps/common/Two Point Campus",
+  "version": "10.3.169253+2024-12-06.1241",
+  "method": "IL2CPP identifier-string table only; no native method-body decompilation or runtime profiling",
+  "metadataVersion": 27,
+  "bootConfig": "gfx-enable-gfx-jobs=1\ngfx-enable-native-gfx-jobs=1\nwait-for-native-debugger=0\nhdr-display-enabled=0\ngc-max-time-slice=3\nsingle-instance=",
+  "assemblies": [
+    "UnityEngine.AnimationModule.dll",
+    "Unity.RenderPipelines.Core.ShaderLibrary.dll",
+    "Unity.Collections.dll",
+    "Unity.RenderPipelines.Core.Runtime.dll",
+    "Unity.Entities.dll",
+    "Unity.Entities.Hybrid.dll",
+    "Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary.dll",
+    "Unity.RenderPipelines.Universal.Shaders.dll",
+    "Unity.RenderPipeline.Universal.ShaderLibrary.dll",
+    "Unity.RenderPipelines.Universal.Runtime.dll",
+    "Unity.Burst.dll",
+    "Unity.Jobs.dll",
+    "Unity.Burst.Unsafe.dll",
+    "Unity.Collections.LowLevel.ILSupport.dll"
+  ],
+  "files": [
+    {
+      "file": "version.txt",
+      "bytes": 27,
+      "sha256": "453e54d722004aa565f9d059bbd54fac7b789d52e3a0019120649ce7c7eae9cc"
+    },
+    {
+      "file": "TPC_Data/boot.config",
+      "bytes": 137,
+      "sha256": "1ba31bd2ee0ec9324e413f2e1785d83eb2b183a551b222d8304a94c6a48f4658"
+    },
+    {
+      "file": "TPC_Data/ScriptingAssemblies.json",
+      "bytes": 4863,
+      "sha256": "41438a2b089eb5e42ec95ceb1d8290e9941852f5ac29610b661ce76f89ce2413"
+    },
+    {
+      "file": "TPC_Data/il2cpp_data/Metadata/global-metadata.dat",
+      "bytes": 14284260,
+      "sha256": "375d924a38c559a10a90af600c609424d5a18a43018caadc29a441d50e0c51fb"
+    },
+    {
+      "file": "TPC_Data/Plugins/x86_64/lib_burst_generated.dll",
+      "bytes": 4706816,
+      "sha256": "1071334e29e7d2fc29e92ee9f9a22c0c8d854e8566d30e6f77e9daafbe64b93e"
+    }
+  ],
+  "symbolCounts": {
+    "characterCulling": 10,
+    "animation": 67,
+    "pooling": 24,
+    "simulation": 237,
+    "navigation": 40,
+    "burst": 196
+  },
+  "modelCounts": {
+    "male": {
+      "baseTriangles": 2650,
+      "baseVertices": 5274,
+      "variantGroups": [
+        "facial",
+        "hair"
+      ]
+    },
+    "female": {
+      "baseTriangles": 3250,
+      "baseVertices": 6404,
+      "variantGroups": [
+        "hair"
+      ]
+    },
+    "male2": {
+      "baseTriangles": 2398,
+      "baseVertices": 4797,
+      "variantGroups": []
+    },
+    "female2": {
+      "baseTriangles": 3084,
+      "baseVertices": 6143,
+      "variantGroups": []
+    }
+  },
+  "repoFiles": [
+    {
+      "file": "js/people.js",
+      "sha256": "fbcb479a394edee4da1891cd96c0f22a20df584add666ecdcae7507a0a1d8aad"
+    },
+    {
+      "file": "js/shop-floor.js",
+      "sha256": "d55e30d1795e8ffb767f772ca39b2520ef170d32e443aa9492e52ec1d77284f2"
+    },
+    {
+      "file": "js/people-model.js",
+      "sha256": "79fb9a4b66418a48bd2c6f00c22a138ad3c23b53557be9ef44c1f66d46aaa7db"
+    }
+  ],
+  "anchors": {
+    "js/people.js": [
+      {
+        "line": 2,
+        "text": "function rebuildPersonGrid(){"
+      },
+      {
+        "line": 91,
+        "text": "function personRoute(a,b){"
+      },
+      {
+        "line": 668,
+        "text": "let crowdRouteBudget=2;"
+      },
+      {
+        "line": 673,
+        "text": "  const closePeople=PEOPLE.filter(q=>q!==p&&Math.hypot(q.x-p.x,q.y-p.y)<36).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y)).slice(0,8);"
+      },
+      {
+        "line": 717,
+        "text": "function stepPeople(){"
+      },
+      {
+        "line": 724,
+        "text": "  crowdRouteBudget=2;"
+      },
+      {
+        "line": 863,
+        "text": "function drawPersonShadow(p){"
+      },
+      {
+        "line": 920,
+        "text": "function personOnScreen(p){if(!personEntered(p))return false;const r=personScreenBounds(p);return r.x1>=0&&r.x0<=CW&&r.y1>=0&&r.y0<=CH;}"
+      },
+      {
+        "line": 949,
+        "text": "function paintPersonMesh(faces,p,H,snapshot=false){"
+      },
+      {
+        "line": 985,
+        "text": "  gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,data.subarray(0,at),gl.STREAM_DRAW);"
+      },
+      {
+        "line": 1028,
+        "text": "function drawPerson(p){"
+      },
+      {
+        "line": 1033,
+        "text": "  const poseRate=(p.motion>.05||p.action!=='watch')?30:12;"
+      },
+      {
+        "line": 1037,
+        "text": "    const faces=dx||dy?cached.faces.map(f=>({rgb:f.rgb,v:f.v.map(v=>[v[0]+dx,v[1]+dy,v[2]])})):cached.faces;"
+      }
+    ],
+    "js/shop-floor.js": [
+      {
+        "line": 1033,
+        "text": "  if(!window.BOOTING && !document.hidden && !(typeof tankMode!=='undefined' && tankMode) && !window.SlugRace?.isOpen()) drawFloor();"
+      },
+      {
+        "line": 1051,
+        "text": "  const drawFloorActive = !document.hidden && !(typeof tankMode!=='undefined' && tankMode) && !window.SlugRace?.isOpen();"
+      },
+      {
+        "line": 1056,
+        "text": "      if(drawFloorActive && onScreen(o)) return;   // drawFloor() ดูแลของที่เห็นในจอเองทุกเฟรมอยู่แล้ว"
+      },
+      {
+        "line": 1060,
+        "text": "  if(typeof stepPeople==='function' && !drawFloorActive) stepPeople();   // drawFloorActive เรียกของมันเองอยู่แล้ว"
+      }
+    ]
+  },
+  "limits": [
+    "Names do not prove execution, frequency, algorithm, or runtime settings.",
+    "No FPS, triangle counts of Campus assets, or 1000-character benchmark was measured.",
+    "No game assets, save files, or native binaries are copied."
+  ]
+}

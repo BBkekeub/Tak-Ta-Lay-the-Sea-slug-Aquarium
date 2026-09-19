@@ -1,0 +1,35 @@
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>11 — ทำอะไรไปแล้ว เหลืออะไร</title><link rel="stylesheet" href="guide.css"></head><body><header><a href="index.html">ทากทาเล · คู่มือวิจัย Two Point Campus</a><small>ตรวจหลักฐาน 19 กันยายน 2026 · ยังไม่มีผล benchmark 1,000 คน</small></header><main><nav aria-label="สารบัญ"><a href="index.html">Two Point Campus เพื่อพัฒนาเกมทากทาเล</a><a href="01-evidence/index.html">01 — หลักฐานจากเกมที่ติดตั้ง</a><a href="02-simulation/index.html">02 — ECS, Burst และงานหลายเธรด</a><a href="03-navigation/index.html">03 — การเดิน การหาทาง และฝูงคน</a><a href="04-animation/index.html">04 — โมเดล กระดูก และแอนิเมชัน</a><a href="05-rendering/index.html">05 — การวาดภาพ Culling, LOD และ Batching</a><a href="06-memory/index.html">06 — หน่วยความจำ Pool และเท็กซ์เจอร์</a><a href="07-our-game/index.html">07 — เปรียบเทียบและแผนพัฒนาเกมทากทาเล</a><a href="08-benchmark/index.html">08 — แผนทดสอบคอมสเปคต่ำ</a><a href="09-sources/index.html">09 — แหล่งข้อมูลและสิ่งที่ยังไม่รู้</a><a href="10-beyond-customers/index.html">10 — สิ่งที่นำมาปรับได้ นอกเหนือจากลูกค้า</a><a href="11-followup-audit/index.html">11 — ตรวจงานคงเหลือหลังมีการปรับปรุงบางส่วน</a><a aria-current="page" href="11-progress.html">11 — ทำอะไรไปแล้ว เหลืออะไร</a></nav><article><h1>11 — ทำอะไรไปแล้ว เหลืออะไร</h1>
+<p>บันทึก 19 กันยายน 2026 · อัปเดตทุกครั้งที่ลงมือแก้จริง ไม่ใช่แผน</p>
+<h2>สรุปสั้น</h2>
+<p>เริ่มลงมือเฟส 1 ข้อแรกของ <a href="07-our-game/index.html">แผนในบท 07</a> แล้ว (เลิกสร้างเรขาคณิตคงที่ใหม่ทุกเฟรม) ยังไม่ได้ทำเฟส 0 (ตัววัดต่อเฟรม) ซึ่งเป็นตัวตัดสินงานที่เหลือทั้งหมด</p>
+<h2>ทำเสร็จแล้ว</h2>
+<h3>แคชรูปทรงบัง/กระจกตู้ ไม่สร้างใหม่ทุกเฟรม</h3>
+<p>ปัญหาเดิม: ทุกเฟรมที่มีการวาดคน <code>paintPersonMesh</code> จะสร้างอาร์เรย์ใหม่ทั้งชุด — หน้าตัดทึบของเฟอร์นิเจอร์ทุกชิ้น (ชิ้นละ 5 หน้า × 4 จุด) และกระจกตู้ทุกใบ (ใบละ 3 บาน) ทั้งที่รูปทรงพวกนี้เปลี่ยนเฉพาะตอนวาง ย้าย หมุน หรือเก็บของ ไม่ได้เปลี่ยนตอนแพน/ซูม</p>
+<p>ที่แก้:</p>
+<ul><li><code>js/people.js</code> — เพิ่ม <code>layoutSignature()</code>, <code>objGeometry(o)</code>, <code>syncGeoCache()</code> แคชรูปทรงต่อชิ้น</li></ul>
+<p>  ทิ้งแคชทั้งชุดเมื่อลายเซ็น layout เปลี่ยน แล้วสร้างใหม่แบบขี้เกียจตอนถูกขอ</p>
+<ul><li><code>js/people.js</code> — ลูปสร้างกระจกตู้ใน <code>paintPersonMesh</code> เปลี่ยนไปหยิบจากแคช</li><li><code>js/cat-seller.js</code> — **จุดสำคัญ** ไฟล์นี้เขียนทับ <code>personFurnitureFaces</code> ของ people.js (โหลดทีหลัง)</li></ul>
+<p>  แคชใน people.js จึงไม่มีผลกับเส้นทางจริง ต้องใส่แคชในตัวที่เขียนทับด้วย   เก็บโค้ดเดิมไว้ชื่อ <code>_personFurnitureFacesUncached</code> เพื่อเทียบผลลัพธ์</p>
+<ul><li><code>js/people.js</code> — <code>window.PeoplePerf</code> สำหรับตรวจ: <code>geoBuilds</code>, <code>geoCached</code>, <code>counts()</code></li></ul>
+<p>ผลทดสอบในเกมจริง:</p>
+<div class="table-wrap"><table><thead><tr><th>ตรวจอะไร</th><th>ผล</th></tr></thead><tbody><tr><td>ผลลัพธ์เหมือนโค้ดเดิมเป๊ะ (props true/false)</td><td>ผ่าน ทั้งสองแบบ</td></tr><tr><td>แพน/ซูม 60 เฟรม</td><td>rebuild **0 ครั้ง** (ตรงเกณฑ์บท 10)</td></tr><tr><td>ย้ายตู้ 1 ครั้ง</td><td>rebuild 1 ครั้ง ตามที่ควรเป็น</td></tr><tr><td>เวลาเฉลี่ย ร้าน 2 ชิ้น</td><td>เร็วขึ้น ×1.36</td></tr><tr><td>เวลาเฉลี่ย ร้าน 30 ชิ้น</td><td>×1.01 — **แทบไม่ต่าง**</td></tr></tbody></table></div>
+<p>ข้อสรุปตรงไปตรงมา: กำไรที่วัดได้จริงคือ **ลดขยะ (allocation) ไม่ใช่เวลาเฉลี่ย** ร้านใหญ่ยังเสียเวลาไปกับการ <code>push</code> ตัวชี้ ~150 ก้อนต่อเฟรม บวกการสแกนลายเซ็น layout ผลของการลดขยะจะไปโผล่ที่ GC และเฟรมกระตุก ซึ่ง micro-benchmark นี้วัดไม่ได้ **ต้องรอเฟส 0 ถึงจะรู้ว่าคุ้มแค่ไหน** อย่าเพิ่งเคลมว่าเร็วขึ้น</p>
+<h2>เหลืออะไร (ตามลำดับที่ควรทำ)</h2>
+<h3>เฟส 0 — ตัววัด (ยังไม่เริ่ม · ต้องทำก่อนทุกอย่างที่เหลือ)</h3>
+<ul><li><code>js/perf.js</code> วัดเวลาแยก sim / route / pose / pack+upload / draw / composite</li><li>ตัวนับสามตัวตามบท 08: จำลองกี่คน / อยู่ในจอกี่คน / ส่งวาดจริงกี่คน + triangles + bytes</li><li>สรุป p50/p95/p99 บนหน้าต่างเลื่อน + นับเฟรมเกิน 50/100 ms</li><li>ตัวสร้างฉากทดสอบซ้ำได้ (เสกลูกค้า N คน seed คงที่ กล้องตำแหน่งเดิม) ตามเมทริกซ์บท 08</li><li>เกณฑ์เสร็จ: รันเมทริกซ์ฉากแล้วกรอกตารางผลในบท 08 ได้</li></ul>
+<h3>เฟส 1 — ที่เหลือ</h3>
+<ul><li>reuse typed array ใน <code>paintPersonMesh</code> แทน <code>subarray</code> ใหม่ทุกเฟรม + เลิก map faces/vertices ตอนคนเดิน</li><li>**เซฟ**: วัด stringify / sign / write แยกกัน (รู้แล้วว่า sign ≈ 9.5 ms ต่อ 1 MB และระหว่างแข่งเซฟทุก 1 วินาที)</li></ul>
+<p>  ถ้าพบ spike ให้แยกสถานะร้อน (เงิน/ซื้อขาย) ออกจากสถานะที่เปลี่ยนตลอด (ตำแหน่ง) + debounce</p>
+<ul><li>render scale: ตอนนี้ล็อก <code>min(2, devicePixelRatio)</code> ทำเป็น preset ให้เลือก 1 ได้</li></ul>
+<h3>เฟส 2 — renderer (หลังมีตัวเลขเท่านั้น)</h3>
+<p>คง indexed geometry บน GPU ส่งเฉพาะ transform ต่อคน/ต่อชิ้น เริ่มจาก rigid-part ก่อน weighted skinning ต้องมีสวิตช์สลับกลับ renderer เดิม และตรวจภาพสี่มุมกล้อง กระจก เงา และ hit test</p>
+<h3>เฟส 3 — เส้นทาง/ฝูงคน</h3>
+<p>แคชกราฟพื้นร้านตาม layoutVersion · คิวคำขอเส้นทางรวมพร้อมงบเวลาและอายุคำขอ · เปลี่ยน <code>PEOPLE.filter().sort()</code> ที่เหลือให้ใช้ spatial grid ที่มีอยู่แล้ว</p>
+<h3>เฟส 4 — LOD</h3>
+<p>ตามขนาดบนจอ + hysteresis · ลอง 5,000 / 2,500 / 1,000 เหลี่ยม **เฉพาะเมื่อผลวัดชี้ว่า vertex เป็นคอขวดจริง** ถ้าคอขวดคือ overdraw ของกระจก การลดเหลี่ยมไม่ช่วย</p>
+<h3>ยังไม่ทำ</h3>
+<p>ECS · Web Worker · baked animation texture · โมเดล 5,000 เหลี่ยม — รอตัวเลขจากเฟส 0</p>
+<h2>บริบทที่เปลี่ยนไปในวันเดียวกัน (สำคัญต่อเป้าหมายทดสอบ)</h2>
+<p>ระบบลูกค้าถูกแก้วันนี้ ทำให้จำนวนคนในร้านสูงขึ้นกว่าเดิมมาก จึงต้องวัดที่ตัวเลขใหม่นี้ก่อนไปไล่ 100–200 คน</p>
+<ul><li>ลูกค้าเดิมตันที่ ~2 คนตลอดเกม → ตอนนี้ผูกกับความนิยมแบบชันขึ้นเรื่อย ๆ (ความนิยม 70 = 10 คน · 3,000 = 51 คน)</li><li>ความจุพื้นที่ 1 คน/4 ช่อง → 1 คน/3 ช่อง (ร้านเริ่มต้น 48 ช่อง = 16 คน)</li><li>นักแข่ง (เพดาน 10) และพ่อค้า (เพดาน 2) แยกโควตาออกจากลูกค้าแล้ว ไม่แย่งที่กัน</li><li>รวมแล้วร้านมีคนพร้อมกันได้ถึง **28 คนในการเล่นปกติ** ซึ่งเกินช่วง &quot;20–30 คน&quot; ที่บท 07 บอกว่ายังไม่มี benchmark รองรับ</li></ul>
+<p>ฉากทดสอบแรกของเฟส 0 จึงควรเป็น **28 คนในร้านจริง** ไม่ใช่เริ่มที่ 100 คน</p><footer><a href="11-progress.md">อ่าน Markdown ต้นฉบับ</a> · ข้อเสนอในคู่มือยังไม่ได้เปลี่ยนระบบเกม</footer></article></main></body></html>

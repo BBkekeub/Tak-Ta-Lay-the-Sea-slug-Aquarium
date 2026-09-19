@@ -4,24 +4,37 @@
  */
 (()=>{
  'use strict';
- const MINUTE=60000, START=20, FINISH=180;
+ /* ⚠️ 2026-09-18 ผู้เล่น: "ช่วงวิ่งสั้น น่าเบื่อ" → วิ่งไป-กลับ
+    head = ระยะที่วิ่งมาแล้วนับจากจุดเริ่ม (START → GOAL) ไม่ใช่ตำแหน่งในตู้ตรง ๆ แล้ว
+    ตำแหน่งจริงในตู้ = trackX(head): ไปถึง TURN (กระจกฝั่งไกล) แล้ววิ่งย้อนกลับมาเข้าเส้นที่จุดเริ่ม · ไม่ต้องกดอะไรเพิ่มตอนกลับตัว */
+ const MINUTE=60000, START=20, TURN=180, GOAL=START+2*(TURN-START), TRACK_CM=GOAL-START;
+ const trackX=d=>d<=TURN?d:2*TURN-d;
+ /* ⚙️ เกจพลัง (ผู้เล่นกำหนด 2026-09-18): กด A/D สะสม · เต็มแล้วเลือก J = บล็อคคู่แข่งทุกตัว 2 วิ (กดแล้วไม่ขยับ) · K = วิ่งเร็วขึ้นเอง 2 วิ
+    บอทก็ใช้ · เวลาทั้งหมดนับด้วย a.elapsed จึงเซฟ/โหลดต่อได้ */
+ const CHARGE_AT=30, POWER_T=2, BOOST_MUL=1.6;
+ /* บล็อค = กำแพงโผล่ขวางหน้าคู่แข่ง "ทุกตัว" (โหมด 3 ตัวโดนทั้งคู่) ห่างหัวออกไป WALL_GAP ซม.
+    ยังกดเดินต่อได้จนชนกำแพง (ผู้เล่นขอ "เผื่อระยะกดด้วย" 2026-09-18) ครบ POWER_T วิ กำแพงหาย */
+ const WALL_GAP=10;
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
- const gap=()=> (30+Math.random()*20)*MINUTE;
+ const gap=()=> ShopEvents.gap();      // 20–45 นาที ใช้ค่าเดียวกันทั้ง 4 ตู้ (config.js)
  const tank=()=>G.objs.find(o=>o.def.race&&o!==moving);
  const owned=()=>[...G.objs,...G.shelter].some(o=>o.def.race);
  const gene=(g,k)=>clamp(Number.isFinite(g[k])?g[k]:50,0,100)/100;
+ /* ⚙️ 2026-09-18 ผู้เล่น: "ง่ายไป จบไวไป" → ก้าวต่อการกดสั้นลงเหลือ STEP_SCALE ของเดิม
+    ใช้กับทุกตัว (เราและบอท) เท่ากัน สูตรเลือกทากยังเหมือนเดิม แค่ต้องกดต่อเนื่องนานขึ้น */
+ const STEP_SCALE=.65;
  function stride(g){
    // Length helps; large girth and large gills add drag. The cap is absolute.
    const length=6+8*gene(g,'len');
    const gills=(gillCount(g)-2)/7;
    const fraction=clamp(.12+.14*gene(g,'len')+.12*gene(g,'vigor')+.10*gills-.07*gene(g,'gillLen')-.06*gene(g,'girth'),.06,.4);
-   return {length,step:length*fraction};
+   return {length,step:length*fraction*STEP_SCALE};
  }
  let state=G.racing;
  if(!state||!Number.isFinite(state.nextAt)||state.nextAt<0)state={purchased:false,nextAt:0,offer:null,active:null};
  G.racing=state;
  let visitors=[],modal=null,raceUI=null,lastFrame=0,lastSave=0,cameraKey='',raceProgress=null,burstAnimations=[],raceBottom=92,raceResize=null;
- let sprites=[],lastKey=null,countNode=null,buttons=[];
+ let sprites=[],lastKey=null,countNode=null,buttons=[],powerUI=null;
  let resumeReady=false,offerDeadline=0;
  const names=['คลื่น','ฟอง','ปะการัง','น้ำวน','มุก','หาดทราย','ใบเรือ','เค็ม'];
  function purchased(){
@@ -30,7 +43,7 @@
  /* ความเร็วกดของบอท (ครั้ง/วิ) — ⚠️ 2026-09-17 เดิม 2.5–4.5 ครั้ง/วิ แต่คนกด A/D สลับได้ 8–12 ครั้ง/วิ
     = ผู้เล่นเร็วกว่า 2–4 เท่า ส่งทากตัวไหนลงก็ชนะเฉย ๆ (ผู้เล่นบ่น) · ตอนนี้บอทกดเร็วใกล้คน
     แพ้ชนะจึงขึ้นกับ "ก้าวต่อครั้ง" จากยีน (stride) + ความเร็วนิ้วจริง · ช่วงเดียวกับบอทชักเย่อ (slug-tug.js botCps) */
- const PACE_MIN=6,PACE_MAX=14;          // ผู้เล่นกำหนด 2026-09-17: 6–14 ครั้ง/วิ (เท่ากับบอทชักเย่อ)
+ const PACE_MIN=8,PACE_MAX=15;          // ผู้เล่นกำหนด 2026-09-18: 8–15 ครั้ง/วิ (เดิม 6–14 · ยังชนะง่ายไป)
  const botPace=()=>PACE_MIN+Math.random()*(PACE_MAX-PACE_MIN);
  function makeOffer(){
    const choices=names.slice().sort(()=>Math.random()-.5);
@@ -54,11 +67,12 @@
  }
  function spawn(){
    if(visitors.length||!peopleOn||!tank()||document.hidden||tankMode||window.BOOTING)return;
-   const capacity=visitorCapacity()-PEOPLE.length;
+   if(!ShopEvents.ready())return;                 // ตู้อื่นเพิ่งส่งคำท้ามา รออีก 3 นาที (config.js EVENT_SPACING)
+   const capacity=challengerRoom();
    if(capacity<2)return;
    const previous=new Set(PEOPLE);
    if(!spawnVisitors(capacity,'race',[{kid:false,gender:Math.random()<.5?'female':'male'},{kid:false,gender:Math.random()<.5?'female':'male'}]))return;
-   visitors=PEOPLE.filter(p=>!previous.has(p));
+   visitors=PEOPLE.filter(p=>!previous.has(p));ShopEvents.mark();
    if(!state.offer){state.offer=makeOffer();state.nextAt=Date.now()+gap();saveGame();}
    visitors.forEach((p,i)=>{
      p.family=null;p.raceChallenger=true;p.wantsBuy=false;p.wantsSell=false;p.tradeDone=true;
@@ -69,9 +83,13 @@
    offerDeadline=Date.now()+5*MINUTE;
    toast('🏁 ผู้ท้าสองคนมาถึงแล้ว! คลิกคนถือตู้เพื่อแข่งทาก','good');
  }
- function dismiss(){state.offer=null;leave();close();saveGame();}
+ /* ⚠️ 2026-09-18 นับเวลานัดหน้า "หลังจบเรื่องนี้" ไม่ใช่ตอนผู้ท้าเข้าร้าน
+    เดิมตั้งตอนสปอว์น → ระหว่างรับคำท้า + แข่ง + อ่านผล เวลาก็เดินหมดไปแล้ว พอกลับถึงร้านคนใหม่มายืนรออยู่เลย */
+ function reschedule(){state.nextAt=Date.now()+gap();}
+ function dismiss(){state.offer=null;leave();close();reschedule();saveGame();}
  function tick(){
    if(owned())purchased();
+   practiceSync();
    if(!window.BOOTING)tourTick();
    if(state.active){
      if(resumeReady&&!modal&&!raceUI&&!window.BOOTING)openRace();
@@ -100,12 +118,13 @@
    modal?.close();modal?.remove();modal=null;
    raceResize?.disconnect();raceResize=null;
    raceUI?.remove();raceUI=null;document.body.classList.remove('race-in-tank');
-   sprites=[];buttons=[];lastFrame=0;lastKey=null;cameraKey='';
+   sprites=[];buttons=[];powerUI=null;lastFrame=0;lastKey=null;cameraKey='';
  }
  function ask(){
    if(modal||!state.offer||!tank()||state.active)return;
    const d=dialog('🏁 มาแข่งทากกันไหม?'),t=tank();
-   element('p',state.offer.rivals.map(r=>r.name).join(' และ ')+' ขอท้าประลอง ระยะทาง 160 ซม.',d);
+   element('p',state.offer.rivals.map(r=>r.name).join(' และ ')+' ขอท้าประลอง วิ่งไป-กลับ '+TRACK_CM+' ซม.',d);
+   element('p','กดจนเกจพลังเต็ม แล้วเลือก J บล็อคคู่แข่ง 2 วิ หรือ K วิ่งเร็ว 2 วิ',d);
    element('p','ที่ 1 ได้เพิ่ม 2 เท่าของเดิมพัน · ที่ 2 เงินเท่าเดิม · ที่ 3 เสียตามเดิมพัน',d);
    /* เลือกทากเป็นการ์ดรูปทาก + แผงยีนตอนชี้/กดค้าง เหมือนหน้าเลือกทากผสมพันธุ์ (slug-hover.js) */
    element('p','เลือกทากในตู้แข่ง',d);
@@ -154,14 +173,36 @@
    const no=element('button','ไม่แข่ง ให้ผู้ท้ากลับ',d);no.className='tbtn';no.onclick=dismiss;
    const later=element('button','กลับไปเตรียมทาก',d);later.className='tbtn';later.onclick=close;
  }
+ /* ---------- โหมดซ้อม: คู่แข่งคือทากในตู้ที่ผู้เล่นเลือกเอง ไม่มีเดิมพัน (slug-practice.js) ---------- */
+ function practiceSync(){
+   const t=tank();
+   if(typeof SlugPractice==='undefined')return;
+   SlugPractice.sync('race',!!t&&tankMode&&curTank===t&&!state.active&&!modal?.open&&!tourOn(),'🏁 ซ้อมวิ่ง',()=>{
+     SlugPractice.pick({tank:t,title:'🏁 ซ้อมวิ่งทาก',need:2,
+       noteFor:s=>'ก้าวละ '+stride(foodGenes(s)).step.toFixed(1)+' ซม.',
+       onStart:(mine,others)=>beginPractice(t,mine,others)});
+   });
+ }
+ function beginPractice(t,s,others){
+   const entrants=[{name:slugNick(s),genes:{...foodGenes(s)},id:s.id},
+     ...others.map(o=>({name:slugNick(o),genes:{...foodGenes(o)},pace:botPace()}))];
+   state.active={tankId:t.id,wager:0,practice:true,elapsed:0,countdown:3,lastKey:null,settled:false,rank:0,
+     entrants:entrants.map((r,i)=>({...r,...stride(r.genes),head:START,finished:null,next:i?1/r.pace:0}))};
+   t.slugs.filter(x=>x!==s).forEach(x=>{x.fy=Math.max(8+slugCm(x.genes)/CM_PER_CELL*.55,x.fy);x.wall=null;x.climbZ=0;});
+   saveGame();close();openRace();
+ }
  function drawTrack(c,project){
    const quad=(x0,y0,x1,y1,color)=>{const pts=[project(x0,y0),project(x1,y0),project(x1,y1),project(x0,y1)];c.fillStyle=color;c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y));c.closePath();c.fill();};
    c.save();
    for(let i=0;i<3;i++)quad(0,2+i*2,40,4+i*2,['#c2d5bc','#e4cea1','#c4d6db'][i]);
    // Physical strips remain visible under water and retain width at every zoom.
    for(const y of [2,4,6,8])quad(0,y-.045,40,y+.045,'#244f56');
-   quad(3.94,2,4.06,8,'#18684c');
-   for(let row=0;row<12;row++)for(let col=0;col<2;col++)quad(35.8+col*.2,2+row*.5,36+col*.2,2+(row+1)*.5,(row+col)%2?'#f4ebd1':'#233b40');
+   /* วิ่งไป-กลับ: เส้นเริ่ม = เส้นชัย (ธงตาหมากรุกที่ 20 ซม.) · ปลายทางฝั่งไกล = เส้นกลับตัวสีส้ม + ลูกศรย้อน */
+   const T=TURN/CM_PER_CELL,F=START/CM_PER_CELL;
+   for(let row=0;row<12;row++)for(let col=0;col<2;col++)quad(F-.2+col*.2,2+row*.5,F+col*.2,2+(row+1)*.5,(row+col)%2?'#f4ebd1':'#233b40');
+   quad(T-.08,2,T+.08,8,'#e08a2e');
+   for(let lane=0;lane<3;lane++){const y=3+lane*2,pts=[project(T-.3,y-.45),project(T-1.3,y),project(T-.3,y+.45)];
+     c.fillStyle='rgba(224,138,46,.55)';c.beginPath();pts.forEach((p,k)=>k?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y));c.closePath();c.fill();}
    c.restore();
  }
  function drawChallengers(){
@@ -206,17 +247,57 @@
  cv.addEventListener('pointerdown',e=>{if(hit(e)){pressedVisitor=true;e.preventDefault();e.stopImmediatePropagation();}},true);
  cv.addEventListener('pointerup',e=>{if(pressedVisitor){pressedVisitor=false;e.preventDefault();e.stopImmediatePropagation();if(hit(e))ask();}},true);
  cv.addEventListener('pointercancel',()=>{pressedVisitor=false;},true);
- function finish(r,time){if(r.head>=FINISH&&r.finished===null){r.head=FINISH;r.finished=time;}}
+ function finish(r,time){if(r.head>=GOAL&&r.finished===null){r.head=GOAL;r.finished=time;}}
+ const walled=(r,time)=>time<(r.blockUntil||0)&&Number.isFinite(r.wallAt);
+ /* ก้าวหนึ่งครั้ง (ทั้งคนกดและบอท) — มีกำแพงอยู่ = เดินได้ถึงหน้ากำแพงแล้วติด · บัฟเร็ว = ก้าวยาวขึ้น · ทุกก้าวสะสมเกจพลัง
+    ⚠️ 2026-09-18 ผู้เล่น: "ติดกำแพงแล้วเกจไม่ขึ้น กดกำแพงรัว ๆ ก็ล็อกคู่แข่งได้ตลอด ไม่ควร"
+       เดิมชนกำแพงแล้ว return ก่อนบวกเกจ = คนโดนบล็อคทั้งเดินไม่ออกทั้งชาร์จไม่ได้ ไม่มีทางสู้กลับ
+       ตอนนี้ติดกำแพง = "ออกแรงดันอยู่กับที่" ยังสะสมเกจเต็มอัตรา แค่ไม่ขยับ → กำแพงหายก็มีพลังสวนกลับได้ */
+ function stepOnce(r,time){
+   const stuck=walled(r,time)&&r.head>=r.wallAt;
+   if(!stuck){
+     let next=r.head+r.step*(time<(r.boostUntil||0)?BOOST_MUL:1);
+     if(walled(r,time))next=Math.min(next,r.wallAt);
+     r.head=next;
+   }
+   r.charge=Math.min(CHARGE_AT,(r.charge|0)+1);
+   if(!stuck)finish(r,time);
+   return true;
+ }
+ function usePower(i,kind){
+   const a=state.active;if(!a||a.settled||a.countdown>0)return false;
+   const r=a.entrants[i];if(!r||r.finished!==null||(r.charge|0)<CHARGE_AT)return false;
+   r.charge=0;r.aiAt=null;
+   if(kind==='block')a.entrants.forEach((o,j)=>{if(j===i||o.finished!==null)return;
+     if(!walled(o,a.elapsed))o.wallAt=Math.min(GOAL,o.head+WALL_GAP);   // กำแพงเดิมยังอยู่ = คงตำแหน่งเดิม แค่ต่อเวลา
+     o.blockUntil=Math.max(o.blockUntil||0,a.elapsed+POWER_T);});
+   else r.boostUntil=a.elapsed+POWER_T;
+   r.lastPower={kind,at:a.elapsed};
+   return true;
+ }
+ /* บอท: เกจเต็มแล้วรอแป๊บ (0.3–1.5 วิ) ค่อยใช้ · มีคนนำอยู่ = ชอบบล็อค · นำอยู่เอง = ชอบวิ่งเร็ว */
+ function botPower(a,i){
+   const r=a.entrants[i];if(r.finished!==null||(r.charge|0)<CHARGE_AT)return;
+   if(r.aiAt==null){r.aiAt=a.elapsed+.3+Math.random()*1.2;return;}
+   if(a.elapsed<r.aiAt)return;
+   const ahead=a.entrants.some((o,j)=>j!==i&&o.finished===null&&o.head>r.head);
+   usePower(i,(ahead?Math.random()<.65:Math.random()<.35)?'block':'boost');
+ }
  /* ⚠️ 2026-09-17 ผู้เล่นขอ: "รอให้เข้าครบก่อน" — เดิมตัดจบทันทีที่เราเข้าเส้นชัย หรือทันทีที่คู่แข่งสองตัวเข้าหมด
     ตอนนี้จบเมื่อทุกตัวเข้าเส้นชัยจริง · กันค้าง: บอทเข้าครบแล้วเราไม่กดต่อ รอ RACE_GRACE วิ ก่อนนับว่าเราไม่ถึงเส้น */
  const RACE_GRACE=25;
+ const RUSH=2;                               // ⚙️ ตัวคูณความเร็วคู่แข่งหลังเราเข้าเส้นชัย
  function advance(dt){
    const a=state.active;if(!a||a.settled)return;
    if(a.countdown>0){a.countdown=Math.max(0,a.countdown-dt);return;}
    a.elapsed+=dt;
+   /* เราเข้าเส้นชัยแล้ว = ตัวที่เหลือกดเร็วขึ้น RUSH เท่า จะได้ไม่ต้องนั่งรอนาน (ผู้เล่นขอ 2026-09-18)
+      อันดับยังตัดสินที่ "เวลาเข้าเส้น" เหมือนเดิม ของเราเข้าไปก่อนแล้วจึงไม่มีทางโดนแซงย้อนหลัง */
+   const rush=(!a.botOnly&&a.entrants[0].finished!==null)?RUSH:1;
    for(let i=a.botOnly?0:1;i<a.entrants.length;i++){
      const r=a.entrants[i];
-     while(r.finished===null&&r.next<=a.elapsed){r.head+=r.step;finish(r,r.next);r.next+=1/r.pace;}
+     while(r.finished===null&&r.next<=a.elapsed){stepOnce(r,r.next);r.next+=1/(r.pace*rush);}
+     botPower(a,i);
    }
    if(a.entrants.every(r=>r.finished!==null)){settleSoon();return;}
    const bots=a.botOnly?a.entrants:a.entrants.slice(1);
@@ -226,9 +307,14 @@
  }
  /* เว้นจังหวะให้เห็นตัวสุดท้ายแตะเส้นก่อนเด้งกล่องผล */
  function settleSoon(){const a=state.active;if(!a||a.settled||a._settleAt)return;a._settleAt=a.elapsed+.9;}
+ const stepCap=makePressLimiter();        // เพดาน 20 ครั้ง/วิ (config.js) กันมาโครกดวิ่ง/ปั๊มกำแพง
  function press(key){
    const a=state.active;if(!a||a.botOnly||a.settled||a.countdown>0||document.hidden||lastKey===key||a.entrants[0].finished!==null)return;
-   lastKey=key;a.lastKey=key;const r=a.entrants[0];r.head+=r.step;finish(r,a.elapsed);   // เข้าเส้นชัยแล้วไม่จบทันที รอตัวอื่น (advance)
+   if(!stepCap())return;
+   const r=a.entrants[0];
+   /* ⚠️ 2026-09-18 เดิม return ตรงนี้ตอนชนกำแพง = ปุ่มไม่ถูกนับเลย เกจเลยไม่ขึ้นด้วย
+      ตอนนี้ปล่อยให้กดต่อได้ stepOnce จะไม่ขยับตัวแต่ยังสะสมเกจให้ (ดู stepOnce) */
+   lastKey=key;a.lastKey=key;stepOnce(r,a.elapsed);   // เข้าเส้นชัยแล้วไม่จบทันที รอตัวอื่น (advance)
    buttons.forEach((b,i)=>{b.classList.toggle('next',(key==='a'?1:0)===i);});
    const b=buttons[key==='a'?0:1];b?.animate([{transform:'scale(.9)',background:'#f4cc68'},{transform:'scale(1)',background:'#296875'}],{duration:150});
  }
@@ -236,17 +322,21 @@
    const a=state.active;if(!a||a.settled)return;
    if(a.tour){a.settled=true;saveGame();tourHeatDone();return;}
    a.rank=1+a.entrants.slice(1).filter(r=>r.finished!==null&&r.finished<=a.entrants[0].finished).length;
-   a.delta=a.rank===1?a.wager*2:a.rank===3?-a.wager:0;
+   a.delta=a.practice?0:a.rank===1?a.wager*2:a.rank===3?-a.wager:0;
    addCoin(a.delta);a.settled=true;saveGame();syncHUD();showResult();
  }
  function complete(){
-   state.active=null;state.offer=null;leave();close();exitTank();saveGame();
+   /* ซ้อม: ไม่ยุ่งกับคำท้าที่ค้างอยู่ ไม่รีเซ็ตนาฬิกา และอยู่ในตู้ต่อ */
+   if(state.active?.practice){state.active=null;close();saveGame();return;}
+   state.active=null;state.offer=null;leave();close();exitTank();reschedule();saveGame();
  }
  /* พลุเต็มจอ (js/fireworks.js) — เรียกหลังเปิดกล่องผล พลุจึงอยู่เหนือกล่องใน top layer */
  function resultFireworks(){if(window.Fireworks)Fireworks.play({count:10,duration:3000});}
  function showResult(){
    const a=state.active;if(!a?.settled||modal)return;
    buttons.forEach(b=>b.disabled=true);
+   /* บอกระบบเควสว่าชนะแล้ว (quests.js) — ธง _qWin กันนับซ้ำ เพราะกลับเข้าตู้ตอน settled แล้วจะเรียก showResult ใหม่ */
+   if(a.rank===1&&!a._qWin){a._qWin=true;window.questContestWin?.();}
    const d=dialog('คุณได้อันดับที่ '+a.rank);d.id='raceResult';d.classList.add('race-result');
    d.addEventListener('cancel',e=>{e.preventDefault();complete();});
    element('p',a.rank===1?'ชนะการแข่งขัน!':a.rank===2?'เข้าเส้นชัยเป็นอันดับสอง':'เข้าเป็นอันดับสุดท้าย',d).className='race-result-caption';
@@ -261,10 +351,16 @@
      const block=element('div',null,step);block.className='race-podium-block';element('span',['','🥇','🥈','🥉'][place],block).className='race-medal';element('b',String(place),block);
    }
    const receipt=element('div',null,d);receipt.className='race-receipt';
-   element('span','เดิมพัน '+a.wager.toLocaleString()+' ทอง',receipt);
-   element('strong',(a.delta>0?'ได้รับ +':a.delta<0?'เสีย ':'ไม่เสีย ไม่ได้เพิ่ม · ')+a.delta.toLocaleString()+' ทอง',receipt);
-   element('small','ทองคงเหลือ '+G.coin.toLocaleString(),receipt);
-   element('p',a.rank===1?'ผู้ท้า: ฝากไว้ก่อน! คราวหน้าจะเอาคืน!':a.rank===2?'ผู้ท้า: ไว้เจอกันใหม่อีกครั้ง!':'ผู้ท้า: ฮ่า ๆ! ฝึกมาอีกหน่อยนะ!',d).className='race-taunt';
+   if(a.practice){
+     element('span','โหมดซ้อม',receipt);
+     element('strong','ไม่มีเดิมพัน',receipt);
+     element('small','ซ้อมได้ไม่จำกัด · คำท้าจริงถึงจะมีเงินรางวัล',receipt);
+   }else{
+     element('span','เดิมพัน '+a.wager.toLocaleString()+' ทอง',receipt);
+     element('strong',(a.delta>0?'ได้รับ +':a.delta<0?'เสีย ':'ไม่เสีย ไม่ได้เพิ่ม · ')+a.delta.toLocaleString()+' ทอง',receipt);
+     element('small','ทองคงเหลือ '+G.coin.toLocaleString(),receipt);
+     element('p',a.rank===1?'ผู้ท้า: ฝากไว้ก่อน! คราวหน้าจะเอาคืน!':a.rank===2?'ผู้ท้า: ไว้เจอกันใหม่อีกครั้ง!':'ผู้ท้า: ฮ่า ๆ! ฝึกมาอีกหน่อยนะ!',d).className='race-taunt';
+   }
    const done=element('button','รับทราบ · กลับร้าน',d);done.className='tbtn';done.onclick=complete;done.focus();resultFireworks(d);
  }
  function isRacing(t){return !!raceUI&&!!state.active&&(!t||t.id===state.active.tankId);}
@@ -291,33 +387,71 @@
    });
    const top=60,bottom=raceBottom,usable=Math.max(90,TCH-top-bottom);
    const key=TCW+'|'+TCH+'|'+bottom;
-   const lead=a.botOnly?sprites.reduce((m,x)=>Math.max(m,x.viewHead??START),START):sprites[0].viewHead;
+   /* กล้องตาม "ตำแหน่งในตู้" ของตัวที่นำ (ขากลับตำแหน่งจะวิ่งย้อนกลับมาทางซ้าย) */
+   const lead=trackX(a.botOnly?sprites.reduce((m,x)=>Math.max(m,x.viewHead??START),START):sprites[0].viewHead);
    if(cameraKey!==key){cameraKey=key;tankCam.zoom=Math.max(.25,Math.min(1.6,(TCW-32)/(CELLW*(TCW<600?12:18)+DEPX*6),usable/(DEPY*8+80)));}
    const desiredX=TCW*.46,desiredY=top+usable*.74,z=tankCam.zoom;
    tankCam.ox=desiredX-((lead/CM_PER_CELL-curTank.def.w/2)*CELLW+(3-curTank.def.h/2)*DEPX)*z;
    tankCam.oy=desiredY+(3-curTank.def.h/2)*DEPY*z+SAND_CELLS*ZH*z;tankNeedFit=false;
    const message=a.countdown>0?String(Math.ceil(a.countdown)):a.settled||a._settleAt!=null?'จบการแข่งขัน'
      :a.botOnly?'กำลังแข่ง'
-     :r.finished!==null?'เข้าเส้นชัยแล้ว! รอตัวอื่น…'
+     :r.finished!==null?'เข้าเส้นชัยแล้ว! ตัวอื่นกำลังเร่งเข้าเส้น ⏩'
+     :walled(r,a.elapsed)?(r.head>=r.wallAt?'🧱 ชนกำแพง! กดต่อไปเพื่อชาร์จเกจ · อีก '+Math.ceil(r.blockUntil-a.elapsed)+' วิ':'🧱 มีกำแพงข้างหน้า!')
+     :(r.charge|0)>=CHARGE_AT?'⚡ พลังเต็ม! J บล็อค · K วิ่งเร็ว'
      :lastKey?'กด '+(lastKey==='a'?'D / ขวา':'A / ซ้าย'):'เริ่ม! กด A / D สลับกัน';
    if(countNode.textContent!==message)countNode.textContent=message;
-   const distance=a.botOnly?a.entrants.map(x=>x.name+' '+Math.min(160,Math.max(0,x.head-START)).toFixed(0)).join(' · ')+' / 160 ซม.'
-     :Math.min(160,Math.max(0,r.head-START)).toFixed(0)+' / 160 ซม.';
+   const leg=x=>x.head>=TURN?' (ขากลับ)':'';
+   const distance=a.botOnly?a.entrants.map(x=>x.name+' '+Math.min(TRACK_CM,Math.max(0,x.head-START)).toFixed(0)+leg(x)).join(' · ')+' / '+TRACK_CM+' ซม.'
+     :Math.min(TRACK_CM,Math.max(0,r.head-START)).toFixed(0)+' / '+TRACK_CM+' ซม.'+leg(r);
    if(raceProgress.textContent!==distance)raceProgress.textContent=distance;
+   if(powerUI){
+     const full=(r.charge|0)>=CHARGE_AT&&r.finished===null&&!a.settled&&a.countdown<=0;
+     powerUI.fill.style.width=((r.charge|0)/CHARGE_AT*100)+'%';
+     powerUI.box.classList.toggle('is-full',full);
+     powerUI.block.disabled=powerUI.boost.disabled=!full;
+     powerUI.boost.classList.toggle('is-on',a.elapsed<(r.boostUntil||0));
+   }
    if(now-lastSave>1000){saveGame();lastSave=now;}
+ }
+ /* กำแพงบล็อค: แผ่นหินตั้งขวางเลนของตัวนั้นที่ตำแหน่ง wallAt · โผล่ขึ้นจากพื้นช่วงแรก และกะพริบก่อนหาย 0.4 วิสุดท้าย */
+ function drawWall(r,i){
+   const a=state.active;if(!walled(r,a.elapsed))return;
+   const left=r.blockUntil-a.elapsed,age=POWER_T-left;
+   if(left<.4&&Math.floor(left*12)%2)return;
+   const x=trackX(r.wallAt)/CM_PER_CELL,y0=3+i*2-.8,y1=3+i*2+.8,t=.25,rise=Math.min(1,age/.18),H=1.6*rise;
+   const face=(ax,ay,bx,by,fill)=>{const p=[S(ax,ay,SAND_CELLS),S(bx,by,SAND_CELLS),S(bx,by,SAND_CELLS+H),S(ax,ay,SAND_CELLS+H)];
+     tctx.fillStyle=fill;tctx.beginPath();p.forEach((q,k)=>k?tctx.lineTo(q.x,q.y):tctx.moveTo(q.x,q.y));tctx.closePath();tctx.fill();
+     tctx.strokeStyle='rgba(40,24,16,.6)';tctx.lineWidth=1;tctx.stroke();};
+   tctx.save();
+   face(x-t/2,y1,x+t/2,y1,'#6d5a48');                          // ด้านหลัง
+   face(x+t/2,y0,x+t/2,y1,'#8a735c');                          // ด้านข้างขวา
+   face(x-t/2,y0,x-t/2,y1,'#9c8468');                          // ด้านข้างซ้าย
+   const top=[S(x-t/2,y0,SAND_CELLS+H),S(x+t/2,y0,SAND_CELLS+H),S(x+t/2,y1,SAND_CELLS+H),S(x-t/2,y1,SAND_CELLS+H)];
+   tctx.fillStyle='#c9b08a';tctx.beginPath();top.forEach((q,k)=>k?tctx.lineTo(q.x,q.y):tctx.moveTo(q.x,q.y));tctx.closePath();tctx.fill();
+   face(x-t/2,y0,x+t/2,y0,'#b39673');                          // ด้านหน้า (ใกล้กล้อง)
+   const c=S(x,y0,SAND_CELLS+H+.15);tctx.font='bold '+Math.max(12,14*tankCam.zoom).toFixed(0)+'px sans-serif';tctx.textAlign='center';tctx.textBaseline='bottom';
+   tctx.fillText('🧱 '+Math.ceil(left),c.x,c.y);
+   tctx.restore();
  }
  function racingItems(){return state.active.entrants.map((r,i)=>({sortY:3+i*2,kind:'race',r,i}));}
  function drawRunner(r,i){
    const s=sprites[i],parts=slugPartsOf(s);if(!parts)return;
-   const p=S((s.viewHead??r.head)/CM_PER_CELL,3+i*2,SAND_CELLS),scale=r.length*depthPxPerCm()/(parts.bw*parts.s),w=parts.w*scale,h=parts.h*scale;
+   drawWall(r,i);
+   const d=s.viewHead??r.head,out=d<TURN,side=out?1:-1;   // ขาไปหันขวา · ขากลับหันซ้าย (หัวนำเสมอ)
+   s.flip=out;
+   const p=S(trackX(d)/CM_PER_CELL,3+i*2,SAND_CELLS),scale=r.length*depthPxPerCm()/(parts.bw*parts.s),w=parts.w*scale,h=parts.h*scale;
    if(p.x+w<0||p.x-w>TCW||p.y<0||p.y-h>TCH)return;
    const stretch=s.state==='walk'?1+Math.sin(s.creepT)*.035:1;
-   const centerX=p.x-((parts.L+parts.R)/2-parts.bw/2*(1-stretch))*parts.s*scale,cy=p.y-h*.44;
+   const centerX=p.x-side*((parts.L+parts.R)/2-parts.bw/2*(1-stretch))*parts.s*scale,cy=p.y-h*.44;
    drawTankSlug(s,parts,scale,centerX,cy,false);
-   drawDefaultEyes(parts,centerX,cy,true,parts.s*scale);
-   const tag=state.active.tour?(i===0&&!state.active.botOnly?'ทีมเรา':r.name):i===0?'คุณ':null;
-   if(tag){tctx.save();tctx.font='bold 12px sans-serif';tctx.textAlign='center';const tw=Math.max(40,tctx.measureText(tag).width+14),mine=i===0&&!state.active.botOnly;
-     tctx.fillStyle=mine?'#153c42':'#3c1a18';tctx.fillRect(p.x-r.length*depthPxPerCm()/2-tw/2,p.y+8,tw,19);tctx.fillStyle=mine?'#ffe3a0':'#ffc9b6';tctx.fillText(tag,p.x-r.length*depthPxPerCm()/2,p.y+22);tctx.restore();}
+   drawDefaultEyes(parts,centerX,cy,s.flip,parts.s*scale);
+   const a=state.active,bodyX=p.x-side*r.length*depthPxPerCm()/2;
+   const tag=a.tour?(i===0&&!a.botOnly?'ทีมเรา':r.name):i===0?'คุณ':null;
+   if(tag){tctx.save();tctx.font='bold 12px sans-serif';tctx.textAlign='center';const tw=Math.max(40,tctx.measureText(tag).width+14),mine=i===0&&!a.botOnly;
+     tctx.fillStyle=mine?'#153c42':'#3c1a18';tctx.fillRect(bodyX-tw/2,p.y+8,tw,19);tctx.fillStyle=mine?'#ffe3a0':'#ffc9b6';tctx.fillText(tag,bodyX,p.y+22);tctx.restore();}
+   /* สถานะพลังเหนือตัว: ⚡ วิ่งเร็ว · 💥 แวบเดียวตอนเพิ่งกดบล็อค (กำแพงวาดแยกใน drawWall) */
+   const fx=['',a.elapsed<(r.boostUntil||0)?'⚡':'',r.lastPower?.kind==='block'&&a.elapsed-r.lastPower.at<.6?'💥':''].join('');
+   if(fx){tctx.save();tctx.font=Math.max(16,22*tankCam.zoom).toFixed(0)+'px sans-serif';tctx.textAlign='center';tctx.textBaseline='bottom';tctx.fillText(fx,bodyX,p.y-h*.95);tctx.restore();}
  }
  function openRace(){
    const a=state.active,t=G.objs.find(o=>o.id===a?.tankId);if(!a||modal||raceUI||!t)return;
@@ -325,17 +459,27 @@
    // Reuse the existing aquarium canvas, furniture, water, lighting and camera.
    raceUI=element('div');raceUI.id='raceTankHUD';document.body.classList.add('race-in-tank');
    enterTank(t);ov.querySelector('.ov-body').append(raceUI);document.getElementById('ovTitle').textContent=a.tour?'🏆 ทัวร์นาเมนต์วิ่ง · '+TOUR_ROUNDS[a.tour.round]+' · เที่ยวที่ '+(a.tour.heat+1):'🏁 ตู้แข่งทากทะเล';
-   const banner=element('div',null,raceUI);banner.className='race-tank-banner';countNode=element('div','3',banner);countNode.className='race-count';countNode.setAttribute('role','status');raceProgress=element('small','0 / 160 ซม.',banner);
+   const banner=element('div',null,raceUI);banner.className='race-tank-banner';countNode=element('div','3',banner);countNode.className='race-count';countNode.setAttribute('role','status');raceProgress=element('small','0 / '+TRACK_CM+' ซม.',banner);
    const controls=element('div',null,raceUI);controls.className='race-controls';
    if(a.botOnly){
      const skip=element('button','⏭ ข้ามไปดูผล',controls);skip.type='button';skip.className='race-skip';
      skip.onclick=()=>{const x=state.active;if(!x||x.settled||x._settleAt!=null)return;const w=simulateHeat(x.entrants[0],x.entrants[1]);
-       x.entrants.forEach((r,i)=>{r.head=FINISH;r.finished=i===w?x.elapsed:x.elapsed+.01;});settleSoon();};
+       x.entrants.forEach((r,i)=>{r.head=GOAL;r.finished=i===w?x.elapsed:x.elapsed+.01;});settleSoon();};
      buttons=[];
    }else
    for(const [key,label] of [['a','A · ซ้าย'],['d','D · ขวา']]){
      const b=element('button',label,controls);b.type='button';b.setAttribute('aria-label','กระดึ๊บฝั่ง'+(key==='a'?'ซ้าย':'ขวา'));
      b.onpointerdown=e=>{e.preventDefault();press(key);};b.onclick=e=>{if(e.detail===0)press(key);};buttons.push(b);
+     /* เกจพลัง + ปุ่ม J / K อยู่กลางระหว่างปุ่ม A กับ D */
+     if(key==='a'){
+       const box=element('div',null,controls);box.className='race-powers';
+       const bar=element('div',null,box);bar.className='race-power-bar';const fill=element('i',null,bar);
+       const row=element('div',null,box);row.className='race-power-row';
+       const mk=(k,icon,text,kind)=>{const pb=element('button',null,row);pb.type='button';pb.className='race-power race-power-'+kind;
+         element('b',k,pb);element('span',icon+' '+text,pb);pb.setAttribute('aria-label',text+' (ปุ่ม '+k+')');
+         pb.onpointerdown=e=>{e.preventDefault();usePower(0,kind);};pb.onclick=e=>{if(e.detail===0)usePower(0,kind);};return pb;};
+       powerUI={box,fill,block:mk('J','🛑','บล็อค 2 วิ','block'),boost:mk('K','⚡','วิ่งเร็ว 2 วิ','boost')};
+     }
    }
    raceBottom=Math.max(88,controls.offsetHeight+22);
    raceResize=new ResizeObserver(entries=>{raceBottom=Math.max(88,entries[0].contentRect.height+22);cameraKey='';});raceResize.observe(controls);
@@ -348,8 +492,10 @@
     ต่างกัน: แต่ละคู่แข่ง "ชนะ 2 ใน 3 เที่ยว" · เที่ยวละ 1 ต่อ 1 · เราเลือกว่าจะส่งตัวไหนก่อนทุกเที่ยว
     ตัวที่วิ่งไปแล้วความสมบูรณ์ −10 นาน 1 ชั่วโมง (ทากเรา = บัฟ raceFatigue ใน foodBuffs · ทีมบอท = นับรอบวิ่งตลอดทัวร์นาเมนต์)
     สถานะอยู่ใน G.racing.tour (เซฟ/โหลดต่อได้ทุกขั้น รวมกลางคู่) · ใช้หน้าตาหน้าต่างชุดเดียวกับชักเย่อ (css/slug-tug.css) */
- const TOUR_TEST=true;                       // ⚙️ ทดสอบ: จดหมายทุก 10 นาที · ใช้จริง: วันละฉบับ (ตั้ง false)
- const TOUR_GAP=TOUR_TEST?10*MINUTE:24*60*MINUTE;
+ /* ⚙️ ทดสอบ: จดหมายทุก 10 นาที · ใช้จริง: ทุก 2 ชั่วโมง (ผู้เล่นกำหนด 2026-09-18 · เดิมวันละฉบับ)
+    ทัวร์นาเมนต์ชักเย่อก็ 2 ชั่วโมงเหมือนกัน แต่ฉบับแรกเหลื่อมกัน 1 ชั่วโมง (ดูบรรทัด tourNextAt) จะได้ไม่มาพร้อมกัน */
+ const TOUR_TEST=false;
+ const TOUR_GAP=TOUR_TEST?10*MINUTE:120*MINUTE;
  const TOUR_ENTRY=1000,TOUR_PREP_MS=MINUTE,TOUR_PRIZE={1:3000,2:2000,3:1000},FATIGUE_VIGOR=10,FATIGUE_MS=60*MINUTE;
  const TOUR_ROUNDS=['รอบ 8 ทีม','รอบรองชนะเลิศ','รอบชิงชนะเลิศ'];
  const TOUR_NAMES=['ม้าน้ำสายฟ้า','ปลาบินฟ้า','กุ้งเดินเร็ว','หอยพายุ','ทากสปรินต์','ปูวิ่งข้าง','ดาวตก','ปลากระเบนราบ','หมึกพ่นควัน','ฉลามครีบเงิน','คลื่นลม','เต่าเทอร์โบ'];
@@ -383,15 +529,38 @@
  function recordTour(round,slot,winner){const tr=state.tour;if(round===0)tr.qf[slot]=winner;else if(round===1)tr.sf[slot]=winner;else tr.final=winner;tr.match=null;saveGame();}
 
  /* ---- จดหมายเชิญ ---- */
+ /* ⚙️ จดหมายเชิญมีอายุเท่านี้ · หมดอายุแล้วลบจดหมายทิ้งเลย ไม่เก็บค้างในกล่องจดหมาย (ผู้เล่นขอ 2026-09-18) */
+ const TOUR_MAIL_TTL=TOUR_TEST?3*MINUTE:30*MINUTE;
+ function dropTourMail(id){
+   if(!id||typeof computerInbox!=='function')return;
+   const box=computerInbox(),i=box.findIndex(m=>m.id===id);
+   if(i<0)return;
+   box.splice(i,1);
+   if(G.mailSent)delete G.mailSent[id];
+   try{if(typeof renderComputer==='function')renderComputer();}catch(_){}
+ }
+ /* เรียกทุกวินาทีจาก tourTick: จดหมายที่หมดเขตและยังไม่ได้สมัคร = ลบทิ้ง
+    แล้วกวาดฉบับเก่าที่ค้างจากเซฟก่อนหน้าออกให้หมดด้วย (เหลือไว้เฉพาะฉบับที่ยังสมัครได้/ที่สมัครไปแล้ว) */
+ function expireTourMail(){
+   const id=state.tourInvite,live=id&&Date.now()<(state.tourInviteUntil||0);
+   if(id&&!live&&state.tour?.mailId!==id){dropTourMail(id);state.tourInvite=null;state.tourInviteUntil=0;saveGame();}
+   if(typeof computerInbox!=='function')return;
+   const keep=new Set([state.tour?.mailId,live?id:null].filter(Boolean));
+   for(const m of computerInbox().slice())if(typeof m.id==='string'&&m.id.startsWith('race-tour-')&&!keep.has(m.id))dropTourMail(m.id);
+ }
  function tourMail(){
    if(typeof receiveComputerMessage!=='function'||!tank()||tourOn()||state.active)return;
-   if(!Number.isFinite(state.tourNextAt))state.tourNextAt=Date.now()+(TOUR_TEST?MINUTE:TOUR_GAP);
+   if(!Number.isFinite(state.tourNextAt))state.tourNextAt=Date.now()+(TOUR_TEST?MINUTE:TOUR_GAP/2);   // ฉบับแรกของสายวิ่งมาก่อนชักเย่อ 1 ชม.
    if(Date.now()<state.tourNextAt)return;
+   if(state.tourInvite&&state.tour?.mailId!==state.tourInvite)dropTourMail(state.tourInvite);   // ฉบับเก่าที่ยังค้าง = ลบก่อนส่งฉบับใหม่
    state.tourSeq=(state.tourSeq|0)+1;const id='race-tour-'+state.tourSeq;
    const ok=receiveComputerMessage({id,type:'online',repeating:true,title:'🏆 เชิญร่วมทัวร์นาเมนต์วิ่งทาก',
      body:'ทัวร์นาเมนต์วิ่ง ทีมละ 3 ตัว · 8 ทีม · แพ้คัดออก\nแต่ละคู่แข่งเที่ยวละ 1 ต่อ 1 ใครชนะ 2 ใน 3 เที่ยวผ่านรอบ\nตัวที่วิ่งแล้วความสมบูรณ์ −10 นาน 1 ชั่วโมง\nค่าสมัคร '+TOUR_ENTRY.toLocaleString()+' ทอง\n\nรางวัล\n  ที่ 1 — 3,000 ทอง\n  ที่ 2 — 2,000 ทอง\n  ที่ 3–4 — 1,000 ทอง\n\nสมัครแล้วมีเวลา 1 นาทีให้ย้ายทาก 3 ตัวลงตู้แข่งวิ่ง แล้วทีมอื่นจะทยอยมาถึงร้าน'});
    state.tourNextAt=Date.now()+TOUR_GAP;
-   if(ok){state.tourInvite=id;toast('📨 จดหมายเชิญทัวร์นาเมนต์วิ่งมาแล้ว! เปิดดูที่คอมพิวเตอร์','good');}
+   /* จดหมายทัวร์นาเมนต์มาแล้ว = เลื่อนคำท้า 1 ต่อ 1 ของตู้นี้ออกไปด้วย (ผู้เล่นขอ 2026-09-18)
+      ไม่งั้นกำลังจะลงทัวร์นาเมนต์ แต่มีผู้ท้าธรรมดามายืนแย่งตู้เดียวกันพอดี */
+   if(ok)reschedule();
+   if(ok){state.tourInvite=id;state.tourInviteUntil=Date.now()+TOUR_MAIL_TTL;toast('📨 จดหมายเชิญทัวร์นาเมนต์วิ่งมาแล้ว! เปิดดูที่คอมพิวเตอร์ (สมัครได้ '+Math.round(TOUR_MAIL_TTL/MINUTE)+' นาที)','good');}
    saveGame();
  }
  const prevDecorate=window.decorateInboxCard;
@@ -425,7 +594,7 @@
    const tr=state.tour;if(!tourOn())return;
    tourPeople=tourPeople.filter(p=>PEOPLE.includes(p));
    if(tourPeople.length>=7||!peopleOn||tankMode||document.hidden||window.BOOTING||!tank())return;
-   const capacity=visitorCapacity()-PEOPLE.length;if(capacity<1)return;
+   const capacity=challengerRoom();if(capacity<1)return;
    const previous=new Set(PEOPLE);
    if(!spawnVisitors(capacity,'race',[{kid:false,gender:Math.random()<.5?'female':'male'}]))return;
    const bots=tr.teams.filter(T=>!T.player),T=bots[tourPeople.length%bots.length];
@@ -632,18 +801,21 @@
  function showTourResult(){
    const tr=state.tour;if(!tr||modal)return;
    const me=playerIdx(tr),place=tourPlace(tr,me),prize=TOUR_PRIZE[place]||0;
-   if(!tr.paid){tr.paid=true;tr.prize=prize;addCoin(prize);saveGame();syncHUD();}
+   if(!tr.paid){tr.paid=true;tr.prize=prize;addCoin(prize);if(place===1)window.questTourWin?.();saveGame();syncHUD();}   // tr.paid กันนับซ้ำให้อยู่แล้ว
    const d=tourDialog('ผลทัวร์นาเมนต์วิ่ง','tug-tour-result');
    d.querySelector('h2').textContent=place===1?'🏆 แชมป์ทัวร์นาเมนต์วิ่ง!':'🏁 จบทัวร์นาเมนต์วิ่ง';
    tourElement('p','tug-tour-place',place===1?'อันดับ 1':place===2?'อันดับ 2':place===3?'อันดับ 3–4':'อันดับ 5–8',d);
    tourElement('p','tug-sub',(tr.prize>0?'รางวัล +'+tr.prize.toLocaleString()+' ทอง':'ไม่ได้รางวัล')+(place===1?'':' · แชมป์คือ '+tr.teams[tr.final].name),d);
    const actions=tourElement('div','tug-actions',null,d);
    const done=element('button','กลับร้าน',actions);done.className='tbtn tug-primary';
-   done.onclick=()=>{state.tour=null;tourLeave();close();exitTank();saveGame();renderTourBar();};
+   /* จบทัวร์นาเมนต์แล้ว จดหมายฉบับนั้นหมดประโยชน์ = ลบทิ้งด้วย */
+   done.onclick=()=>{dropTourMail(tr.mailId);if(state.tourInvite===tr.mailId){state.tourInvite=null;state.tourInviteUntil=0;}
+     state.tour=null;tourLeave();close();exitTank();saveGame();renderTourBar();};
    if(place===1)resultFireworks();
  }
  function tourTick(){
    const tr=state.tour;
+   expireTourMail();
    if(!tr){tourMail();renderTourBar();return;}
    if(!tank()){renderTourBar();return;}
    tourSpawn();
@@ -654,7 +826,10 @@
 
  window.addEventListener('keydown',e=>{
    if(!raceUI||modal?.open)return;
-   if(state.active&&!state.active.botOnly){e.stopImmediatePropagation();if(['KeyA','KeyD','Space','Escape'].includes(e.code))e.preventDefault();if(!e.repeat&&(e.code==='KeyA'||e.code==='KeyD'))press(e.code==='KeyA'?'a':'d');}
+   if(state.active&&!state.active.botOnly){e.stopImmediatePropagation();if(['KeyA','KeyD','KeyJ','KeyK','Space','Escape'].includes(e.code))e.preventDefault();if(e.repeat)return;
+     if(e.code==='KeyA'||e.code==='KeyD')press(e.code==='KeyA'?'a':'d');
+     else if(e.code==='KeyJ')usePower(0,'block');
+     else if(e.code==='KeyK')usePower(0,'boost');}
  },true);
  document.addEventListener('visibilitychange',()=>{lastFrame=0;if(document.hidden)for(const a of burstAnimations)a.cancel();saveGame();});
  /* ผู้ท้าแข่งยืนรออยู่ที่ตู้แข่ง = ลูกค้าปกติไม่มาดูตู้นี้ (people.js eventReservedTank) */

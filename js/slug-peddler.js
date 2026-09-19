@@ -123,12 +123,12 @@
  function stepPeddlerArrival(capacity){
   if(!Number.isFinite(G.nextPeddlerAt)||G.nextPeddlerAt<=0){ G.nextPeddlerAt=Date.now()+FIRST_MS; return false; }
   if(Date.now()<G.nextPeddlerAt) return false;
-  if(!capacity||PEOPLE.length>=capacity) return false;
+  if(typeof traderRoom==='function'&&traderRoom()<1) return false;   // โควตาพ่อค้าแยกจากลูกค้าแล้ว (people.js)
   if(typeof TRADE_OFFERS==='undefined') return false;
   if(!(G.objs||[]).some(function(o){return o._key==='counter'&&o!==moving;})) return false;   // ไม่มีเคาน์เตอร์ = ไม่มีที่ยื่นขาย
   if(TRADE_OFFERS.some(function(o){return o.sell;})) return false;
   if(PEOPLE.some(function(p){return p.wantsSell;})) return false;
-  if(spawnVisitors(capacity-PEOPLE.length,'peddler',[{kid:false,gender:Math.random()<.5?'female':'male'}])){
+  if(spawnVisitors(Math.max(1,capacity),'peddler',[{kid:false,gender:Math.random()<.5?'female':'male'}])){
    G.nextPeddlerAt=Date.now()+gap();
    if(typeof saveGame==='function') saveGame();
    return true;

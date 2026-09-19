@@ -39,7 +39,10 @@ function commitFloorTiles(tiles){
  const added=[];let changed=true;while(changed){changed=false;for(const [k,[x,y]] of pending){if([[x-1,y],[x+1,y],[x,y-1],[x,y+1]].some(p=>set.has(p.join(',')))){set.add(k);pending.delete(k);added.push([x,y]);changed=true;}}}
  if(pending.size)return {ok:false,reason:'ช่องใหม่ต้องเชื่อมกับพื้นที่เดิมทางด้านข้าง'};
  if(!added.length)return {ok:false,reason:'ยังไม่ได้เลือกช่องใหม่'};
- const cost=expandCost(added.length, floorArea());   // ช่องที่ซื้อพร้อมกันคิดราคาไล่ขึ้นทีละช่องif(G.coin<cost)return {ok:false,reason:'เหรียญไม่พอ ('+cost+')'};
+ const cost=expandCost(added.length, floorArea());   // ช่องที่ซื้อพร้อมกันคิดราคาไล่ขึ้นทีละช่อง
+ /* ⚠️ 2026-09-18 บรรทัดเช็คเงินเคยติดอยู่ท้ายคอมเมนต์บรรทัดบน = ถูกกลืนหายไปทั้งบรรทัด
+    ผลคือ commitFloorTiles() หักเงินได้แม้เงินไม่พอ (เงินติดลบ) — กันไว้แค่ที่ปุ่ม UI เท่านั้น */
+ if(G.coin<cost)return {ok:false,reason:'เหรียญไม่พอ ('+cost.toLocaleString()+')'};
  addCoin(-cost);G.floorTiles=[...set].map(k=>k.split(',').map(Number));G.bw=Math.max(...G.floorTiles.map(p=>p[0]))+1;G.bh=Math.max(...G.floorTiles.map(p=>p[1]))+1;floorRevision++;
  return {ok:true,count:added.length,cost};
 }

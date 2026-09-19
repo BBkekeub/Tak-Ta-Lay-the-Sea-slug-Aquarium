@@ -10,6 +10,7 @@ for(const food of Object.values(FOOD_TYPES))for(const spec of food.levels){if(sp
 const FOOD_IMAGES={};
 let foodChoice=null,foodHover=null,foodSeq=0;
 let foodMode=false;   // โหมดวางอาหาร: เปิดค้างไว้ วางได้เรื่อย ๆ · ย้ายอาหารเดิมได้เฉพาะตอนเปิดโหมดนี้
+let foodPick=false;   // โหมดเก็บอาหาร: คลิกอาหารในตู้เพื่อเอาออก (เศษที่ถูกแทะแล้วเกะกะตู้/กินโควตา foodMax)
 const foodClamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /* อิ่มเกินค่านี้ = ไม่เดินไปกิน (เดิมกินทุกชิ้นแม้อิ่มเต็ม ค่าอิ่มส่วนเกินถูกทิ้ง) */
 const FOOD_HUNGRY=90;
@@ -202,6 +203,7 @@ function foodCanPlace(type,level,fx,fy){
  if(tank.def.race&&fy-Math.max(14,spec.cap*1.65)/CM_PER_CELL/2<8)return {ok:false,why:'แถบสนามด้านหน้า 40 ซม. ห้ามวางอาหารและของตกแต่ง'};
  {const half=Math.max(14,spec.cap*1.65)/CM_PER_CELL/2;
   if(tank.def.eat&&window.SlugEat&&fy-half<SlugEat.ARENA_H)return {ok:false,why:'แถบสนามแข่งกินด้านหน้า '+SlugEat.ARENA_H*CM_PER_CELL+' ซม. ห้ามวางอาหารและของตกแต่ง'};
+  if(tank.def.throwing&&window.SlugThrow&&fy-half<SlugThrow.LANE_H)return {ok:false,why:'ลานปาหินด้านหน้า '+Math.round(SlugThrow.LANE_H*CM_PER_CELL)+' ซม. ห้ามวางอาหารและของตกแต่ง'};
   if(tugLaneBlocked(tank.def,fy-half,fy+half))return {ok:false,why:'แถบเลนเชือกด้านหน้าตู้ต้องโล่ง ห้ามวางอาหารและของตกแต่ง'};}
  const foodMax=Number.isFinite(tank.def.foodMax)?tank.def.foodMax:8;
  if((tank.foods||[]).length>=foodMax) return {ok:false,why:'ตู้นี้วางอาหารพร้อมกันได้ไม่เกิน '+foodMax+' ชิ้น'};
@@ -214,6 +216,15 @@ function foodGhostItem(){
  return {preview:true,invalid:!foodHover.ok,type:foodChoice.type,level:foodChoice.level,
          spec:FOOD_TYPES[foodChoice.type].levels[foodChoice.level-1],fx:foodHover.fx,fy:foodHover.fy,eaten:[],reserved:{}};
 }
+/* เอาอาหารออกจากตู้ — ตัวเดียวกับที่ใช้ทั้งเก็บทีละชิ้นและเก็บเศษรวดเดียว
+   ต้องปลดมื้อที่ทากจองไว้ด้วย ไม่งั้นตัวที่กำลังเดินมากินจะค้างสถานะ seekFood (ดู foodStep: เช็ก f._gone) */
+function foodRemove(tank,f){
+ if(!tank||!f)return false;
+ const i=(tank.foods||[]).indexOf(f);if(i<0)return false;
+ tank.foods.splice(i,1);f._gone=true;
+ for(const s of tank.slugs||[])if(s._meal&&s._meal.food===f){s._meal=null;s.state='rest';s.stt=2;s._mealCooldown=Date.now()+3000;}
+ return true;
+}
 function foodPlace(type,level,fx,fy){
  const spec=FOOD_TYPES[type].levels[level-1],tank=curTank;
  const chk=foodCanPlace(type,level,fx,fy);
@@ -223,36 +234,77 @@ function foodPlace(type,level,fx,fy){
 }
 function foodUI(){
  const bar=document.createElement('div');bar.id='foodBar';bar.style.cssText='position:relative;flex-shrink:0;padding:10px;background:rgba(20,44,48,.94);color:#fff0db;display:flex;gap:8px;align-items:center;flex-wrap:wrap';
- bar.innerHTML='<span>อาหาร</span><select id="foodType"></select><select id="foodLevel"></select><button id="foodChoose" class="tbtn">วางอาหาร</button><button id="foodCancel" class="tbtn">ยกเลิก</button><span id="foodInfo" style="font-size:12px"></span>';
+ bar.innerHTML='<span>อาหาร</span><select id="foodType"></select><select id="foodLevel"></select><button id="foodChoose" class="tbtn">วางอาหาร</button><button id="foodPick" class="tbtn">เก็บอาหาร</button><button id="foodSweep" class="tbtn">เก็บเศษที่ถูกกินแล้ว</button><button id="foodCancel" class="tbtn">ยกเลิก</button><span id="foodInfo" style="font-size:12px"></span>';
  ov.insertBefore(bar,ov.querySelector('.ov-bottom'));const type=bar.querySelector('#foodType'),level=bar.querySelector('#foodLevel'),info=bar.querySelector('#foodInfo');
  for(const [k,v]of Object.entries(FOOD_TYPES)){const op=document.createElement('option');op.value=k;op.textContent=v.icon+' '+v.name;type.appendChild(op);const im=new Image();im.src='assets/food/'+k+'.png';FOOD_IMAGES[k]=im;}
  const preview=document.createElement('img');preview.style.cssText='width:48px;height:48px;object-fit:contain';bar.prepend(preview);
  const chooseBtn=bar.querySelector('#foodChoose'),cancelBtn=bar.querySelector('#foodCancel');
+ const pickBtn=bar.querySelector('#foodPick'),sweepBtn=bar.querySelector('#foodSweep');
  function update(){const sp=FOOD_TYPES[type.value].levels[Number(level.value)-1];preview.src='assets/food/'+type.value+'.png';
-  info.textContent=(foodMode?'คลิกพื้นที่ว่างในตู้เพื่อวาง · วางต่อได้เรื่อย ๆ · ลากอาหารเดิมเพื่อย้าย · Esc ปิดโหมด\n':'')
-   +sp.cost+' เหรียญ · อิ่ม +'+sp.sat+' · '+sp.cap+' คำ · '+sp.h+' ชม. · '+foodDescription(sp);}
+  info.textContent=(foodPick?'คลิกอาหารในตู้เพื่อเก็บออก · Esc ปิดโหมด\n':foodMode?'คลิกพื้นที่ว่างในตู้เพื่อวาง · วางต่อได้เรื่อย ๆ · ลากอาหารเดิมเพื่อย้าย · Esc ปิดโหมด\n':'')
+   +sp.cost+' เหรียญ · อิ่ม +'+sp.sat+' · '+sp.cap+' คำ · '+sp.h+' ชม. · '+foodDescription(sp);
+  syncPickButtons();}
+ /* ปุ่มเก็บ: โชว์จำนวนเศษที่ถูกแทะแล้วในตู้นี้ · ไม่มีเศษ = กดไม่ได้ */
+ function syncPickButtons(){
+  const bitten=(curTank?.foods||[]).filter(f=>f.eaten.length).length,all=(curTank?.foods||[]).length;
+  pickBtn.textContent=foodPick?'✓ ปิดโหมดเก็บอาหาร':'🗑 เก็บอาหารทีละชิ้น';
+  pickBtn.setAttribute('aria-pressed',String(foodPick));
+  pickBtn.disabled=!curTank||!all;
+  sweepBtn.textContent='🧹 เก็บเศษที่ถูกกินแล้ว'+(bitten?' ('+bitten+')':'');
+  sweepBtn.disabled=!bitten;
+ }
  const syncChoice=()=>{foodChoice=foodMode?{type:type.value,level:Number(level.value)}:null;};
  function levels(){level.innerHTML='';FOOD_TYPES[type.value].levels.forEach((sp,i)=>{const op=document.createElement('option');op.value=i+1;op.textContent='ระดับ '+(i+1);level.appendChild(op);});syncChoice();update();}
  /* เปิด/ปิดโหมดวางอาหาร — ปิดแล้วอาหารในตู้จะลากย้ายไม่ได้ (กันเผลอลากตอนดูทาก) */
  function foodModeSet(on){
   if(on&&curTank) enterExclusiveMode('food');            // เปิดวางอาหาร = ปิดจัดของ/แปรงขัดให้เอง
-  foodMode=!!on&&!!curTank; syncChoice(); foodHover=null;
+  foodMode=!!on&&!!curTank; if(foodMode)foodPick=false; syncChoice(); foodHover=null;
   chooseBtn.textContent=foodMode?'✓ ปิดโหมดวางอาหาร':'🌸 เปิดโหมดวางอาหาร';
   chooseBtn.setAttribute('aria-pressed',String(foodMode));
   cancelBtn.hidden=!foodMode;
   const sum=bar.closest('details')&&bar.closest('details').querySelector('summary');
   if(sum)sum.textContent=foodMode?'🌸 กำลังวางอาหาร':'🌸 ให้อาหาร';
-  if(typeof tankCv!=='undefined')tankCv.style.cursor=foodMode?'crosshair':'';
+  if(typeof tankCv!=='undefined')tankCv.style.cursor=foodMode||foodPick?'crosshair':'';
+  update();
+ }
+ /* โหมดเก็บอาหาร — คนละโหมดกับวางอาหาร เปิดพร้อมกันไม่ได้ (คลิกเดียวจะสับสนว่าวางหรือเก็บ) */
+ function foodPickSet(on){
+  if(on&&curTank)enterExclusiveMode('food');
+  foodPick=!!on&&!!curTank; if(foodPick){foodMode=false;syncChoice();}
+  chooseBtn.textContent=foodMode?'✓ ปิดโหมดวางอาหาร':'🌸 เปิดโหมดวางอาหาร';
+  chooseBtn.setAttribute('aria-pressed',String(foodMode));
+  cancelBtn.hidden=!foodMode&&!foodPick;
+  if(typeof tankCv!=='undefined')tankCv.style.cursor=foodMode||foodPick?'crosshair':'';
   update();
  }
  window.foodModeSet=foodModeSet;
- registerMode('food','tank',()=>foodMode,()=>foodModeSet(false));
+ registerMode('food','tank',()=>foodMode||foodPick,()=>{foodModeSet(false);foodPickSet(false);});
  type.onchange=levels;level.onchange=()=>{syncChoice();update();};levels();
  chooseBtn.onclick=()=>foodModeSet(!foodMode);
- cancelBtn.onclick=()=>foodModeSet(false);
+ cancelBtn.onclick=()=>{foodModeSet(false);foodPickSet(false);};
+ pickBtn.onclick=()=>foodPickSet(!foodPick);
+ sweepBtn.onclick=()=>{
+  if(!curTank)return;
+  const bitten=(curTank.foods||[]).filter(f=>f.eaten.length);
+  let n=0;for(const f of bitten)if(foodRemove(curTank,f))n++;
+  if(n){saveGame();toast('เก็บเศษอาหารออก '+n+' ชิ้น','good');}
+  syncPickButtons();
+ };
  foodModeSet(false);
+ /* ปุ่มเก็บต้องอัปเดตตามจำนวนเศษที่เปลี่ยนตลอดเวลา (ทากกินเพิ่ม/อาหารเน่าหาย) */
+ setInterval(()=>{if(!ov.classList.contains('on'))return;syncPickButtons();},1000);
  let placingPointer=false;
  tankCv.addEventListener('pointerdown',e=>{
+  /* โหมดเก็บอาหาร: คลิกโดนชิ้นไหนเอาชิ้นนั้นออก (มาก่อนโหมดวาง เพราะเปิดพร้อมกันไม่ได้อยู่แล้ว) */
+  if(foodPick&&curTank){
+   const q=tankXY(e),f=typeof foodAt==='function'?foodAt(q.mx,q.my):null;
+   if(f){
+    placingPointer=true;e.preventDefault();e.stopImmediatePropagation();
+    const bites=f.eaten.length;
+    if(foodRemove(curTank,f)){saveGame();toast('เก็บ'+FOOD_TYPES[f.type].name+'ออก'+(bites?' (ถูกกินไป '+bites+' คำ)':''),'good');syncPickButtons();}
+   }
+   return;
+  }
   if(!foodMode||!foodChoice||!curTank)return;
   const q=tankXY(e);
   if(typeof foodAt==='function'&&foodAt(q.mx,q.my))return;      // กดโดนอาหารเดิม = ปล่อยให้ tank-view ลากย้าย
@@ -267,7 +319,7 @@ function foodUI(){
   foodHover={fx:p.fx,fy:p.fy,ok:chk.ok,why:chk.why};
  },true);
  tankCv.addEventListener('pointerleave',()=>{foodHover=null;});
- window.addEventListener('keydown',e=>{if(e.key==='Escape'&&foodMode){e.preventDefault();e.stopPropagation();foodModeSet(false);}},true);
+ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&(foodMode||foodPick)){e.preventDefault();e.stopPropagation();foodModeSet(false);foodPickSet(false);}},true);
 }
 /* ความหิว: ความอิ่มค่อย ๆ ลดตามเวลาจริง — อิ่มเต็ม 100 → 0 ใน ~5 ชม. */
 const FOOD_DECAY_PER_SEC=100/(5*3600);

@@ -28,7 +28,10 @@ function tankSideGaps(t,objects,side,depth){
     if(rectHits(strip,r))blocked.push([Math.max(start,vertical?r.cy:r.cx),Math.min(end,vertical?r.cy+r.h:r.cx+r.w)]);
   }
   blocked.sort((a,b)=>a[0]-b[0]);let at=start;const gaps=[];
-  const required=SUB; // A continuous 50 cm opening, not the entire side.
+  /* ⚠️ 2026-09-19 ผู้เล่น: "ทุกตู้ต้องเว้นทางเดินจาก 1 ช่องใหญ่เป็น 2 ช่องใหญ่"
+     เดิมช่องว่างหน้าตู้กว้างต่อเนื่องแค่ 1 ช่องใหญ่ (50 ซม.) ก็ผ่าน — ลูกค้าหลายคนเลยเบียดกันเป็นกระจุก
+     ตอนนี้ต้องกว้าง 2 ช่องใหญ่ (100 ซม.) สวนกันได้ · ความลึกของทางเดินยังเป็น 2 ช่องใหญ่เท่าเดิม */
+  const required=2*SUB;
   for(const [a,b] of blocked){if(a-at>=required)gaps.push([at,a]);at=Math.max(at,b);}
   if(end-at>=required)gaps.push([at,end]);return gaps;
 }
@@ -44,7 +47,7 @@ function accessibleTankSpots(t){
 }
 function tankAccessIssue(objects){
   for(const t of objects.filter(o=>o.type==='tank')){
-    if(![0,1,2,3].some(s=>tankSideOpen(t,objects,s,2*SUB)))return 'ต้องเหลือหน้าตู้ช่วงว่างติดกัน 50 ซม. และเว้นทางจากช่วงนั้นลึก 2 ช่องใหญ่ (100 ซม.)';
+    if(![0,1,2,3].some(s=>tankSideOpen(t,objects,s,2*SUB)))return 'ต้องเหลือหน้าตู้ช่วงว่างติดกันกว้าง 2 ช่องใหญ่ (100 ซม.) และลึกอีก 2 ช่องใหญ่ ให้ลูกค้าเดินสวนกันได้';
   }
   return '';
 }

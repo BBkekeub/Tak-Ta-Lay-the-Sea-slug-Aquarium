@@ -210,7 +210,7 @@
  function purchased(){ if(!state.purchased){state.purchased=true;state.nextAt=Date.now()+5*MINUTE;saveGame();} }
  /* ⚙️ ช่วงเวลาที่คนมาท้าแข่ง — ตอนนี้ตั้งสั้นไว้ 5 นาทีเพื่อเทสต์จังหวะเกมหลาย ๆ รอบ
     จูนเกมเสร็จแล้วค่อยดันกลับเป็นช่วงห่างจริง (ของเดิม 30-50 นาที) */
- function gap(){ return 5*MINUTE; }
+ function gap(){ return ShopEvents.gap(); }      // 20–45 นาที ใช้ค่าเดียวกันทั้ง 4 ตู้ (config.js)
  function makeOffer(){
    return {rival:{name:names[(Math.random()*names.length)|0],genes:SlugEngine.randGene(),cps:botCps(),size:rollSize()}};
  }
@@ -228,10 +228,11 @@
  }
  function spawn(){
    if(visitors.length||!peopleOn||!tank()||document.hidden||tankMode||window.BOOTING)return;
-   const capacity=visitorCapacity()-PEOPLE.length; if(capacity<1)return;
+   if(!ShopEvents.ready())return;                 // ตู้อื่นเพิ่งส่งคำท้ามา รออีก 3 นาที (config.js EVENT_SPACING)
+   const capacity=challengerRoom(); if(capacity<1)return;
    const previous=new Set(PEOPLE);
    if(!spawnVisitors(capacity,'tug',[{kid:false,gender:Math.random()<.5?'female':'male'}]))return;
-   visitors=PEOPLE.filter(p=>!previous.has(p));
+   visitors=PEOPLE.filter(p=>!previous.has(p));ShopEvents.mark();
    if(!state.offer){state.offer=makeOffer();state.nextAt=Date.now()+gap();saveGame();}
    visitors.forEach(p=>{
      p.family=null;p.tugChallenger=true;p.wantsBuy=false;p.wantsSell=false;p.tradeDone=true;
@@ -243,9 +244,30 @@
    offerDeadline=Date.now()+5*MINUTE;
    toast('🪢 มีคนมาท้าชักเย่อ! คลิกคนถือตู้เพื่อรับคำท้า','good');
  }
- function dismiss(){state.offer=null;leave();close();saveGame();}
+ /* ⚠️ 2026-09-18 นับเวลานัดหน้า "หลังจบเรื่องนี้" ไม่ใช่ตอนผู้ท้าเข้าร้าน (แบบเดียวกับ slug-race.js) */
+ function reschedule(){state.nextAt=Date.now()+gap();}
+ function dismiss(){state.offer=null;leave();close();reschedule();saveGame();}
+ /* ---------- โหมดซ้อม: คู่ชักเย่อคือทากในตู้ที่ผู้เล่นเลือกเอง ไม่มีค่าสมัคร/รางวัล (slug-practice.js) ---------- */
+ function practiceSync(){
+   const t=tank();
+   if(typeof SlugPractice==='undefined')return;
+   SlugPractice.sync('tug',!!t&&tankMode&&curTank===t&&!state.active&&!modal?.open&&!tourOn(),'🪢 ซ้อมชักเย่อ',()=>{
+     SlugPractice.pick({tank:t,title:'🪢 ซ้อมชักเย่อ 1 ต่อ 1',need:1,
+       noteFor:s=>{const g=geneOfSlug(s);return 'ดึง '+pull(g).toFixed(1)+' · ต้าน '+resist(g).toFixed(1);},
+       onStart:(mine,others)=>beginPractice(t,mine,others[0])});
+   });
+ }
+ function beginPractice(t,s,foe){
+   const mine=[{id:s.id,genes:{...geneOfSlug(s)}}],foes=[{genes:{...geneOfSlug(foe)}}];
+   state.active={tankId:t.id,rope:0,countdown:3,freezeUntil:0,freezeSide:null,settled:false,won:null,practice:true,
+     camX:(HOME+AWAY)/2,view:layoutAt(0),elapsed:0,size:1,entry:0,prizePot:0,
+     me:{id:mine[0].id,name:slugNick(s),genes:mine[0].genes,team:mine,total:0,used:0,sneezeUntil:0},
+     foe:{name:slugNick(foe),genes:foes[0].genes,team:foes,cps:botCps(),total:0,used:0,sneezeUntil:0,nextPressAt:0}};
+   saveGame();close();openMatch();
+ }
  function tick(){
    if(owned())purchased();
+   practiceSync();
    if(!window.BOOTING)tourTick();
    if(state.active){ if(resumeReady&&!modal&&!tugUI&&!window.BOOTING)openMatch(); return; }
    if(tourOn()){ if(state.offer){state.offer=null;leave();saveGame();} return; }   // ทัวร์นาเมนต์อยู่ = ไม่มีคำท้า 1 ต่อ 1
@@ -515,10 +537,12 @@
  function charges(side){const o=state.active[side];return Math.floor(o.total/CHARGE_AT)-o.used;}
  /* ต้องสลับปุ่ม: กด F แล้วต้อง K ถัดไป กดซ้ำปุ่มเดิมไม่นับแต้ม (เหมือน slug-race.js)
     ปุ่มถัดไปถูกไฮไลต์ไว้ตลอดผ่าน markNextKey() ผู้เล่นจึงไม่ต้องจำเองว่าถึงคิวปุ่มไหน */
+ const pullCap=makePressLimiter();
  function press(now,key){
    const a=state.active;
    if(!a||a.me.bot||a.settled||a.countdown>0||now<a.freezeUntil||document.hidden||!tugUI)return;
    if(lastKey===key)return;
+   if(!pullCap())return;                            // เพดาน 20 ครั้ง/วิ (config.js) กันมาโครดึงรัว
    lastKey=key;a.lastKey=key;
    a.me.pullDir=key==='f'?1:-1;a.me.pullAt=now;     // หงอนสะบัด: F = ไปทางหาง · K = ไปทางหัว (ดู updateTankFrame)
    score('me');markNextKey();
@@ -584,9 +608,11 @@
    setTimeout(()=>{if(!state.active?.settled||modal)return;if(state.active.tour)tourMatchDone();else showResult();},a.me.bot?700:won?900:1300);
  }
  function complete(){
-   const t=tankOf();
+   const t=tankOf(),wasPractice=state.active?.practice;
    if(t)for(const s of t.slugs){delete s._tugSpot;delete s.tugLean;delete s.tugStrain;s.state='rest';s.stt=.5;}   // tugLean ค้าง = หงอนเอียงค้าง/ทากไม่เข้าโครงแชร์ (slug-3d.js)
-   state.active=null;state.offer=null;leave();close();exitTank();saveGame();
+   /* ซ้อม: ไม่ยุ่งกับคำท้าที่ค้างอยู่ ไม่รีเซ็ตนาฬิกา และอยู่ในตู้ต่อ */
+   if(wasPractice){state.active=null;close();saveGame();return;}
+   state.active=null;state.offer=null;leave();close();exitTank();reschedule();saveGame();
  }
 
  /* ---------- คัทซีนท่าไม้ตาย (สไตล์สั่งท่าโปเกม่อน) ----------
@@ -655,6 +681,8 @@
    const a=state.active;if(!a?.settled||modal)return;
    for(const k of ['f','k'])if(keyBtns[k]){keyBtns[k].disabled=true;keyBtns[k].classList.remove('next');}
    if(chargeNode)chargeNode.disabled=true;
+   /* บอกระบบเควสว่าชนะแล้ว (quests.js) — ธง _qWin กันนับซ้ำ เพราะกลับเข้าตู้ตอน settled แล้วจะเรียก showResult ใหม่ */
+   if(a.won&&!a._qWin){a._qWin=true;window.questContestWin?.();}
    const d=dialog(a.won?'ชนะ! 🪢':'แพ้...');d.classList.add('tug-result');
    d.addEventListener('cancel',e=>{e.preventDefault();complete();});
    element('p',a.won?a.foe.name+' ถูกลากข้ามเส้นไปเรียบร้อย':a.foe.name+' ลากเราข้ามเส้นไป',d).className='tug-result-caption';
@@ -672,9 +700,15 @@
      element('b',Math.round(who.total).toLocaleString()+' แต้ม',cell).className='tug-result-score';
    }
    const receipt=element('div',null,d);receipt.className='race-receipt';
-   element('span','ค่าสมัคร −'+(a.entry??ENTRY).toLocaleString()+' ทอง',receipt);
-   element('strong',a.prize>0?'รางวัล +'+a.prize.toLocaleString()+' ทอง':'ไม่ได้รางวัล',receipt);
-   element('small','ทองคงเหลือ '+G.coin.toLocaleString(),receipt);
+   if(a.practice){
+     element('span','โหมดซ้อม',receipt);
+     element('strong','ไม่มีค่าสมัคร ไม่มีรางวัล',receipt);
+     element('small','ซ้อมได้ไม่จำกัด · คำท้าจริงถึงจะมีเงินรางวัล',receipt);
+   }else{
+     element('span','ค่าสมัคร −'+(a.entry??ENTRY).toLocaleString()+' ทอง',receipt);
+     element('strong',a.prize>0?'รางวัล +'+a.prize.toLocaleString()+' ทอง':'ไม่ได้รางวัล',receipt);
+     element('small','ทองคงเหลือ '+G.coin.toLocaleString(),receipt);
+   }
    element('p',a.won?'คู่แข่ง: แขนหลุดแล้ว! ไว้เจอกันใหม่':'คู่แข่ง: ยังอ่อนซ้อมนะเพื่อน',d).className='race-taunt';
    const done=element('button','รับทราบ · กลับร้าน',d);done.className='tbtn';done.onclick=complete;done.focus();
    if(a.won)fireworks(d);                              // ฉลองบนกล่องผล (top layer) ไม่ใช่แค่บนฉากที่โดนกล่องบัง
@@ -964,8 +998,9 @@
     รางวัลตามอันดับตอนจบ: ที่ 1 = 3,000 · ที่ 2 = 2,000 · ที่ 3–4 = 1,000 · ที่ 5–8 = 0
     ระหว่างทัวร์นาเมนต์: ลูกค้าปกติไม่เข้าใกล้ตู้ชักเย่อ (people.js ถาม SlugTug.reserved) และไม่มีคำท้า 1 ต่อ 1
     สถานะทั้งหมดอยู่ใน G.tug.tour (เซฟ/โหลดต่อได้ทุกขั้น) */
- const TOUR_TEST=true;                       // ⚙️ ทดสอบ: จดหมายทุก 10 นาที · ใช้จริง: วันละฉบับ (ตั้ง false)
- const TOUR_GAP=TOUR_TEST?10*MINUTE:24*60*MINUTE;
+ /* ⚙️ ทดสอบ: จดหมายทุก 10 นาที · ใช้จริง: ทุก 2 ชั่วโมง (ผู้เล่นกำหนด 2026-09-18 · เดิมวันละฉบับ) */
+ const TOUR_TEST=false;
+ const TOUR_GAP=TOUR_TEST?10*MINUTE:120*MINUTE;
  const TOUR_ENTRY=1000, TOUR_PREP_MS=MINUTE, TOUR_PRIZE={1:3000,2:2000,3:1000};
  const TOUR_ROUNDS=['รอบ 8 ทีม','รอบรองชนะเลิศ','รอบชิงชนะเลิศ'];
  const TOUR_NAMES=['ฉลามทราย','กุ้งมังกร','หมึกยักษ์','ปูเสฉวน','ดาวทะเล','ม้าน้ำทอง','เต่าหิน','ปลาไหลไฟ','หอยมุก','แมงกะพรุน','ทากสายฟ้า','คลื่นยักษ์'];
@@ -994,15 +1029,36 @@
  const playerIdx=tr=>tr.teams.findIndex(T=>T.player);
 
  /* ---- จดหมายเชิญ ---- */
+ /* ⚙️ อายุจดหมายเชิญ · หมดเขตแล้วลบทิ้งเลย ไม่เก็บค้างในกล่องจดหมาย (ผู้เล่นขอ 2026-09-18) */
+ const TOUR_MAIL_TTL=TOUR_TEST?3*MINUTE:30*MINUTE;
+ function dropTourMail(id){
+   if(!id||typeof computerInbox!=='function')return;
+   const box=computerInbox(),i=box.findIndex(m=>m.id===id);
+   if(i<0)return;
+   box.splice(i,1);
+   if(G.mailSent)delete G.mailSent[id];
+   try{if(typeof renderComputer==='function')renderComputer();}catch(_){}
+ }
+ /* หมดเขตแล้วลบ + กวาดฉบับเก่าที่ค้างจากเซฟก่อนหน้าออกให้หมด (เหลือเฉพาะฉบับที่ยังสมัครได้/ที่สมัครไปแล้ว) */
+ function expireTourMail(){
+   const id=state.tourInvite,live=id&&Date.now()<(state.tourInviteUntil||0);
+   if(id&&!live&&state.tour?.mailId!==id){dropTourMail(id);state.tourInvite=null;state.tourInviteUntil=0;saveGame();}
+   if(typeof computerInbox!=='function')return;
+   const keep=new Set([state.tour?.mailId,live?id:null].filter(Boolean));
+   for(const m of computerInbox().slice())if(typeof m.id==='string'&&m.id.startsWith('tug-tour-')&&!keep.has(m.id))dropTourMail(m.id);
+ }
  function tourMail(){
    if(typeof receiveComputerMessage!=='function'||!tank()||tourOn()||state.active)return;
    if(!Number.isFinite(state.tourNextAt))state.tourNextAt=Date.now()+(TOUR_TEST?MINUTE:TOUR_GAP);
    if(Date.now()<state.tourNextAt)return;
+   if(state.tourInvite&&state.tour?.mailId!==state.tourInvite)dropTourMail(state.tourInvite);   // ฉบับเก่าที่ยังค้าง = ลบก่อนส่งฉบับใหม่
    state.tourSeq=(state.tourSeq|0)+1;const id='tug-tour-'+state.tourSeq;
    const ok=receiveComputerMessage({id,type:'online',repeating:true,title:'🏆 เชิญร่วมทัวร์นาเมนต์ชักเย่อ',
      body:'ทัวร์นาเมนต์ชักเย่อ 3 ต่อ 3 · 8 ทีม · แพ้คัดออก\nค่าสมัคร '+TOUR_ENTRY.toLocaleString()+' ทอง\n\nรางวัล\n  ที่ 1 — 3,000 ทอง\n  ที่ 2 — 2,000 ทอง\n  ที่ 3–4 — 1,000 ทอง\n\nสมัครแล้วมีเวลา 1 นาทีให้ย้ายทาก 3 ตัวลงตู้ชักเย่อ แล้วทีมอื่นจะทยอยมาถึงร้าน'});
    state.tourNextAt=Date.now()+TOUR_GAP;
-   if(ok){state.tourInvite=id;toast('📨 จดหมายเชิญทัวร์นาเมนต์ชักเย่อมาแล้ว! เปิดดูที่คอมพิวเตอร์','good');}
+   /* จดหมายทัวร์นาเมนต์มาแล้ว = เลื่อนคำท้า 1 ต่อ 1 ของตู้นี้ออกไปด้วย (ผู้เล่นขอ 2026-09-18) */
+   if(ok)reschedule();
+   if(ok){state.tourInvite=id;state.tourInviteUntil=Date.now()+TOUR_MAIL_TTL;toast('📨 จดหมายเชิญทัวร์นาเมนต์ชักเย่อมาแล้ว! เปิดดูที่คอมพิวเตอร์ (สมัครได้ '+Math.round(TOUR_MAIL_TTL/MINUTE)+' นาที)','good');}
    saveGame();
  }
  const prevDecorate=window.decorateInboxCard;
@@ -1036,7 +1092,7 @@
    const tr=state.tour;if(!tr||tr.status!=='prep'&&tr.status!=='bracket')return;
    tourPeople=tourPeople.filter(p=>PEOPLE.includes(p));
    if(tourPeople.length>=7||!peopleOn||tankMode||document.hidden||window.BOOTING||!tank())return;
-   const capacity=visitorCapacity()-PEOPLE.length;if(capacity<1)return;
+   const capacity=challengerRoom();if(capacity<1)return;
    const previous=new Set(PEOPLE);
    if(!spawnVisitors(capacity,'tug',[{kid:false,gender:Math.random()<.5?'female':'male'}]))return;
    const bots=tr.teams.filter(T=>!T.player),T=bots[tourPeople.length%bots.length];
@@ -1183,18 +1239,21 @@
  function showTourResult(){
    const tr=state.tour;if(!tr||modal)return;
    const me=playerIdx(tr),place=tourPlace(tr,me),prize=TOUR_PRIZE[place]||0;
-   if(!tr.paid){tr.paid=true;tr.prize=prize;addCoin(prize);saveGame();syncHUD();}
+   if(!tr.paid){tr.paid=true;tr.prize=prize;addCoin(prize);if(place===1)window.questTourWin?.();saveGame();syncHUD();}   // tr.paid กันนับซ้ำให้อยู่แล้ว
    const d=dialog('ผลทัวร์นาเมนต์',true);d.classList.add('tug-ask','tug-tour-result');
    d.querySelector('h2').textContent=place===1?'🏆 แชมป์ทัวร์นาเมนต์!':'🏁 จบทัวร์นาเมนต์';
    const big=element('p',place===1?'อันดับ 1':place===2?'อันดับ 2':place===3?'อันดับ 3–4':'อันดับ 5–8',d);big.className='tug-tour-place';
    element('p',(tr.prize>0?'รางวัล +'+tr.prize.toLocaleString()+' ทอง':'ไม่ได้รางวัล')+(place===1?'':' · แชมป์คือ '+tr.teams[tr.final].name),d).className='tug-sub';
    const actions=element('div',null,d);actions.className='tug-actions';
    const done=element('button','กลับร้าน',actions);done.className='tbtn tug-primary';
-   done.onclick=()=>{state.tour=null;tourLeave();close();exitTank();saveGame();renderTourBar();};
+   /* จบทัวร์นาเมนต์แล้ว จดหมายฉบับนั้นหมดประโยชน์ = ลบทิ้งด้วย */
+   done.onclick=()=>{dropTourMail(tr.mailId);if(state.tourInvite===tr.mailId){state.tourInvite=null;state.tourInviteUntil=0;}
+     state.tour=null;tourLeave();close();exitTank();saveGame();renderTourBar();};
    if(place===1)fireworks(d);
  }
  function tourTick(){
    const tr=state.tour;
+   expireTourMail();
    if(!tr){tourMail();renderTourBar();return;}
    if(!tank()){renderTourBar();return;}                               // ตู้ถูกเก็บ = ทัวร์นาเมนต์ค้างไว้จนกว่าจะวางคืน
    tourSpawn();

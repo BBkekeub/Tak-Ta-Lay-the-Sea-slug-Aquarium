@@ -1,4 +1,13 @@
 const ALGAE_STEP=5*60*1000,ALGAE_GRACE=15*60*1000,ALGAE_FULL=5*3600000,ALGAE_CELLS=144;
+const algaeAlphaBytes=new Map();let algaeAlphaContext=null;
+function algaeAlphaByte(level){
+ if(algaeAlphaBytes.has(level))return algaeAlphaBytes.get(level);
+ // Browser CSS alpha quantization is not always Math.round(level * 255).
+ // Sample each distinct level once with one reusable pixel, not three full masks.
+ if(!algaeAlphaContext){const c=document.createElement('canvas');c.width=c.height=1;algaeAlphaContext=c.getContext('2d',{willReadFrequently:true});}
+ const x=algaeAlphaContext;x.clearRect(0,0,1,1);x.fillStyle='rgba(255,255,255,'+level+')';x.fillRect(0,0,1,1);
+ const value=x.getImageData(0,0,1,1).data[3];if(algaeAlphaBytes.size>=128)algaeAlphaBytes.clear();algaeAlphaBytes.set(level,value);return value;
+}
 function tankHygiene(o,now=Date.now()){
  if(!o.hygiene||!Array.isArray(o.hygiene.cleaned)||o.hygiene.cleaned.length!==ALGAE_CELLS)o.hygiene={cleaned:Array(ALGAE_CELLS).fill(now)};
  const h=o.hygiene;
@@ -13,6 +22,13 @@ function tankHygiene(o,now=Date.now()){
   });h.dirt=h.levels.reduce((a,b)=>a+b,0)/ALGAE_CELLS;
  }
  if(h.levels.every(v=>v===0)){h.dirt=0;algaeSurfaceCache.delete(o);return h;}
+ // Untouched surfaces have equal-area cells: simulation needs only their alpha
+ // average. Build the full masks lazily for drawing or the first brush stroke.
+ if(!(h.erases||[]).some(e=>now-e.at<ALGAE_FULL)){
+  if(h.naturalLevels!==h.levels){h.naturalLevels=h.levels;h.naturalDirt=h.levels.reduce((sum,level)=>sum+algaeAlphaByte(level),0)/(255*ALGAE_CELLS);}
+  h.dirt=h.naturalDirt;
+  return h;
+ }
  rebuildAlgaeSurface(o,h,now);return h;
 }
 function tankCleanliness(o,now=Date.now()){return 100*(1-tankHygiene(o,now).dirt);}
@@ -66,7 +82,7 @@ function flushAlgaeTextures(cache){
  const tint=algaePalette();for(const face of cache.dirty){let canvas=cache.faces[face];if(!canvas){canvas=document.createElement('canvas');canvas.width=canvas.height=ALGAE_TEXTURE;cache.faces[face]=canvas;}const x=canvas.getContext('2d'),pixels=x.createImageData(ALGAE_TEXTURE,ALGAE_TEXTURE),coverage=cache.coverage[face];for(let i=0;i<coverage.length;i++){const k=i*4;pixels.data[k]=tint[k];pixels.data[k+1]=tint[k+1];pixels.data[k+2]=tint[k+2];pixels.data[k+3]=coverage[i]*tint[k+3];}x.putImageData(pixels,0,0);}cache.dirty.clear();
 }
 
-function drawTankHygiene(o){if(document.hidden||!tankMode||o!==curTank)return;const h=tankHygiene(o);if(h.dirt<=0)return;const cache=algaeSurfaceCache.get(o);flushAlgaeTextures(cache);tctx.save();
+function drawTankHygiene(o){if(document.hidden||!tankMode||o!==curTank)return;const now=Date.now(),h=tankHygiene(o,now);if(h.dirt<=0)return;const cache=rebuildAlgaeSurface(o,h,now);flushAlgaeTextures(cache);tctx.save();
  cache.faces.forEach((canvas,face)=>{const [p,a,b]=algaeFace(o,face);tctx.save();tctx.transform((a.x-p.x)/ALGAE_TEXTURE,(a.y-p.y)/ALGAE_TEXTURE,(b.x-p.x)/ALGAE_TEXTURE,(b.y-p.y)/ALGAE_TEXTURE,p.x,p.y);tctx.drawImage(canvas,0,0);tctx.restore();});tctx.restore();}
 let tankBrush=false,brushDown=false,brushPoint=null;
 function scrubTank(o,x,y,now=Date.now()){
@@ -77,7 +93,7 @@ function scrubTank(o,x,y,now=Date.now()){
   if(cx+Math.hypot(ax,bx)<0||cy+Math.hypot(ay,by)<0||cx-Math.hypot(ax,bx)>ALGAE_TEXTURE||cy-Math.hypot(ay,by)>ALGAE_TEXTURE)continue;
   added.push({face,cx,cy,ax,ay,bx,by,at:now});
  }
- if(!added.length)return false;const cache=algaeSurfaceCache.get(o),effective=added.filter(e=>eraseAlgaeRegion(cache,e));
+ if(!added.length)return false;const cache=rebuildAlgaeSurface(o,h,now),effective=added.filter(e=>eraseAlgaeRegion(cache,e));
  if(!effective.length)return false;h.erases.push(...effective);h.eraseRevision=(h.eraseRevision||0)+1;cache.revision=h.eraseRevision;cache.next=Math.min(cache.next,now+ALGAE_GRACE);h.dirt=cache.dirt;
  const baseline=h.levels.reduce((a,b)=>a+b,0)/ALGAE_CELLS;
  if(before/Math.max(.0001,baseline)<.05){h.cleaned.fill(now);h.erases=[];h.eraseRevision++;delete h.bucket;tankHygiene(o,now);}

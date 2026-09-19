@@ -48,9 +48,20 @@ export class SlugCrowd {
    const metal=new THREE.InstancedBufferAttribute(new Float32Array(capacity),1);if(palette)g.setAttribute('crowdMetal',metal);
    const traits=new THREE.InstancedBufferAttribute(new Float32Array(capacity*4),4);if(palette)g.setAttribute('aGeneTraits',traits);
    const pose=new THREE.InstancedBufferAttribute(new Float32Array(capacity),1);g.setAttribute('crowdPose',pose);
+   /* ---- สีกระจกตู้ (หน้าร้าน) ----
+      ย้อม "หลังแสงตกกระทบ" ไม่ใช่ผสมเข้าไปในสีของยีน ไม่งั้นไฟหลัก + ACES จะดันทากสีอ่อนกลายเป็นขาว
+      ⚠️ 2026-09-18 เคยทำเป็น InstancedBufferAttribute (crowdGlass) แล้ว "หงอนหายทั้งเกม":
+         เมชหงอนมี attribute เยอะกว่าลำตัวอยู่แล้ว (gillRelief + instanceMatrix 4 + pose + metal + traits + สียีน 4)
+         เพิ่มอีกตัวเลยทะลุเพดาน MAX_VERTEX_ATTRIBS = 16 ของ WebGL → โปรแกรมลิงก์ไม่ผ่าน เมชหงอนไม่ถูกวาด
+      ทุกตัวในเฟรมเดียวกันอยู่ตู้เดียวกันเสมอ (หน้าร้าน = ย้อมหมด · ในตู้ = ไม่ย้อม) จึงใช้ uniform ตัวเดียว ไม่กินช่อง attribute */
+   const glass={value:new THREE.Vector4(0,0,0,0)};
    const colors={};if(palette)for(const k of ['geneBase','geneAcc','geneDark','geneLight']){colors[k]=new THREE.InstancedBufferAttribute(new Float32Array(capacity*3),3);g.setAttribute('a'+k,colors[k]);}
    m.onBeforeCompile=function(shader){
     original.call(source.material,shader);
+    shader.uniforms.crowdGlass=glass;
+    shader.fragmentShader=shader.fragmentShader
+      .replace('#include <common>','#include <common>\nuniform vec4 crowdGlass;')
+      .replace('#include <colorspace_fragment>','#include <colorspace_fragment>\ngl_FragColor.rgb=mix(gl_FragColor.rgb,crowdGlass.rgb,crowdGlass.a);');
     if(palette){
      shader.fragmentShader=shader.fragmentShader.replace('uniform vec4 geneTraits;','varying vec4 geneTraits;');
      shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute vec4 aGeneTraits;varying vec4 geneTraits;').replace('#include <begin_vertex>','#include <begin_vertex>\ngeneTraits=aGeneTraits;');
@@ -66,14 +77,18 @@ export class SlugCrowd {
      mat4 getBoneMatrix(const in float i){int p=int((crowdPose*${thisCrowd.bones}.0+i)*4.0);return mat4(texelFetch(crowdBones,ivec2(p%256,p/256),0),texelFetch(crowdBones,ivec2((p+1)%256,(p+1)/256),0),texelFetch(crowdBones,ivec2((p+2)%256,(p+2)/256),0),texelFetch(crowdBones,ivec2((p+3)%256,(p+3)/256),0));}`);
     }
    };
-   const thisCrowd=this;m.customProgramCacheKey=()=>key.call(source.material)+'-crowd-'+skin;
+   const thisCrowd=this;m.customProgramCacheKey=()=>key.call(source.material)+'-crowd-glass2-'+skin;
    const mesh=new THREE.InstancedMesh(g,m,capacity);mesh.frustumCulled=false;if(source.morphTargetInfluences?.length)mesh.setMorphAt(0,source);mesh.count=0;scene.add(mesh);
-   this.parts.push({name:source.name,mesh,pose,colors,skin,metal,traits,rank,strain:/^EyeStrain_/.test(source.name)});
+   this.parts.push({name:source.name,mesh,pose,colors,skin,metal,traits,glass,rank,strain:/^EyeStrain_/.test(source.name)});
   });
   this.transform=new THREE.Matrix4();this.rotation=new THREE.Matrix4();this.offset=new THREE.Matrix4();this.shape=new THREE.Matrix4();this.appendage=new THREE.Matrix4();this.anchor=new THREE.Vector3();
  }
  update(jobs,up,columns){
   for(const part of this.parts)part.mesh.count=jobs.length;
+  /* ทุกตัวในเฟรมเดียวกันอยู่ฉากเดียวกัน (หน้าร้าน = ย้อมสีกระจก · ในตู้ = ไม่ย้อม) จึงตั้ง uniform ทีเดียวทั้งฝูง */
+  const tint=jobs.find(j=>j.tint)?.tint;
+  if(tint)TINT.copy(tint.color).convertLinearToSRGB();
+  for(const part of this.parts)part.glass.value.set(tint?TINT.r:0,tint?TINT.g:0,tint?TINT.b:0,tint?tint.amount:0);
   const updated=new Set();
   jobs.forEach((job,i)=>{
    const v=job.v,root=v.poseModel||v.model;if(!updated.has(root)){root.updateMatrixWorld(true);updated.add(root);const skeletons=new Set();root.traverse(o=>{if(o.isSkinnedMesh)skeletons.add(o.skeleton);});for(const sk of skeletons)sk.update();}
@@ -131,11 +146,8 @@ export class SlugCrowd {
     if(part.rank>=d.nGill)this.transform.scale(HIDDEN);
     if(part.strain&&!v.strain)this.transform.scale(HIDDEN);   // ตา ＞＜ (slug-skin.js) โผล่เฉพาะตอนออกแรงชักเย่อ
     part.traits.setXYZW(i,d.aura,d.nSpot,d.shape==='sq'?1:d.shape==='tri'?2:0,part.name==='Body'?d.deep:d.gdeep);part.mesh.setMatrixAt(i,this.transform);part.pose.setX(i,i);part.metal.setX(i,part.name==='Body'?v.bodyMetal:v.gillMetal);
-     /* job.tint = สีกระจกตู้ (หน้าร้านส่งมา) — ผสมเข้ากับสีจากยีนก่อนเขียนลง attribute
-        ทากที่อยู่ในตู้จึงดู "มองผ่านกระจก" เท่าของ 2D แทนที่จะคมเด่นลอยอยู่เหนือชั้นกระจก */
-     for(const [k,attr] of Object.entries(part.colors)){const c=v.palette[k];
-      if(job.tint){TINT.copy(c).lerp(job.tint.color,job.tint.amount);attr.setXYZ(i,TINT.r,TINT.g,TINT.b);}
-      else attr.setXYZ(i,c.r,c.g,c.b);}
+     /* สีจากยีนเขียนตรง ๆ — สีกระจกไปย้อมทีหลังใน shader ผ่าน uniform crowdGlass (ดูคอมเมนต์ตอนสร้าง material) */
+     for(const [k,attr] of Object.entries(part.colors)){const c=v.palette[k];attr.setXYZ(i,c.r,c.g,c.b);}
      if(src.morphTargetInfluences?.length)part.mesh.setMorphAt(i,src);}
   });
   this.texture.needsUpdate=true;

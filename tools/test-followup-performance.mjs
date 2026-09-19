@@ -1,0 +1,27 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
+const {chromium}=require('C:/Users/ACER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const read=f=>fs.readFileSync('js/'+f,'utf8');
+function section(s,a,b){const i=s.indexOf(a),j=s.indexOf(b,i+a.length);assert(i>=0&&j>i);return s.slice(i,j);}
+const browser=await chromium.launch({channel:'chrome',headless:true});
+try{
+ const page=await browser.newPage();await page.setContent('<body></body>');
+ const quest=section(read('quests.js'),'function setQuestCardHTML','/* รางวัลเควส');
+ await page.addScriptTag({content:`var card=document.createElement('div');document.body.append(card);var G={questDone:false,questIndex:0},QUESTS=[{t:'first',h:'help',reward:{coin:1}},{t:'second',h:'next',reward:{coin:2}}],questCollapsed=false,bindings=0;function updateQuestGlow(){}function clearGlow(){}function setPointer(){}function questHeader(s){return '<button>'+s+'</button>'}function bindToggle(){bindings++} ${quest}`});
+ const questResult=await page.evaluate(()=>{renderCard();const button=card.querySelector('button');button.focus();for(let i=0;i<60;i++)renderCard();const stable=button===card.querySelector('button')&&document.activeElement===button&&bindings===1;G.questIndex=1;renderCard();const changed=card.textContent.includes('second')&&bindings===2;questCollapsed=true;renderCard();return {stable,changed,collapsed:bindings===3};});
+ assert(Object.values(questResult).every(Boolean));
+ const shop=section(read('slug-box-shop.js'),'function renderSlugShop','function openSlugShopDialog');
+ await page.addScriptTag({content:`var slugShopDialog=document.createElement('dialog');document.body.append(slugShopDialog);var stock=2,deliveries=[],remaining='10s',opened=[],orders=[];G.coin=100;var SLUG_BOX_MAX=10,SLUG_BOXES=[{name:'test',colorLo:0,colorHi:1,lo:0,hi:1,price:50}];function slugBoxStock(){return {n:stock}}function slugDeliveries(){return deliveries}function slugBoxWaitText(){return remaining}function slugDeliveryReady(d){return d.ready}function slugDeliveryWaitText(){return remaining}function orderSlugBox(i){orders.push(i)}function openSlugDelivery(id){opened.push(id)}${shop}`});
+ const shopResult=await page.evaluate(()=>{renderSlugShop();slugShopDialog.showModal();const button=slugShopDialog.querySelector('[data-order]');button.focus();for(let i=0;i<60;i++)renderSlugShop();const stable=button===slugShopDialog.querySelector('[data-order]')&&document.activeElement===button;deliveries=[{id:'a',name:'A',ready:false},{id:'b',name:'B',ready:true}];renderSlugShop();const a=slugShopDialog.querySelector('[data-delivery="a"]'),b=slugShopDialog.querySelector('[data-delivery="b"]');remaining='9s';G.coin=0;deliveries[0].ready=true;renderSlugShop();const patched=a===slugShopDialog.querySelector('[data-delivery="a"]')&&button.disabled&&a.querySelector('[data-wait]').textContent==='ถึงแล้ว'&&slugShopDialog.querySelector('[data-stock-wait]').textContent==='9s';a.querySelector('button').click();deliveries=[deliveries[1]];renderSlugShop();return {stable,patched,removed:!a.isConnected,retained:b===slugShopDialog.querySelector('[data-delivery="b"]'),clicked:opened.join()==='a'};});
+ assert(Object.values(shopResult).every(Boolean));
+ const scheduler=section(read('people.js'),'let _pLast = 0;','function stepPeopleSlice(dt)');
+ const timing=await page.evaluate(code=>{let now=1000;const samples=[];const run=new Function('performance','samples',`let peopleOn=true;${code}function stepPeopleSlice(dt){samples.push(dt)}return {tick:stepPeople,reset(){_pLast=0},off(){peopleOn=false},on(){peopleOn=true},debt(){return _peopleTimeDebt}}`);const sim=run({now:()=>now},samples);sim.tick();for(let i=0;i<100;i++){now+=100;sim.tick()}const ten=samples.reduce((a,b)=>a+b,0);now+=5000;const before=samples.length;sim.tick();const bounded=samples.length-before===20&&sim.debt()>3.9;for(let i=0;i<5;i++)sim.tick();const catchup=Math.abs(samples.reduce((a,b)=>a+b,0)-15)<1e-8;sim.off();now+=2000;sim.tick();sim.on();now+=100;sim.tick();return {ten,bounded,catchup,max:Math.max(...samples),total:samples.reduce((a,b)=>a+b,0)};},scheduler);
+ assert(Math.abs(timing.ten-10)<1e-8&&timing.bounded&&timing.catchup&&timing.max<=.05&&Math.abs(timing.total-15.1)<1e-8);
+ const hygiene=read('tank-hygiene.js').split('(()=>{')[0];
+ await page.addScriptTag({content:hygiene});
+ const algae=await page.evaluate(()=>{const now=10*3600000;let maxError=0;const samples=[];for(let k=0;k<=60;k++){const o={hygiene:{cleaned:Array.from({length:144},(_,i)=>now-((k+i%3)*5*60000))}};const h=tankHygiene(o,now),fast=h.dirt;const lazy=!algaeSurfaceCache.has(o);const raster=rebuildAlgaeSurface(o,h,now);maxError=Math.max(maxError,Math.abs(fast-raster.dirt));samples.push(lazy);}const o={hygiene:{cleaned:Array(144).fill(now-3600000)}};const h=tankHygiene(o,now),c=rebuildAlgaeSurface(o,h,now);const e={face:0,cx:90,cy:90,ax:30,ay:0,bx:0,by:30,at:now};const erased=eraseAlgaeRegion(c,e);h.erases.push(e);h.eraseRevision=1;c.revision=1;const expected=c.dirt;const actual=tankHygiene(o,now+1).dirt;return {maxError,lazy:samples.every(Boolean),erased,preserved:Math.abs(actual-expected)<1e-10};});
+ assert(algae.maxError<1e-10&&algae.lazy&&algae.erased&&algae.preserved,JSON.stringify(algae));
+ console.log(JSON.stringify({questResult,shopResult,timing,algae},null,2));
+}finally{await browser.close()}

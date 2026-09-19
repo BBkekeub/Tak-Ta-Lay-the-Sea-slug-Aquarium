@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {SlugCrowd} from './slug-crowd.js?v=gilln4';
+import {SlugCrowd} from './slug-crowd.js?v=glass2';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 
 // Visible WebGL canvas, not an atlas, snapshot, billboard or drawImage source.
@@ -263,7 +263,9 @@ function tankTint(def){
  let t=glassTints.get(def.glass);
  if(!t){
   const g=shadeRgb(hexToRgb(def.glass),-20);     // สีเดียวกับหน้ากระจกด้านหน้าที่ 2D ใช้
-  t={color:new THREE.Color().setRGB(g[0]/255,g[1]/255,g[2]/255,THREE.SRGBColorSpace),amount:.5};
+  /* ⚠️ 2026-09-18 amount .5 (ย้อมทับสีหลังแสงตกกระทบ) ทำให้ทากซีดขาวจนดูไม่ออกว่าตัวสีอะไร
+     ชั้นกระจก 2D ในหน้าร้านใช้ alpha .32 (shop-floor.js isoBox) จึงใช้ค่าเดียวกัน ความเข้มจะได้เท่ากับของ 2D จริง ๆ */
+  t={color:new THREE.Color().setRGB(g[0]/255,g[1]/255,g[2]/255,THREE.SRGBColorSpace),amount:.32};
   glassTints.set(def.glass,t);
  }
  return t;

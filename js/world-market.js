@@ -354,7 +354,10 @@
   const zoom = document.createElement('div');
   zoom.id = 'wmZoom';
   zoom.style.cssText = 'position:fixed;inset:0;background:rgba(8,14,16,.85);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:100000;cursor:zoom-out';
-  zoom.innerHTML = '<canvas id="wmZoomCv" width="520" height="380" style="max-width:88vw;max-height:66vh;background:#0f1e22;border-radius:16px;border:1px solid #b59859"></canvas><div id="wmZoomLabel" style="color:#e5dcc4;font-size:15px;font-weight:600"></div><div style="color:#9fbfb5;opacity:.6;font-size:12px">แตะที่ไหนก็ได้เพื่อปิด</div>';
+  /* ⚠️ 2026-09-18 css/style.css มีกฎรวม canvas{width:100%;height:100%} ภาพซูมเลยโดนยืดเต็มจอจนสัดส่วนเพี้ยน
+     (ผู้เล่นทัก: "ถูกดึงออกข้างจนดูค่าไม่ออก") · สั่ง width/height:auto ทับในสไตล์อินไลน์ แล้วคุมขนาดด้วย max-* อย่างเดียว
+     เบราว์เซอร์จะย่อโดยรักษาอัตราส่วนเดิมให้เอง · ความละเอียดแคนวาสคูณสองให้ภาพคมตอนย่อ */
+  zoom.innerHTML = '<canvas id="wmZoomCv" width="1040" height="760" style="width:auto;height:auto;max-width:min(88vw,620px);max-height:66vh;background:#0f1e22;border-radius:16px;border:1px solid #b59859"></canvas><div id="wmZoomLabel" style="color:#e5dcc4;font-size:15px;font-weight:600"></div><div style="color:#9fbfb5;opacity:.6;font-size:12px">แตะที่ไหนก็ได้เพื่อปิด</div>';
   document.body.append(zoom);
   let _zoomGenes = null;
   zoom.onclick = () => { zoom.style.display = 'none'; _zoomGenes = null; };
@@ -476,7 +479,7 @@
     const listings = m.listings.slice().sort((a, b) => b.prog - a.prog);
 
     marketDialog.innerHTML =
-      `<div style="display:flex;align-items:center;justify-content:space-between"><b>🌐 ตลาดโลก</b><button class="tbtn" data-close>✕</button></div>
+      `<div style="display:flex;align-items:center;justify-content:space-between"><b>🌐 ตลาดโลก</b><button class="tbtn" data-close>✕</button></div><div data-filterhost></div>
       <p style="font-size:12px;opacity:.85;margin:8px 0">คุณตั้งราคาเอง — <b>ถูกกว่าราคากลาง = ขายไว</b> · <b>แพงกว่า = ช้า</b> · เกิน ${R_DEAD}× ของราคากลาง = ไม่มีใครซื้อ<br>
       ผ่านครึ่งเวลาแล้วผู้ซื้อจะเริ่มต่อราคา (ลดได้ถึง ${Math.round(HAGGLE_MAX * 100)}%) · ครบ 3 ชม. ยังไม่ขาย ทากจะกลับเข้าคลัง<br>
       เทรนเปลี่ยนใน <b data-mk-refresh>${fmtLeft(t.refreshAt - now())}</b></p>

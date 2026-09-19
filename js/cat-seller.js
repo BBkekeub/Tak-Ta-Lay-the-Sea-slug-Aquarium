@@ -39,7 +39,44 @@ function catModel(o){
  const result={key,faces};catModelCache.set(o,result);return faces;
 }
 // Furniture depth masks use the real L, including its empty seller corner.
+/* ⚠️ 2026-09-19 ไฟล์นี้ "เขียนทับ" personFurnitureFaces ของ people.js (โหลดทีหลัง)
+   แคชที่ใส่ไว้ใน people.js จึงไม่มีผลกับเส้นทางจริง ต้องแคชที่นี่ด้วย
+   รูปทรงบังเปลี่ยนเฉพาะตอน layout เปลี่ยน — เดิมสร้างใหม่ทุกเฟรมที่วาดคน (คู่มือ Two Point Campus บท 05)
+   เก็บต่อชิ้น + แยกตามธง props (props=true มีกล่องบังหัวแมวเพิ่ม) · layoutSignature() มาจาก people.js */
+const _catGeo=new Map(); let _catGeoSig=null;
 personFurnitureFaces=function(props=true){
+ const sig=typeof layoutSignature==='function'?layoutSignature():null;
+ if(sig!==_catGeoSig){_catGeoSig=sig;_catGeo.clear();if(typeof _bumpGeoBuilds==='function')_bumpGeoBuilds();}
+ const out=[];
+ const boxFaces=(bx,by,bw,bh,top)=>{ if(!(top>0))return null;
+  const a=[bx,by,0],b=[bx+bw,by,0],c=[bx+bw,by+bh,0],d=[bx,by+bh,0];
+  const A=[bx,by,top],B=[bx+bw,by,top],C=[bx+bw,by+bh,top],D=[bx,by+bh,top];
+  return [[A,B,C,D],[a,b,B,A],[b,c,C,B],[c,d,D,C],[d,a,A,D]];
+ };
+ const cached=(o)=>{                       // รูปทรงของชิ้นนี้ (แคชไว้ ไม่สร้างใหม่ทุกเฟรม)
+  const key=o._key==='counter'?(props?'c1':'c0'):'p';
+  let byKey=_catGeo.get(o); if(!byKey){byKey={};_catGeo.set(o,byKey);}
+  if(byKey[key])return byKey[key];
+  const faces=[];
+  const add=(bx,by,bw,bh,top)=>{const f=boxFaces(bx,by,bw,bh,top);if(f)for(const q of f)faces.push(q);};
+  if(o._key==='counter'){
+   const top=decoH(o)/ZUNIT;
+   for(const q of [counterBlock(o,0,10,20,10),counterBlock(o,10,0,10,10)]) add(q.x,q.y,q.w,q.h,top);
+   if(props){ const cat=counterBlock(o,1,1,8,8); add(cat.x,cat.y,cat.w,cat.h,22); }
+  }else{
+   const top=(o.type==='tank'?tankStandH(o.def):decoH(o))/ZUNIT;
+   add(o.cx,o.cy,oW(o),oH(o),top);
+  }
+  return (byKey[key]=faces);
+ };
+ for(const o of G.objs){
+  if(o===moving||(props&&!onScreen(o)))continue;
+  if(o.def.playTable){out.push(...playTableDepthFaces(o).opaque);continue;}   // ของบนโต๊ะเปลี่ยนตลอด ไม่แคช
+  for(const q of cached(o))out.push(q);
+ }
+ return out;};
+/* โค้ดเดิมเก็บไว้เป็นเอกสารอ้างอิงว่ารูปทรงที่แคชต้องออกมาเหมือนเดิมเป๊ะ (ไม่ถูกเรียกใช้แล้ว) */
+const _personFurnitureFacesUncached=function(props=true){
  const out=[];
  const boxTo=(bx,by,bw,bh,top)=>{ if(!(top>0))return;
   const a=[bx,by,0],b=[bx+bw,by,0],c=[bx+bw,by+bh,0],d=[bx,by+bh,0];
@@ -225,6 +262,7 @@ function renderComputer(){
   +'<button class="tbtn" data-offers>ข้อเสนอหน้าร้าน ('+TRADE_OFFERS.length+')</button>'
   +'<button class="tbtn" data-orderbox>🛒 สั่งซื้อกล่องทาก'+(typeof slugDeliveryReadyCount==='function'&&slugDeliveryReadyCount()?' · 📦'+slugDeliveryReadyCount():'')+'</button>'
   +'<button class="tbtn" data-market>🌐 ตลาดโลก</button>'
+  +'<button class="tbtn" data-codex>📓 สมุดสายพันธุ์'+(typeof slugCodexCount==='function'?' ('+slugCodexCount()+'/486)':'')+'</button>'
   +'</div>'
   +(computerTab==='log'
     ?'<div style="max-height:52vh;overflow:auto" data-log></div>'
@@ -262,6 +300,7 @@ function renderComputer(){
  computerDialog.querySelector('[data-offers]').onclick=()=>{computerDialog.close();const b=document.getElementById('navOffers');if(b&&b.getAttribute('aria-expanded')!=='true')b.click();renderTradeOffers(true);};
  computerDialog.querySelector('[data-orderbox]').onclick=()=>{computerDialog.close();if(typeof openSlugShopDialog==='function')openSlugShopDialog();};
  computerDialog.querySelector('[data-market]').onclick=()=>{computerDialog.close();if(typeof openWorldMarket==='function')openWorldMarket();};
+ computerDialog.querySelector('[data-codex]').onclick=()=>{computerDialog.close();if(typeof openSlugCodex==='function')openSlugCodex();};
 }
 computerDialog.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape'){e.preventDefault();computerDialog.close();}},true);
 let computerPointer=null;

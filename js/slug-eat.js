@@ -114,7 +114,7 @@
 
  /* ---------- ลูกค้ามาท้า (ยกแบบ slug-race.js — ที่นี่ 3 คน) ---------- */
  function purchased(){if(!state.purchased){state.purchased=true;state.nextAt=Date.now()+5*MINUTE;saveGame();}}
- const gap=()=>5*MINUTE;                        // ⚙️ ทดสอบ: ทุก 5 นาที (ใช้จริงค่อยยืดเหมือนตู้แข่งวิ่ง)
+ const gap=()=>ShopEvents.gap();                // 20–45 นาที ใช้ค่าเดียวกันทั้ง 4 ตู้ (config.js)
  function makeOffer(){
    const pool=names.slice().sort(()=>Math.random()-.5);
    return {rivals:[0,1,2].map(i=>({name:pool[i],genes:SlugEngine.randGene(),cps:6+Math.random()*4,greed:Math.random(),dashUse:.2+Math.random()*.5}))};
@@ -133,10 +133,11 @@
  }
  function spawn(){
    if(visitors.length||!peopleOn||!tank()||document.hidden||tankMode||window.BOOTING)return;
-   const capacity=visitorCapacity()-PEOPLE.length;if(capacity<3)return;
+   if(!ShopEvents.ready())return;                 // ตู้อื่นเพิ่งส่งคำท้ามา รออีก 3 นาที (config.js EVENT_SPACING)
+   const capacity=challengerRoom();if(capacity<3)return;
    const previous=new Set(PEOPLE),gender=()=>Math.random()<.5?'female':'male';
    if(!spawnVisitors(capacity,'eat',[0,1,2].map(()=>({kid:false,gender:gender()}))))return;
-   visitors=PEOPLE.filter(p=>!previous.has(p));
+   visitors=PEOPLE.filter(p=>!previous.has(p));ShopEvents.mark();
    if(!state.offer){state.offer=makeOffer();state.nextAt=Date.now()+gap();saveGame();}
    visitors.forEach((p,i)=>{
      const r=state.offer.rivals[i%3];
@@ -148,9 +149,12 @@
    offerDeadline=Date.now()+5*MINUTE;
    toast('🍽️ มีคนมาท้าแข่งกินจุ! คลิกคนถือตู้เพื่อรับคำท้า','good');
  }
- function dismiss(){state.offer=null;leave();close();saveGame();}
+ /* ⚠️ 2026-09-18 นับเวลานัดหน้า "หลังจบเรื่องนี้" ไม่ใช่ตอนผู้ท้าเข้าร้าน (แบบเดียวกับ slug-race.js) */
+ function reschedule(){state.nextAt=Date.now()+gap();}
+ function dismiss(){state.offer=null;leave();close();reschedule();saveGame();}
  function tick(){
    if(owned())purchased();
+   practiceSync();
    if(state.active){if(resumeReady&&!modal&&!ui&&!window.BOOTING)openMatch();return;}
    if(!tank()){if(state.offer){state.offer=null;leave();if(modal)close();saveGame();}return;}
    if(visitors.length&&!visitors.every(p=>PEOPLE.includes(p)))leave();
@@ -208,7 +212,7 @@
    const row=element('div',null,d,'eat-rivals');
    for(const r of rivals){const cell=element('div',null,row,'eat-rival');const c=element('canvas',null,cell);c.width=150;c.height=90;c.setAttribute('aria-hidden','true');
      try{drawSlugPortrait(c,{genes:r.genes});}catch(_){}element('b',r.name,cell);element('small',cmPerSec(r.genes)+' ซม./วิ',cell);}
-   element('p','ลากอาหารจากกลางตู้กลับฐาน แล้วกด F / K สลับกันเพื่อกิน · ตัวเล็กเดินเร็ว ตัวใหญ่ลากของหนักเก่ง',d,'eat-rule');
+   element('p','ลากอาหารจากกลางตู้กลับฐาน แล้วกด F / K สลับกันเพื่อกิน · ตัวเล็กเดินเร็ว ตัวใหญ่ลากของหนักเก่ง · กองของทิ้งไว้แล้วออกไปไกล ระวังโดนบุกขโมย! (เจ้าของอยู่ในฐาน = ขโมยไม่ได้)',d,'eat-rule');
    element('p','🥬 สาหร่าย ×0.8 · 🌿 ไฮดรอยด์ ×1 · 🧽 ฟองน้ำ ×1.1 ตัวใหญ่ +10% 15 วิ · 🌸 ดอกไม้ทะเล ×1.2 หงอนใหญ่ +20% 10 วิ · 🧽 นีโอเปโทรเซีย ×0.7 วิ่งเร็ว +20% 20 วิ · บัฟซ้อนกันได้',d,'eat-rule');
    element('p','เลือกทากในตู้แข่งกิน',d);
    let picked=t.slugs[0]?.id||null;
@@ -252,6 +256,26 @@
    const list=first?['S','S','S','M','M','L','L','XL']:[];
    if(!first)while(a.foods.length+list.length<WAVE_FILL)list.push(rollSize());
    for(const size of list){const f=randomFood(t,a,size);if(f)a.foods.push(f);}
+ }
+ /* ---------- โหมดซ้อม: คู่แข่งคือทากในตู้ที่ผู้เล่นเลือกเอง ไม่มีเดิมพัน (slug-practice.js) ---------- */
+ function practiceSync(){
+   const t=tank();
+   if(typeof SlugPractice==='undefined')return;
+   SlugPractice.sync('eat',!!t&&tankMode&&curTank===t&&!state.active&&!modal?.open,'🍽️ ซ้อมแข่งกินจุ',()=>{
+     SlugPractice.pick({tank:t,title:'🍽️ ซ้อมแข่งกินจุ',need:3,
+       noteFor:s=>{const g=foodGenes(s);return 'เดิน '+cmPerSec(g)+' ซม./วิ';},
+       onStart:(mine,others)=>beginPractice(t,mine,others)});
+   });
+ }
+ function beginPractice(t,s,others){
+   const b=bases(t),g={...foodGenes(s)};
+   const entrant=(slot,o)=>({slot,x:b[slot].x,y:b[slot].y,dir:Math.atan2(pileOf(t).y-b[slot].y,pileOf(t).x-b[slot].x),
+     carry:null,stash:[],buffs:[],score:0,gauge:100,dashT:0,dashX:0,dashY:0,...o});
+   const a={tankId:t.id,wager:0,practice:true,elapsed:0,countdown:COUNTDOWN,nextWave:WAVE_EVERY,settled:false,foods:[],seq:0,
+     entrants:[entrant(0,{name:slugNick(s),id:s.id,genes:g}),
+       ...others.map((o,i)=>entrant(i+1,{name:slugNick(o),genes:{...foodGenes(o)},cps:6+Math.random()*4,greed:Math.random(),dashUse:.2+Math.random()*.5,bot:true}))]};
+   wave(t,a,true);
+   state.active=a;saveGame();close();openMatch();
  }
  function begin(t,s,wager){
    const b=bases(t),g={...foodGenes(s)};
@@ -347,6 +371,37 @@
    for(const f of a.foods){const d=Math.hypot(f.x-e.x,f.y-e.y);if(d<reach(e,f)&&d<bd){bd=d;best=f;}}
    return best;
  }
+ /* ---------- ขโมยของจากฐานคนอื่น ----------
+    ⚠️ 2026-09-18 ผู้เล่นขอ: "กินจุให้ขโมยจากฐานได้ กันคนเก็บมาไว้ที่บ้านอย่างเดียว แต่ถ้ากินอยู่จะขโมยไม่ได้"
+    กติกา: มือว่าง + ยืนในฐานคนอื่น + กด F = คาบของจากจานเขาออกมา 1 ชิ้น (ลากกลับฐานตัวเองแล้วกินได้เลย)
+      · เจ้าของยืนอยู่ในฐานตัวเอง = เฝ้าอยู่/กินอยู่ → ขโมยไม่ได้ (กลับมาเฝ้าบ้านเองได้)
+      · ชิ้นแรกที่กัดค้างไว้แล้ว (chews>0) ขโมยไม่ได้ — หยิบชิ้นที่วางทีหลังสุดก่อน (คำที่กัดไปแล้วไม่สูญ) */
+ function baseOwnerAt(a,t,e){
+   const list=bases(t);
+   for(let i=0;i<list.length;i++){
+     if(i===e.slot||!inSquare(e.x,e.y,list[i]))continue;
+     return a.entrants[i]||null;
+   }
+   return null;
+ }
+ /* ดูเฉย ๆ ว่าตอนนี้ยืนในฐานที่ปล้นได้ไหม (ใช้กับ HUD / ปุ่ม F มือถือ — ไม่แตะจานใคร) */
+ function raidableAt(a,t,e){
+   const owner=baseOwnerAt(a,t,e);
+   if(!owner||!owner.stash.length||inBase(owner,t))return null;
+   const last=owner.stash.length-1;
+   if(last===0&&owner.stash[0].chews>0)return null;
+   return {...owner.stash[last],owner:owner.name};
+ }
+ /* คืนชิ้นที่ขโมยได้ (ถอดออกจากจานเจ้าของแล้ว) หรือ null ถ้าขโมยไม่ได้ */
+ function steal(a,t,e){
+   const owner=baseOwnerAt(a,t,e);
+   if(!owner||!owner.stash.length||inBase(owner,t))return null;
+   const last=owner.stash.length-1;
+   if(last===0&&owner.stash[0].chews>0)return null;
+   const item=owner.stash.splice(last,1)[0];
+   owner.robbedAt=a.elapsed;
+   return {item,owner};
+ }
  /* F (คาบ): ถือของอยู่ = วางลงตรงนั้น · มือว่าง = งับชิ้นที่ใกล้สุดในระยะ · ถึงฐานแล้วของถูกวางลงจานเอง */
  function bite(i){
    const a=state.active,t=tankOf();if(!a||!t||a.settled||a.countdown>0)return false;
@@ -357,11 +412,19 @@
    }
    const f=nearestFood(a,e);
    if(f){a.foods.splice(a.foods.indexOf(f),1);e.carry={id:f.id,size:f.size,type:f.type};return true;}
+   const loot=steal(a,t,e);
+   if(loot){
+     e.carry={id:'loot'+(a.seq++),size:loot.item.size,type:loot.item.type};
+     pops.push({x:e.x,y:e.y,text:'ขโมย '+kindName(loot.item.type)+'!',color:COLORS[i],t:0});
+     return true;
+   }
    return false;
  }
  /* F / K ต้องสลับกัน กดปุ่มเดิมซ้ำไม่นับ (แบบเดียวกับชักเย่อ) */
+ const chewCap=makePressLimiter();        // เพดาน 20 ครั้ง/วิ (config.js) กันมาโครเคี้ยวรัว
  function chewKey(k){
    if(k===lastChewKey)return false;
+   if(!chewCap())return false;
    if(!chew(0))return false;
    lastChewKey=k;hud.chewBtn?.[k]?.animate([{transform:'translateY(4px) scale(.93)',filter:'brightness(1.4)'},{transform:'none',filter:'none'}],{duration:140});
    return true;
@@ -415,6 +478,23 @@
    }
    return best;
  }
+ /* ฐานที่ "ปล้นได้ตอนนี้" ที่ใกล้ที่สุด — เจ้าของไม่อยู่บ้าน มีของในจาน และมีเวลาพอจะลากกลับไปกินทัน */
+ function chooseRaid(t,a,e){
+   const list=bases(t),left=LIMIT-a.elapsed,m=mods(e),home=list[e.slot];
+   let best=null;
+   for(let i=0;i<list.length;i++){
+     const o=a.entrants[i];
+     if(i===e.slot||!o||!o.stash.length||inBase(o,t))continue;
+     if(o.stash.length===1&&o.stash[0].chews>0)continue;
+     const loot=o.stash[o.stash.length-1],at=list[i];
+     const d=Math.hypot(at.x-e.x,at.y-e.y);
+     const go=d/(WALK*speedMul(e.genes,m));
+     const back=Math.hypot(home.x-at.x,home.y-at.y)/(WALK*speedMul(e.genes,m)*carryMul(loot.size,e.genes,m));
+     if(go+back+SIZES[loot.size].chew/(e.cps*BOT_CHEW_MUL)+.6>left)continue;
+     if(!best||d<best.d)best={at,d,loot};
+   }
+   return best;
+ }
  function stepBot(t,a,e,dt){
    const br=brains[e.slot],home=bases(t)[e.slot];
    /* อยู่ในฐานและมีของในจาน = นั่งเคี้ยวให้หมดก่อน */
@@ -429,7 +509,13 @@
    else{
      let f=a.foods.find(x=>x.id===br.target);
      if(!f||br.think<=0){const pick=chooseFood(t,a,e);if(pick?.id!==br.target){br.target=pick?.id||null;br.path=[];}f=pick;br.think=.8+Math.random()*.6;}
-     if(f){goal=f;if(Math.hypot(f.x-e.x,f.y-e.y)<reach(e,f)*.9){bite(e.slot);br.target=null;br.path=[];return {vx:0,vy:0};}}
+     /* บอทก็บุกฐานเป็น — ฐานที่ของกองไว้เยอะและเจ้าของไม่อยู่ ถ้าใกล้กว่าของบนพื้นก็ไปปล้นก่อน */
+     const raid=chooseRaid(t,a,e);
+     if(raid&&(!f||raid.d<Math.hypot(f.x-e.x,f.y-e.y)*.9)){
+       goal=raid.at;
+       if(inSquare(e.x,e.y,raid.at)){if(bite(e.slot)){br.target=null;br.path=[];return {vx:0,vy:0};}}
+     }
+     else if(f){goal=f;if(Math.hypot(f.x-e.x,f.y-e.y)<reach(e,f)*.9){bite(e.slot);br.target=null;br.path=[];return {vx:0,vy:0};}}
      else goal=home;
    }
    if(!br.path.length||br.goalX!==goal.x||br.goalY!==goal.y||br.replan<=0){br.path=gridPath(t,e,goal.x,goal.y);br.goalX=goal.x;br.goalY=goal.y;br.replan=1.5;}
@@ -445,12 +531,18 @@
  }
 
  /* ---------- เดินเกม ---------- */
+ /* ⚠️ 2026-09-18 ผู้เล่น: "บนคอมเดินเฉียงไม่ได้"
+    เดิมแปลงปุ่มเป็น "ทิศบนจอ" ก่อนแล้วค่อยแปลงลงพื้น — ภาพเฉียงทำให้ 8 ทิศบนจอไปกระจุกบนพื้นแบบไม่เท่ากัน
+    (วัดจริง: D = 0° · W+D = 87° · W = 115° → มุม 20–70° ซึ่งเป็นแนวจากฐานมุมเข้าหากองกลาง กดยังไงก็ไม่ได้)
+    ตอนนี้ปุ่มผูกกับ "แกนพื้นตู้" ตรง ๆ W/S = แกนลึก · A/D = แกนขวาง → ได้ 8 ทิศห่างกัน 45° เท่ากันบนพื้น
+    จอยมือถือยังใช้ทิศบนจอเหมือนเดิม เพราะเป็นอนาล็อกต่อเนื่อง ไม่มีช่องว่างให้ติด */
  function inputDir(){
-   let sx=0,sy=0;
-   if(keys.has('KeyA')||keys.has('ArrowLeft'))sx--;if(keys.has('KeyD')||keys.has('ArrowRight'))sx++;
-   if(keys.has('KeyW')||keys.has('ArrowUp'))sy--;if(keys.has('KeyS')||keys.has('ArrowDown'))sy++;
-   if(joy.id!=null&&Math.hypot(joy.x,joy.y)>.18){sx=joy.x;sy=joy.y;}
-   return screenToFloor(sx,sy);
+   if(joy.id!=null&&Math.hypot(joy.x,joy.y)>.18)return screenToFloor(joy.x,joy.y);
+   let fx=0,fy=0;
+   if(keys.has('KeyA')||keys.has('ArrowLeft'))fx--;if(keys.has('KeyD')||keys.has('ArrowRight'))fx++;
+   if(keys.has('KeyW')||keys.has('ArrowUp'))fy++;if(keys.has('KeyS')||keys.has('ArrowDown'))fy--;
+   const d=Math.hypot(fx,fy);
+   return d>1e-6?{x:fx/d,y:fy/d,m:1}:{x:0,y:0,m:0};
  }
  function advance(t,a,dt){
    if(a.settled)return;
@@ -490,19 +582,23 @@
    const progress=e=>e.stash.reduce((n,s)=>n+s.chews/SIZES[s.size].chew,0);
    const order=a.entrants.map((e,i)=>i).sort((x,y)=>(a.entrants[y].score-a.entrants[x].score)||(progress(a.entrants[y])-progress(a.entrants[x]))||(x-y));
    a.order=order;a.rank=order.indexOf(0)+1;
-   a.delta=(a.rank===1?a.wager*2:a.rank===2?0:a.rank===3?-Math.floor(a.wager/2):-a.wager)||0;   // ||0 กัน "-0 ทอง" ตอนไม่เดิมพัน
+   a.delta=a.practice?0:(a.rank===1?a.wager*2:a.rank===2?0:a.rank===3?-Math.floor(a.wager/2):-a.wager)||0;   // ||0 กัน "-0 ทอง" ตอนไม่เดิมพัน
    addCoin(a.delta);a.settled=true;saveGame();syncHUD();
    if(typeof playNotificationSound==='function')playNotificationSound(a.rank===1?'tugWin':'tugLose');
    if(a.rank===1&&window.Fireworks)Fireworks.play({count:12,duration:3400});
    setTimeout(()=>{if(state.active===a&&!modal)showResult();},1100);
  }
  function complete(){
-   const t=tankOf(),me=state.active?.entrants[0];
+   const a=state.active,t=tankOf(),me=a?.entrants[0];
    const s=t?.slugs.find(x=>x.id===me?.id);if(s){s.state='rest';s.stt=1;s.wall=null;s.climbZ=0;delete s._breedScale;}
-   state.active=null;state.offer=null;leave();close();exitTank();saveGame();
+   /* ซ้อม: ไม่ยุ่งกับคำท้าที่ค้างอยู่ ไม่รีเซ็ตนาฬิกา และอยู่ในตู้ต่อ จะได้ซ้อมซ้ำได้เลย */
+   if(a?.practice){state.active=null;close();saveGame();return;}
+   state.active=null;state.offer=null;leave();close();exitTank();reschedule();saveGame();
  }
  function showResult(){
    const a=state.active;if(!a?.settled||modal)return;
+   /* บอกระบบเควสว่าชนะแล้ว (quests.js) — ธง _qWin กันนับซ้ำ เพราะกลับเข้าตู้ตอน settled แล้วจะเรียก showResult ใหม่ */
+   if(a.rank===1&&!a._qWin){a._qWin=true;window.questContestWin?.();}
    const titles=['','ชนะเลิศ! 🍽️','ได้ที่ 2','ได้ที่ 3','ได้ที่ 4'];
    const d=dialog(titles[a.rank]);d.classList.add('race-result','eat-result');
    d.addEventListener('cancel',e=>{e.preventDefault();complete();});
@@ -516,11 +612,17 @@
      const block=element('div',null,step,'race-podium-block');element('span',['','🥇','🥈','🥉','🍴'][place],block,'race-medal');element('b',e.score+' คะแนน',block);
    }
    const receipt=element('div',null,d,'race-receipt');
-   element('span','เดิมพัน '+a.wager.toLocaleString()+' ทอง',receipt);
-   element('strong',(a.delta>0?'ได้รับ +':a.delta<0?'เสีย ':'ไม่เสีย ไม่ได้เพิ่ม · ')+a.delta.toLocaleString()+' ทอง',receipt);
-   element('small','ทองคงเหลือ '+G.coin.toLocaleString(),receipt);
-   element('p',a.rank===1?'ผู้ท้า: ท้องทำด้วยอะไรเนี่ย!':a.rank===4?'ผู้ท้า: ฮ่า ๆ ยังไม่อิ่มเลยเหรอ?':'ผู้ท้า: ไว้มากินกันใหม่!',d,'race-taunt');
-   const done=element('button','รับทราบ · กลับร้าน',d,'tbtn');done.onclick=complete;done.focus();
+   if(a.practice){
+     element('span','โหมดซ้อม',receipt);
+     element('strong','ไม่มีเดิมพัน',receipt);
+     element('small','ซ้อมได้ไม่จำกัด · คำท้าจริงถึงจะมีเงินรางวัล',receipt);
+   }else{
+     element('span','เดิมพัน '+a.wager.toLocaleString()+' ทอง',receipt);
+     element('strong',(a.delta>0?'ได้รับ +':a.delta<0?'เสีย ':'ไม่เสีย ไม่ได้เพิ่ม · ')+a.delta.toLocaleString()+' ทอง',receipt);
+     element('small','ทองคงเหลือ '+G.coin.toLocaleString(),receipt);
+   }
+   if(!a.practice)element('p',a.rank===1?'ผู้ท้า: ท้องทำด้วยอะไรเนี่ย!':a.rank===4?'ผู้ท้า: ฮ่า ๆ ยังไม่อิ่มเลยเหรอ?':'ผู้ท้า: ไว้มากินกันใหม่!',d,'race-taunt');
+   const done=element('button',a.practice?'จบการซ้อม':'รับทราบ · กลับร้าน',d,'tbtn');done.onclick=complete;done.focus();
    if(a.rank===1&&window.Fireworks)Fireworks.play({count:5,duration:1600});
  }
 
@@ -537,7 +639,17 @@
    c.beginPath();q.forEach((p,k)=>k?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y));c.closePath();c.fillStyle='rgba(196,164,106,.16)';c.fill();
    c.beginPath();c.moveTo(q[3].x,q[3].y);c.lineTo(q[2].x,q[2].y);c.strokeStyle='rgba(120,92,44,.7)';c.lineWidth=2;c.stroke();
    square(pileOf(t),'rgba(120,86,40,.2)','rgba(255,236,190,.6)',1.5);
-   bases(t).forEach((b,i)=>square(b,COLORS[i]+'40',COLORS[i]+'d0',2));
+   /* ฐานที่ "ปล้นได้ตอนนี้" (มีของกองไว้ + เจ้าของไม่อยู่) กะพริบเส้นประ — ของตัวเองก็เห็น จะได้รีบกลับบ้าน */
+   const a=state.active;
+   bases(t).forEach((b,i)=>{
+     square(b,COLORS[i]+'40',COLORS[i]+'d0',2);
+     const o=a?.entrants[i];
+     if(!o||!o.stash.length||inBase(o,t))return;
+     if(o.stash.length===1&&o.stash[0].chews>0)return;
+     c.save();c.setLineDash([6,5]);c.lineDashOffset=-(performance.now()/55)%11;
+     square({x:b.x,y:b.y},null,'rgba(255,138,122,'+(.55+.35*Math.sin(performance.now()/200)).toFixed(2)+')',2.5);
+     c.restore();
+   });
    c.restore();
  }
  function foodImage(type){const im=typeof FOOD_IMAGES!=='undefined'&&FOOD_IMAGES[type];return im&&im.complete&&im.naturalWidth?im:null;}
@@ -650,10 +762,13 @@
    if(hud.time.textContent!==time)hud.time.textContent=time;
    hud.time.classList.toggle('is-urgent',a.countdown<=0&&!a.settled&&left<=10);
    const base=inBase(me,t),near=!me.carry&&nearestFood(a,me),chewable=base&&me.stash.length>0;
+   const loot=!me.carry&&!near?raidableAt(a,t,me):null;      // ยืนในฐานคนอื่นที่ปล้นได้อยู่ตอนนี้
    const nextKey=lastChewKey==='f'?'K':lastChewKey==='k'?'F':'F / K';
    const msg=a.settled?'หมดเวลา!':a.countdown>0?'ลูกศรกะพริบ = ทากของคุณ · ฐานสีเหลือง'
+     :me.robbedAt!=null&&a.elapsed-me.robbedAt<2.5?'⚠️ ฐานของคุณโดนขโมย! กลับไปเฝ้า/กินซะ'
      :chewable?'กด '+nextKey+' สลับกันเพื่อกิน!'
      :me.carry?'ลาก '+kindName(me.carry.type)+' '+me.carry.size+' กลับฐาน'
+     :loot?'กด F ขโมย '+kindName(loot.type)+' '+loot.size+' จากฐาน'+loot.owner+'!'
      :near?'กด F คาบ '+kindName(near.type)+' '+near.size+' (+'+foodPts(near)+')':'ไปที่พื้นที่อาหารกลางตู้';
    if(hud.status.textContent!==msg)hud.status.textContent=msg;
    const big=a.settled?'':a.countdown>0?String(Math.ceil(a.countdown)):a.elapsed<.8?'กิน!':'';
@@ -673,7 +788,8 @@
      hud.plate.classList.toggle('is-away',!base);}
    const m=mods(me),cost=dashCost(me.genes,m);
    hud.dashFill.style.height=me.gauge+'%';hud.dash.classList.toggle('ready',me.gauge>=cost&&me.dashT<=0);
-   hud.bite.disabled=!(me.carry||near);const bl=me.carry?'วาง':'คาบ';if(hud.biteLabel.textContent!==bl)hud.biteLabel.textContent=bl;
+   hud.bite.disabled=!(me.carry||near||loot);const bl=me.carry?'วาง':loot?'ขโมย':'คาบ';if(hud.biteLabel.textContent!==bl)hud.biteLabel.textContent=bl;
+   hud.bite.classList.toggle('is-loot',!!loot);
    hud.chew.hidden=!chewable;
    for(const k of ['f','k'])hud.chewBtn[k].classList.toggle('next',chewable&&lastChewKey!==k);
  }

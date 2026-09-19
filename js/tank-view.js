@@ -58,7 +58,9 @@ function intoLayer(c, box, sc, fn){
 }
 /* แปะชั้นลูก · rect = จำกัดเฉพาะกรอบที่ต้องใช้จริง (พิกัดจอ) จะได้ไม่ composite ทั้งผืน */
 function blitLayer(c, box, rect){
-  if(!c||!box) return;
+  /* ⚠️ 2026-09-18 เข้าตู้ตอนหน้าต่างไม่ได้วาดภาพ (แคนวาสกว้าง/สูง 0) → drawImage โยน InvalidStateError
+     ทั้งลูป drawTank ตายกลางคัน ตู้ค้างจนกว่าจะรีโหลด · กันไว้ตรงนี้ เฟรมนั้นข้ามไปเฉย ๆ */
+  if(!c||!box||!c.width||!c.height||box.w<=0||box.h<=0) return;
   const dx=tankCam.ox+box.x, dy=tankCam.oy+box.y;
   if(!rect){ tctx.drawImage(c, dx, dy, box.w, box.h); return; }
   const x0=Math.max(rect.x0,dx), y0=Math.max(rect.y0,dy);
@@ -350,6 +352,9 @@ function drawRoomFloor(ctx){
 }
 let _bgC=null, _bgX=null, _bgKey='';
 function drawTankBg(ctx){                 // แคชไว้ เปลี่ยนเฉพาะตอนกล้องขยับ/จอเปลี่ยนขนาด/วัสดุเปลี่ยน/ภาพโหลดเสร็จ
+  /* ⚠️ แคนวาสกว้าง/สูง 0 (เข้าตู้ตอนหน้าต่างยังไม่จัดเลย์เอาต์ / ย่อหน้าต่างจนสุด) → drawImage โยน
+     InvalidStateError แล้วลูปวาดตู้ตายทั้งเกม · กันแบบเดียวกับ blitLayer */
+  if(!tankCv.width||!tankCv.height)return false;
   const mats=curTank?tankRoomMats(curTank):null;
   if(!mats || !roomPat(ctx,mats.wall)) return false;
   const k=[TCW,TCH,tankCam.zoom.toFixed(4),Math.round(tankCam.ox),Math.round(tankCam.oy),
@@ -906,6 +911,8 @@ function canPlaceDecor(key, fx, fy, flip, ignore){
   if(curTank.def.tug){const b=decorRequiredBounds(key,fx,fy,flip);if(!b||tugLaneBlocked(curTank.def,b.top,b.bottom))return false;}
   /* ตู้แข่งกินจุ: แถบสนามหน้าตู้ต้องโล่งเสมอ แบบตู้แข่งวิ่ง/ชักเย่อ — กันวางหินดักทางคู่แข่ง (slug-eat.js ARENA_H) */
   if(curTank.def.eat&&window.SlugEat&&!SlugEat.decorOk(curTank,mine,decorRequiredBounds(key,fx,fy,flip)))return false;
+  /* ตู้ปาหิน: ลานปาอยู่ชิดหน้าตู้ ต้องโล่งเหมือนกัน (ผู้เล่นขอ 2026-09-19 — slug-throw.js LANE_H) */
+  if(curTank.def.throwing&&window.SlugThrow&&!SlugThrow.decorOk(curTank,mine,decorRequiredBounds(key,fx,fy,flip)))return false;
   if(!mine.size) return true;
   if(isBreeder(curTank)){const zone=fx<20?[0,20]:fx<25?[20,25]:[25,30];for(const k of mine){const [ix,iy]=k.split(',').map(Number),x=ix*DCELL,y=iy*DCELL;if(x<zone[0]||x+DCELL>zone[1])return false;if(zone[0]===20&&!(fy<1?y>=0&&y+DCELL<=1:fy>=curTank.def.h-1&&y>=curTank.def.h-1&&y+DCELL<=curTank.def.h))return false;}}
   for(const k of mine){ const c=k.split(','), ix=+c[0], iy=+c[1];
@@ -1573,10 +1580,19 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
   });
 }
 
-/* ---------- ฉากในตู้ (มองจากด้านหน้า — ขอบหน้าตรง ไม่มีมุมแหลม) ---------- */
+/* ---------- ฉากในตู้ (มองจากด้านหน้า — ขอบหน้าตรง ไม่มีมุมแหลม) ----------
+   ⚠️ 2026-09-18 เดิมต่อเฟรมถัดไป (requestAnimationFrame) ไว้ "บรรทัดสุดท้าย" ของฟังก์ชันวาด
+      เฟรมไหนโยน error กลางทาง = ไม่มีใครต่อเฟรม ลูปตายถาวร · แถม tankLoopOn ยังเป็น true อยู่
+      enterTank จึงไม่สตาร์ทลูปใหม่ → ตู้ค้างดำทั้งเกมจนกว่าจะรีเฟรชหน้า
+      ตอนนี้แยกตัวห่อ: วาดพังก็แค่ข้ามเฟรมนั้น แล้วต่อเฟรมถัดไปเสมอ */
 function drawTank(){
-  if(document.hidden||window.SlugRace?.isOpen()){window.DecorGLB?.hide();requestAnimationFrame(()=>{if(tankMode)drawTank();else tankLoopOn=false;});return;}
-  if(!curTank){requestAnimationFrame(()=>{if(tankMode)drawTank();else tankLoopOn=false;});return;}
+  try{ drawTankFrame(); }
+  catch(e){ if(!drawTank._warned){drawTank._warned=true;console.warn('[tank] วาดตู้ไม่ผ่าน ข้ามเฟรมนี้',e);} }
+  requestAnimationFrame(()=>{ if(tankMode) drawTank(); else tankLoopOn=false; });
+}
+function drawTankFrame(){
+  if(document.hidden||window.SlugRace?.isOpen()){window.DecorGLB?.hide();return;}
+  if(!curTank){return;}
   resizeTank();
   if(tankNeedFit){applyEnterView(tankFocus);tankNeedFit=false;}
   window.DecorGLB?.beginTank();
@@ -1593,6 +1609,7 @@ function drawTank(){
   if(window.SlugRace?.isRacing(curTank))SlugRace.updateTankFrame(performance.now());
   if(window.SlugTug?.isPulling(curTank))SlugTug.updateTankFrame(performance.now());
   if(window.SlugEat?.isEating(curTank))SlugEat.updateTankFrame(performance.now());
+  if(window.SlugThrow?.isThrowing(curTank))SlugThrow.updateTankFrame(performance.now());
 
   const fw=curTank.def.w, fh=curTank.def.h;
   const wallH=wallCells(), standH=STAND_CELLS, sandT=SAND_CELLS;   // ความสูง (หน่วยช่อง)
@@ -1641,6 +1658,7 @@ function drawTank(){
     if(curTank.def.race&&window.SlugRace)SlugRace.drawTrack(tctx,(x,y)=>S(x,y,sandT));
     if(curTank.def.tug&&window.SlugTug)SlugTug.drawLane(tctx,(x,y)=>S(x,y,sandT));
     if(curTank.def.eat&&window.SlugEat)SlugEat.drawArena(tctx,(x,y)=>S(x,y,sandT),curTank);
+    if(curTank.def.throwing&&window.SlugThrow)SlugThrow.drawField(tctx,(x,y)=>S(x,y,sandT),curTank);
   };
   /* ---------- ชั้นนิ่งที่อยู่ "หน้า" ตัวทาก: น้ำ + ผิวน้ำ + กระจกใกล้ ---------- */
   const drawGlass=(x)=>{
@@ -1657,7 +1675,7 @@ function drawTank(){
     SIDES.map(s=>face(s.a,s.b,sandT,wallH)).sort(byFar).slice(2)
          .forEach(f=> qfill(f.p,'rgba(150,205,215,0.05)','rgba(200,235,240,0.24)',1.3));
   };
-  const layKey=[window.DecorGLB?.viewRevision||0,TCW,TCH,DPR,tankCam.zoom.toFixed(4),fw,fh,wallH,!!curTank.def.race,!!curTank.def.tug,!!curTank.def.eat,
+  const layKey=[window.DecorGLB?.viewRevision||0,TCW,TCH,DPR,tankCam.zoom.toFixed(4),fw,fh,wallH,!!curTank.def.race,!!curTank.def.tug,!!curTank.def.eat,!!curTank.def.throwing,
                 (_sandImg&&_sandImg.naturalWidth)?1:0, texOK(woodSrc())?1:0].join('|');
   if(performance.now() >= _zoomBusyT && (_lay.key!==layKey || !layCovers())){
     const box=layBox();
@@ -1705,6 +1723,8 @@ function drawTank(){
 
   /* ชักเย่อ: เชือก+ผ้าแดงต้องอยู่ "ใต้" ทาก 3D ซึ่งวาดบนแคนวาส WebGL ที่ซ้อนอยู่เหนือชั้นพื้นหลังนี้ */
   if(window.SlugTug?.isPulling(curTank))SlugTug.drawUnder();
+  /* สายไข่ตู้เพาะ: ต้องวาดก่อนแยกชั้น ไม่งั้นไปอยู่บนแคนวาสชั้นหน้าแล้วทับตัวทาก 3D (breeding.js) */
+  if(typeof drawBreederEggs==='function')drawBreederEggs(curTank);
   window.DecorGLB?.splitTankBackground();
   // --- delta time + พฤติกรรม ---
   const now=performance.now(); let dt=(now-(tankLastT||now))/1000; tankLastT=now; if(dt>0.05) dt=0.05;
@@ -1712,14 +1732,17 @@ function drawTank(){
   const pulling=!racing&&!!window.SlugTug?.isPulling(curTank);
   /* แข่งกินจุ: ผู้แข่ง 4 ตัววาด/เดินโดย slug-eat.js ทั้งหมด · ทากอื่นในตู้เดินเล่นได้แต่อยู่หลังแถบสนาม (SlugEat.stepNormal) */
   const eating=!racing&&!pulling&&!!window.SlugEat?.isEating(curTank);
+  /* ปาหิน: ผู้แข่ง 4 ตัววาดโดย slug-throw.js · ทากอื่นเดินได้แต่อยู่หลังลานปา */
+  const throwing=!racing&&!pulling&&!eating&&!!window.SlugThrow?.isThrowing(curTank);
   /* ตัวที่ลงแข่งชักเย่อถูกคัดออกจาก slugs — ทั้งเดินและวาดจะถูกคุมโดย slug-tug.js เองทั้งหมด
      (แบบเดียวกับนักวิ่งใน slug-race.js) ที่เหลือในตู้กลายเป็นผู้ชมยืนดูขอบตู้ */
-  const slugs=racing?SlugRace.normalSlugs(curTank):pulling?SlugTug.spectatorSlugs(curTank):eating?SlugEat.normalSlugs(curTank):curTank.slugs;
+  const slugs=racing?SlugRace.normalSlugs(curTank):pulling?SlugTug.spectatorSlugs(curTank):eating?SlugEat.normalSlugs(curTank):throwing?SlugThrow.normalSlugs(curTank):curTank.slugs;
   tuneSpriteBudget(dt*1000);
   _tsprBudget = TSPR_MAX;                 // งบเรนเดอร์สไปรต์ต่อเฟรม ปรับตามความเร็วเครื่อง
   if(racing)SlugRace.stepNormal(slugs,dt);
   else if(pulling)SlugTug.stepSpectators(slugs,dt);
   else if(eating)SlugEat.stepNormal(slugs,dt);
+  else if(throwing)SlugThrow.stepNormal(slugs,dt);
   else stepTankSlugs(heldSlug? slugs.filter(s=>s!==heldSlug) : slugs, fw, fh, dt, true, curTank.decor, curTank.def);
 
   // --- วาดทาก + ของตกแต่ง รวมกัน เรียงลึก (fy มาก=ไกล วาดก่อน) · clip กล่องแก้วแบบเปิดฝา ---
@@ -1738,6 +1761,7 @@ function drawTank(){
   if(racing)items.push(...SlugRace.racingItems());
   if(pulling)items.push(...SlugTug.tugItems());
   if(eating)items.push(...SlugEat.items());
+  if(throwing)items.push(...SlugThrow.items());
   items.sort((a,b)=> b.sortY - a.sortY);
   const ghKey = dragDecor ? dragDecor.key : (tankBuildMode ? selDecorKey : null);
   const ghPos = dragDecor ? dragGhost : decorHover;
@@ -1746,6 +1770,7 @@ function drawTank(){
     if(it.kind==='race'){SlugRace.drawRunner(it.r,it.i);return;}
     if(it.kind==='tug'){SlugTug.drawPart(it);return;}
     if(it.kind==='eat'){SlugEat.drawItem(it);return;}
+    if(it.kind==='throw'){SlugThrow.drawItem(it);return;}
     if(it.kind==='food'){drawFood(it.f);return;}
     if(it.kind==='decor'){ drawDecor(it.d); return; }
     const s=it.s;
@@ -1832,7 +1857,6 @@ function drawTank(){
   if(haveLay) blitLayer(_lay.glass, _lay.box, vis); else drawGlass(tctx);
   if(selSlug) drawGeneCard(selSlug, 12, 12);
   window.DecorGLB?.endTank();
-  requestAnimationFrame(()=>{ if(tankMode) drawTank(); else tankLoopOn=false; });
 }
 
 /* ---- การ์ดยีน (ยกเครื่อง 2026-09-14) ----

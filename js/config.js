@@ -10,7 +10,7 @@ const CM_PER_BIG = 50;     // 1 ช่องใหญ่ = 50 ซม.
 const CM_PER_CELL= CM_PER_BIG / SUB;   // = 5 ซม. ต่อช่องเล็ก
 const START_BW   = 8;      // พื้นที่เริ่มต้น กว้าง (ช่องใหญ่) = 4 เมตร
 const START_BH   = 6;      // พื้นที่เริ่มต้น ลึก (ช่องใหญ่) = 3 เมตร
-const MAX_B      = 32;     // ขยายได้ถึง 32×32 ช่องใหญ่ (16×16 เมตร)
+const MAX_B      = 64;     // ขยายได้ถึง 64×64 ช่องใหญ่ (32×32 เมตร) — ผู้เล่นขอพื้นที่สูงสุดเยอะขึ้น 2026-09-18 (เดิม 32×32)
 const TW         = 26;     // ครึ่งกว้างช่องเล็กบนจอ (ไอโซเมตริก)
 const TH         = 13;     // ครึ่งสูงช่องเล็กบนจอ
 
@@ -88,12 +88,57 @@ function slugCm(g){ return 6 + (g.girth/100)*4; }
    จากเคาน์เตอร์ทางเดียว · ตลาดโลก 5 ช่อง (ขายเร็วสุด 30 น.) เติมอีก ~2,600 หักค่าอาหาร
    ~290 (ทากกิน 50 หน่วยอิ่ม/ชม. × 0.1 เหรียญ/หน่วย) → สุทธิ ~3,470 = 3.02 เท่าของเดิม
    สูตร: EXPAND_BASE = 200 × (รายได้จริง ÷ 1,150) · วัดรายได้จริงได้จาก js/econ-stats.js */
-const EXPAND_BASE = 600;
-const EXPAND_EXP  = 0.65;
+/* ⚠️ 2026-09-18 เปลี่ยนเป็น "ราคาขึ้นเป็น % ต่อช่อง โดย % ค่อย ๆ ลดลง" (ผู้เล่นออกแบบ)
+   ช่องแรกแพงขึ้นช่องละ EXPAND_RATE_HI (3%) แล้วอัตราลดลงแบบ exp เข้าหา EXPAND_RATE_LO (0.5%)
+   ครึ่งทางที่ EXPAND_RATE_K ช่อง → ช่องที่ 40 = 1.42% · ช่องที่ 100 = 0.71% · ช่องที่ 200 = 0.52%
+   ต้นเกมจึงยังขึ้นราคาชัด (ไม่ขึ้นเลยก็จืด) แต่ไม่ระเบิดแบบ 3% ทบต้นทั้งเส้น
+   ราคาจริงที่ EXPAND_BASE=400: 60 ช่อง 550 · 100 ช่อง 1,050 · 200 ช่อง 2,400 · 500 ช่อง 10,000
+   รู้สึกแพง/ถูกไป: ขยับ EXPAND_BASE ก่อน · อยากให้ปลายเกมชันน้อยลงค่อยลด EXPAND_RATE_LO */
+const EXPAND_BASE = 400;
+const EXPAND_RATE_HI = .03, EXPAND_RATE_LO = .005, EXPAND_RATE_K = 40;
 const START_AREA  = START_BW * START_BH;
-function expandTileCost(area){ return Math.round(EXPAND_BASE*Math.pow(Math.max(1,area)/START_AREA, EXPAND_EXP)); }
+/* ผลคูณสะสมของอัตรา เก็บแคชไว้ (expandCost เรียกทีละช่อง ถ้าคำนวณใหม่ทุกครั้งจะเป็น O(n²)) */
+const _expandLn=[0];
+function expandTileCost(area){
+  const n=Math.max(0,Math.round(Math.max(1,area)-START_AREA));
+  for(let k=_expandLn.length-1;k<n;k++)                 // ราคา = BASE × Π(1+อัตราของช่องก่อนหน้า)
+    _expandLn.push(_expandLn[k]+Math.log(1+EXPAND_RATE_LO+(EXPAND_RATE_HI-EXPAND_RATE_LO)*Math.exp(-k/EXPAND_RATE_K)));
+  return Math.round(EXPAND_BASE*Math.exp(_expandLn[n]));
+}
 function expandCost(n, area){ let s=0; for(let i=0;i<n;i++) s+=expandTileCost(area+i); return s; }
 const DECO_REFUND = 0.5;   // เก็บของตกแต่งคืนได้กี่ % ของราคา
+
+/* ---- จังหวะกิจกรรมตู้แข่ง (ผู้เล่นกำหนด 2026-09-18 · เกมขายแบบเล่นยาว) ----
+   คำท้าของแต่ละตู้มาทุก EVENT_GAP_MIN–EVENT_GAP_MAX นาที (สุ่ม)
+   ถ้าตู้ไหนมาก่อน ตู้อื่นต้องรออีก EVENT_SPACING ก่อนถึงจะมาได้ — กันมาพร้อมกันทีเดียวหลายตู้แล้วเงียบยาว
+   ตัวนับอยู่ในหน่วยความจำอย่างเดียว (ปิดเกมแล้วเริ่มใหม่) เพราะเป็นแค่ช่วงเว้นสั้น ๆ
+   ⚠️ 2026-09-18 รอบสอง: 30–60 นาทีแล้วเงียบเกินไป (ผู้เล่น "ดูไม่มีอะไรทำ")
+      → 20–45 นาที · 4 ตู้รวมกันเฉลี่ยราว 8 นาทีครั้ง · เว้นระหว่างตู้ 5 นาที จะได้ไม่มารัวติดกัน */
+const EVENT_GAP_MIN = 20*60*1000, EVENT_GAP_MAX = 45*60*1000;
+const EVENT_SPACING = 5*60*1000;
+/* ---- เพดานอัตราการกดปุ่มรัวในตู้แข่งทุกโหมด ----
+   ⚠️ 2026-09-19 ผู้เล่นกำหนด 20 ครั้ง/วิ — "คนที่กดเร็วก็มี ถ้าไม่เกินก็ไม่ควรจะเป็นไม่เกิน"
+   เดิมไม่มีเพดานเลย คีย์บอร์ดมาโคร/เทอร์โบ 30+ ครั้ง/วิ กวาดชนะได้ทุกโหมด
+     (วัดจริง: ปาหินกดมั่วทุกเฟรมได้ที่ 1 · วิ่งปั๊มกำแพงจนคู่แข่งขยับไม่ได้)
+   ใช้ถังโทเคน ไม่ใช่ "ห้ามเร็วกว่า 50ms" ตรง ๆ — มือคนกดรัวจริงจะมีจังหวะกระชากสั้น ๆ เกินเพดานอยู่แล้ว
+   เก็บโทเคนสำรองไว้ PRESS_CAP_BURST ครั้ง กระชากได้ แต่ค่าเฉลี่ยยาว ๆ ถูกตรึงที่ 20/วิ */
+const PRESS_CAP_HZ = 20, PRESS_CAP_BURST = 3;
+function makePressLimiter(hz=PRESS_CAP_HZ, burst=PRESS_CAP_BURST){
+  let tokens=burst, last=0;
+  return function(now=performance.now()){
+    if(!last)last=now;
+    tokens=Math.min(burst, tokens+Math.max(0,now-last)/1000*hz); last=now;
+    if(tokens<1)return false;                    // เกินเพดาน = ปุ่มนี้ไม่ถูกนับ (ไม่ขยับ ไม่ได้เกจ)
+    tokens-=1; return true;
+  };
+}
+const ShopEvents = {
+  last: 0,
+  gap(){ return EVENT_GAP_MIN + Math.random()*(EVENT_GAP_MAX-EVENT_GAP_MIN); },
+  ready(){ return Date.now() >= this.last + EVENT_SPACING; },      // ตู้อื่นเพิ่งส่งคำท้าไปหรือยัง
+  mark(){ this.last = Date.now(); },
+};
+try{ window.ShopEvents = ShopEvents; }catch(_){}
 
 /* ---- การเรนเดอร์ตู้ในหน้าร้าน ---- */
 const STAND_H = 30;        // ความสูงขาตั้ง (โลก px)
@@ -130,13 +175,15 @@ const SLUG_WID_CELLS = 20 / CM_PER_CELL;            // 4 ช่อง
    ของตกแต่ง: w,h = footprint · col = สี
    foodMax = วางอาหารพร้อมกันได้กี่ชิ้นในตู้นั้น (ตู้ใหญ่วางได้เยอะกว่า — ดู feeding.js)   */
 const TANK_GLASS_COLOR='#9fd0f0';                  // ทุกขนาดใช้น้ำ/กระจกสีเดียวกัน
+const BREEDER_MAX=5;                               // ⚙️ ตู้เพาะพันธุ์ต่อร้าน (ผู้เล่นกำหนด 2026-09-18) · ตู้แข่ง/ชักเย่อ/แข่งกิน = อย่างละ 1
 const CATALOG = {
   tank_showcase:{kind:'tank',name:'ตู้โชว์',icon:'🔎',price:500,w:SUB,h:SUB,glass:TANK_GLASS_COLOR,foodMax:8,maxSlugs:1,shopSlugScale:7.2,decorScale:1.3},
   tank_race:{kind:'tank',name:'ตู้แข่งทากทะเล',icon:'🏁',price:2500,w:4*SUB,h:2*SUB,glass:TANK_GLASS_COLOR,race:true,foodMax:24},
   tank_tug:{kind:'tank',name:'ตู้ชักเย่อ',icon:'🪢',price:2500,w:2*SUB,h:SUB,glass:TANK_GLASS_COLOR,tug:true,foodMax:12},
   tank_eat:{kind:'tank',name:'ตู้แข่งกินจุ',icon:'🍽️',price:2500,w:2*SUB,h:2*SUB,glass:TANK_GLASS_COLOR,eat:true,foodMax:8},   // 100×100 ซม. · แข่ง 4 ตัว (slug-eat.js)
+  tank_throw:{kind:'tank',name:'ตู้ปาหิน',icon:'🪨',price:2500,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,throwing:true,foodMax:8},   // 150×50 ซม. · ปาหินด้วยหงอน 4 ตัว (slug-throw.js)
   play_table:{kind:'deco',name:'โต๊ะเล่นกับทาก',icon:'',price:500,w:SUB,h:SUB,col:'#98744b',playTable:true},
-  tank_breed:{kind:'tank',name:'ตู้เพาะพันธุ์ 3 ส่วน',icon:'🥚',price:2000,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,breeder:true,foodMax:10},
+  tank_breed:{kind:'tank',name:'ตู้เพาะพันธุ์ 3 ส่วน',icon:'🥚',price:2000,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,breeder:true,foodMax:10},   // มีได้ BREEDER_MAX ตู้ (shop-floor.js placeBuy)
   counter: {kind:'deco',name:'เคาน์เตอร์แมวขายทาก',icon:'🐱',price:0,w:2*SUB,h:2*SUB,col:'#826448'},
   tank_s:  {kind:'tank', name:'ตู้เล็ก',  icon:'🐚', price:500,  w:1*SUB, h:1*SUB, glass:TANK_GLASS_COLOR, foodMax:8},
   tank_m:  {kind:'tank', name:'ตู้กลาง', icon:'🪸', price:1500, w:2*SUB, h:1*SUB, glass:TANK_GLASS_COLOR, foodMax:10},

@@ -1,0 +1,166 @@
+{
+  "capturedAt": "2026-09-18T23:01:29.144Z",
+  "scope": "Source review and isolated function invocation; no whole-game FPS or hardware emulation",
+  "checks": {
+    "unchangedQuest": {
+      "calls": 60,
+      "innerHTMLWrites": 60,
+      "bindToggleCalls": 60
+    },
+    "unchangedEmptyBoxShop": {
+      "calls": 60,
+      "innerHTMLWrites": 60
+    },
+    "peopleTimeAt100msCadence": {
+      "elapsedSeconds": 10,
+      "simulatedSeconds": 4.99999999999999,
+      "scope": "Actual stepPeople time prefix only; 100ms is configured fallback cadence, not a measured browser interval"
+    }
+  },
+  "evidence": [
+    {
+      "file": "js/quests.js",
+      "sha256": "77cf206da35f548705217744431ead1375f7a26d3e82234b743ec928071988bd",
+      "anchors": [
+        {
+          "line": 248,
+          "text": " function renderCard(){"
+        },
+        {
+          "line": 362,
+          "text": " setInterval(function(){"
+        }
+      ]
+    },
+    {
+      "file": "js/slug-box-shop.js",
+      "sha256": "c81a8d67c3fa0915bc80ccd7aea4551792310a2f275cd95bcf49360f71387cf6",
+      "anchors": [
+        {
+          "line": 72,
+          "text": "function renderSlugShop(){"
+        },
+        {
+          "line": 133,
+          "text": "setInterval(()=>{"
+        }
+      ]
+    },
+    {
+      "file": "js/tank-hygiene.js",
+      "sha256": "c77a21efb3f2520128fa35d2ef36f9c88dfa25f4b6c9b51dee37e4cff60003f2",
+      "anchors": [
+        {
+          "line": 40,
+          "text": "function rebuildAlgaeSurface(o,h,now){"
+        },
+        {
+          "line": 45,
+          "text": " // No coloured texture is allocated for offscreen tanks. Masks are only rebuilt"
+        },
+        {
+          "line": 100,
+          "text": " setInterval(()=>{for(const o of [...G.objs,...G.shelter])if(o.type==='tank')tankHygiene(o);update();},1000);update();"
+        }
+      ]
+    },
+    {
+      "file": "js/people.js",
+      "sha256": "c8c74cf37621c1457996f49c4c715a5f2a191f2b744c5b6f853c2803cbc41686",
+      "anchors": [
+        {
+          "line": 78,
+          "text": "  if(!a||!b||![a.x,a.y,b.x,b.y].every(Number.isFinite)||a.x<E||a.y<E||a.x>cellsW()-E||a.y>cellsH()-E||b.x<E||b.y<E||b.x>cellsW()-E||b.y>cellsH()-E)return false;"
+        },
+        {
+          "line": 732,
+          "text": "  if(dt > 0.05) dt = 0.05;"
+        }
+      ]
+    },
+    {
+      "file": "js/shop-floor.js",
+      "sha256": "d55e30d1795e8ffb767f772ca39b2520ef170d32e443aa9492e52ec1d77284f2",
+      "anchors": [
+        {
+          "line": 1043,
+          "text": "   ผิดกฎ AGENTS.md ข้อ 5 — ตัวนี้อุดเฉพาะช่องว่างนั้น ใช้ setInterval เพราะเบราว์เซอร์ไม่หยุด"
+        },
+        {
+          "line": 1044,
+          "text": "   setInterval สนิทตอนแท็บซ่อนเหมือนที่หยุด requestAnimationFrame (ดู breeding.js/tank-hygiene.js) */"
+        },
+        {
+          "line": 1062,
+          "text": "setInterval(stepShopSimulation, 100);"
+        }
+      ]
+    },
+    {
+      "file": "js/decor-glb.js",
+      "sha256": "db30717665fdf4dfc66e929b1839c3c4eb9935516aa7102ea6a8782476e60230",
+      "anchors": [
+        {
+          "line": 292,
+          "text": "function fillDepth(mesh,faces){"
+        },
+        {
+          "line": 294,
+          "text": " if(!a||a.array.length<needed){"
+        },
+        {
+          "line": 304,
+          "text": "function updateShopOcclusion(key){"
+        },
+        {
+          "line": 377,
+          "text": " api.ready=true;sizeCanvas();setInterval(preloadOwned,3000);idle(preloadOwned);status.textContent=RELEASE_ALL?'':'GLB real-time · ทดสอบไหโบราณแตกก่อน';"
+        },
+        {
+          "line": 380,
+          "text": " document.addEventListener('visibilitychange',()=>{if(document.hidden){canvas.style.display='none';bgCanvas.style.display='none';}else{signature='';thumbDirty=true;}});"
+        }
+      ]
+    },
+    {
+      "file": "js/play-table.js",
+      "sha256": "a7626ab38fcba01a10370762dc28107bdec346f1e3b0bc95df7f4cdeb3ba9bf1",
+      "anchors": [
+        {
+          "line": 276,
+          "text": " function frame(now){raf=0;if(!dialog.open||document.hidden)return;const dt=Math.min(.1,(now-(last||now))/1000);last=now;"
+        },
+        {
+          "line": 294,
+          "text": " document.addEventListener('visibilitychange',()=>{input.held=false;pointer=null;updateTool();if(document.hidden){cancelAnimationFrame(raf);raf=0;if(dialog.open)saveGame();}else if(dialog.open){last=0;resizeScene();raf=requestAnimationFrame(frame);}});"
+        }
+      ]
+    },
+    {
+      "file": "js/slug-crowd.js",
+      "sha256": "9dafbb08f2a60f996dfe7e7f97fa121b00ac181101ba029c847311cc074bddc8",
+      "anchors": [
+        {
+          "line": 53,
+          "text": "      ⚠️ 2026-09-18 เคยทำเป็น InstancedBufferAttribute (crowdGlass) แล้ว \"หงอนหายทั้งเกม\":"
+        },
+        {
+          "line": 61,
+          "text": "    shader.uniforms.crowdGlass=glass;"
+        },
+        {
+          "line": 63,
+          "text": "      .replace('#include <common>','#include <common>\\nuniform vec4 crowdGlass;')"
+        },
+        {
+          "line": 64,
+          "text": "      .replace('#include <colorspace_fragment>','#include <colorspace_fragment>\\ngl_FragColor.rgb=mix(gl_FragColor.rgb,crowdGlass.rgb,crowdGlass.a);');"
+        },
+        {
+          "line": 149,
+          "text": "     /* สีจากยีนเขียนตรง ๆ — สีกระจกไปย้อมทีหลังใน shader ผ่าน uniform crowdGlass (ดูคอมเมนต์ตอนสร้าง material) */"
+        }
+      ]
+    }
+  ]
+}

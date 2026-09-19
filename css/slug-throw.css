@@ -1,0 +1,71 @@
+/* ปาหินด้วยหงอน (js/slug-throw.js) — ใช้ธีมโมดอล .slug-race-dialog และแถบอันดับ .eat-board ร่วมกัน */
+body.throw-in-tank{overflow:hidden}
+.throw-in-tank #ov{position:fixed!important;inset:0!important;z-index:50;padding:env(safe-area-inset-top) 0 0!important;box-sizing:border-box}
+.throw-in-tank #ov .ov-top{flex:0 0 auto;min-height:38px!important;padding:6px 14px!important}
+.throw-in-tank #ov .ov-title{font-size:15px!important}
+.throw-in-tank #ov .ov-body{padding:0!important;overflow:hidden}
+.throw-in-tank #ovBack,.throw-in-tank #ov .ov-top .stat,.throw-in-tank #ov .tank-side,.throw-in-tank #ov .ov-decor,.throw-in-tank #ov .mobileTankBar,.throw-in-tank #ov .mobileTankZoom,.throw-in-tank #tankDecorDock,.throw-in-tank #newSlugTray{display:none!important}
+.throw-in-tank #tankCv{pointer-events:none;touch-action:none}
+
+#throwTankHUD{position:absolute;inset:0;z-index:15;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;pointer-events:none}
+.throw-top{position:absolute;top:10px;left:50%;transform:translateX(-50%);max-width:calc(100% - 24px);box-sizing:border-box;padding:7px 22px;background:#17393fe8;border:1px solid #b69c66;border-radius:12px;text-align:center;color:#f3e8ca;white-space:nowrap;box-shadow:0 4px 16px #0004}
+.throw-turn{font-size:19px;font-weight:800;color:#ffe19b}
+.throw-hint{font-size:13px;color:#c8dbd2;margin-top:2px}
+
+/* แถบแรง / แถบองศา */
+.throw-meters{position:absolute;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(520px,calc(100% - 32px));display:flex;flex-direction:column;gap:10px}
+.throw-meter{padding:8px 12px 10px;background:#10292ed9;border:1px solid #b69c6680;border-radius:12px;opacity:.55;transition:opacity .15s}
+.throw-meter.is-live{opacity:1;border-color:#ffd36b;box-shadow:0 0 0 2px #ffd36b33}
+.throw-meter-head{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#f3e8ca;margin-bottom:5px}
+.throw-meter-head b{font-variant-numeric:tabular-nums;color:#ffe19b}
+.throw-bar{position:relative;height:18px;border-radius:9px;background:#0007;overflow:hidden}
+.is-power .throw-bar{background:linear-gradient(90deg,#2c4a52,#c9723f 70%,#ff9d54)}
+.is-angle .throw-bar{background:linear-gradient(90deg,#2c4a52,#3f7f68,#2c4a52)}
+.throw-zone{position:absolute;top:0;bottom:0;background:#9fe3a655;border-left:1px solid #9fe3a6;border-right:1px solid #9fe3a6}
+.throw-mark{position:absolute;top:-3px;bottom:-3px;width:4px;margin-left:-2px;border-radius:2px;background:#fff3c4;box-shadow:0 0 8px #ffe19b}
+
+.throw-controls{position:absolute;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%)}
+.throw-btn{pointer-events:auto;touch-action:none;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:150px;height:68px;border:1px solid #c1a76d;border-bottom:4px solid #78623b;border-radius:14px;font:800 24px "IBM Plex Sans Thai",sans-serif;background:linear-gradient(#3d696c,#23484e);color:#fff0c8;box-shadow:0 5px 18px #0005;cursor:pointer}
+.throw-btn:disabled{opacity:.4}
+.throw-btn.is-live{background:linear-gradient(#f6dc98,#d6ae5c);color:#1d2f31;border-color:#ffe2a0;animation:throwPulse .7s ease-in-out infinite}
+.throw-btn:active{transform:translateY(3px)}
+.throw-key{font-size:11px;font-weight:600;opacity:.8}
+@keyframes throwPulse{50%{transform:scale(1.05)}}
+
+#throwTankHUD .eat-board{top:auto;bottom:calc(200px + env(safe-area-inset-bottom));left:12px}
+@media (max-width:560px){
+  .throw-turn{font-size:16px}
+  .throw-meters{bottom:calc(90px + env(safe-area-inset-bottom))}
+  .throw-btn{min-width:120px;height:60px;font-size:20px}
+  #throwTankHUD .eat-board{bottom:calc(210px + env(safe-area-inset-bottom));min-width:112px}
+}
+@media (prefers-reduced-motion:reduce){.throw-btn.is-live{animation:none}}
+/* รอบสองของดีไซน์: โซนฟาวล์ · ช่วงเร่งแรง F/K · แถบคลื่น · ปุ่มข้ามตาบอท — 2026-09-18 */
+.throw-zone.is-foul{background:#ff6a5a55;border-color:#ff8a7a}
+.throw-meters[hidden],.throw-fly[hidden]{display:none}
+.throw-fly{position:absolute;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(560px,calc(100% - 32px));display:flex;flex-direction:column;gap:10px}
+.throw-boost,.throw-wavebox{padding:8px 12px 10px;background:#10292ee8;border:1px solid #ffd36b;border-radius:12px}
+.throw-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,#ffb45e,#ffe19b)}
+.throw-clock{margin-top:4px;font-size:12px;color:#ffd7a0;text-align:right;font-variant-numeric:tabular-nums}
+/* รางคลื่น: ลูกคลื่นวิ่งจากขวาเข้าเส้นเป้าทางซ้าย */
+.throw-wave-track{position:relative;height:30px;border-radius:8px;background:linear-gradient(90deg,#123a44,#0b2a31);overflow:hidden}
+.throw-wave-goal{position:absolute;left:88%;top:0;bottom:0;width:4px;margin-left:-2px;background:#ffe19b;box-shadow:0 0 10px #ffe19b}
+.throw-wave{position:absolute;top:4px;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#bff0f8,#3f8fa0);border:1px solid #9fe3ee}
+.throw-wave.is-hit{background:radial-gradient(circle at 40% 35%,#d8ffd8,#4fae6a);border-color:#9fe3a6}
+.throw-wave.is-miss{background:#6b2f2a;border-color:#ff8a7a;opacity:.6}
+.throw-side{min-width:72px}
+.throw-side[hidden]{display:none}
+.throw-controls{display:flex;gap:10px;align-items:flex-end}
+.throw-skip{pointer-events:auto;position:absolute;right:16px;bottom:calc(20px + env(safe-area-inset-bottom));padding:10px 16px;border-radius:12px;font:700 15px "IBM Plex Sans Thai",sans-serif;color:#1d2f31;background:linear-gradient(180deg,#f6dc98,#d6ae5c);border:1px solid #f6dc98;box-shadow:0 3px 0 #8a6a2c,0 6px 16px #0007;cursor:pointer}
+.throw-skip[hidden]{display:none}
+.throw-shots{display:block;font-size:11px;color:#c9ddd1;margin-top:3px}
+.throw-live{margin-top:4px;font-size:13px;font-weight:700;color:#ffe19b;text-align:center;font-variant-numeric:tabular-nums}
+
+/* ---- มาตรวัดมุมหัวหิน (ช่วงหินตก) — ผู้เล่นออกแบบ 2026-09-19 ----
+   กลางแถบ = หัวราบ เพรียวลม · ซ้าย = หัวจม · ขวา = หัวเชิด · กด Space งัดหัวขึ้นรับคลื่นให้พอดี */
+.throw-pitch{position:relative;height:16px;margin-top:8px;border-radius:8px;background:linear-gradient(90deg,#5a2a2a,#2c4a4f 42%,#2c4a4f 58%,#5a2a2a);border:1px solid #5c7076;transition:box-shadow .12s}
+.throw-pitch.is-flat{box-shadow:0 0 0 2px #9fe3ee66}
+.throw-pitch.is-bad{box-shadow:0 0 0 2px #ff8a7a88}
+.throw-pitch-flat{position:absolute;left:42%;width:16%;top:0;bottom:0;background:#9fe3ee2e;border-left:1px solid #9fe3ee77;border-right:1px solid #9fe3ee77}
+.throw-pitch-mark{position:absolute;top:-3px;width:4px;height:22px;margin-left:-2px;border-radius:2px;background:#ffe1a0;box-shadow:0 0 6px #000a;transition:left .06s linear}
+.throw-pitch-labels{position:absolute;left:0;right:0;top:18px;display:flex;justify-content:space-between;font-size:10px;color:#a9c2c6}

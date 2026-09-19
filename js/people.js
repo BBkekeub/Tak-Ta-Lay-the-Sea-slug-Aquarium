@@ -28,7 +28,9 @@ const PERSON_R        = 2.5;     // รัศมีกันชนกับต�
 const PERSON_EDGE     = 2.0;     // เว้นจากขอบพื้นร้าน (ช่องเล็ก)
 const LOOK_MIN = 5, LOOK_MAX = 5;    // ยืนดูตู้นานแค่ไหน (วินาที)
 const STROLL_MIN = 1, STROLL_MAX = 2;    // เดินเล่นกี่จุดคั่นระหว่างตู้
-const VISIT_MIN = 2,  VISIT_MAX = 5;     // ดูกี่ตู้ก่อนกลับ
+/* ดูกี่ตู้ก่อนกลับ — 2–5 → 3–7 (2026-09-19): ลูกค้าอยู่ในร้านนานขึ้น คนเลยค้างอยู่ในฉากพร้อมกันเยอะขึ้น
+   ทำให้ร้านดูคึกคักโดยไม่ต้องเร่งอัตราคนเข้าอย่างเดียว (เดินเข้า-ออกถี่ ๆ ดูวุ่นแต่ร้านโล่ง) */
+const VISIT_MIN = 3,  VISIT_MAX = 7;
 // Arrival timing is computed from the slugs displayed in the shop.
 const PERSON_GAP = 7.0;          // ระยะห่างระหว่างคน (ช่องเล็ก = 35 ซม.) — กันยืนซ้อนกัน
 /* ⚠️ ดันขึ้นเป็น 8.5 แล้วแย่ลง: แรงแยกไปชนกันชนของตู้บ่อยขึ้น ดันไม่ออก
@@ -254,7 +256,7 @@ function personGesture(action,t,dur){
   return ss(Math.max(0,Math.min(1,(d-t)/fall)));
 }
 function beginPersonBrowse(p){
-  p.state='look';p.t=0;p.lookT=(p.raceChallenger||p.tugChallenger||p.eatChallenger)?Infinity:5;p._browseActed=false;
+  p.state='look';p.t=0;p.lookT=(p.raceChallenger||p.tugChallenger||p.eatChallenger||p.throwChallenger)?Infinity:5;p._browseActed=false;
   p.action='watch';p.actionT=0;p.actionDuration=0;p.socialPartner=null;
   p.socialCooldown=.5+Math.random()*.5;
 }
@@ -302,7 +304,22 @@ function stepPersonLife(p,dt){
 
 // Floor area controls occupancy; displayed slugs control arrival frequency.
 let _arrivalScore=null, _pendingParty=null, _arrivalRetryAt=0;
-function visitorCapacity(){return Math.max(0,Math.floor(floorArea()/4));}
+/* ⚠️ 2026-09-19 ผู้เล่น: "ขอให้ร้านมันดูคึกคักขึ้นมาหน่อย" — เดิม 1 คนต่อ 4 ช่อง (ร้านเริ่มต้น 48 ช่อง = 12 คน)
+   ลดเหลือ 1 คนต่อ 3 ช่อง → ร้านเริ่มต้นรับได้ 16 คน · พื้นที่เท่าเดิมแต่คนแน่นขึ้นครึ่งหนึ่ง */
+function visitorCapacity(){return Math.max(0,Math.floor(floorArea()/3));}
+/* ---- โควตาคนในร้าน แยกกันคนละถัง (ผู้เล่นสั่ง 2026-09-19) ----
+   ⚠️ เดิมผู้ท้าแข่ง 9 คน (กินจุ 3 + ปาหิน 3 + วิ่ง 2 + ชักเย่อ 1) กับพ่อค้า นับรวมโควตาเดียวกับลูกค้า
+      ร้าน 48 ช่อง = ความจุ 12 → เหลือที่ให้ลูกค้าจริงแค่ 3 · ร้าน 24 ช่อง = เหลือ 0 (ลูกค้าเข้าไม่ได้เลย)
+   ตอนนี้: ลูกค้าใช้ visitorCapacity() ของตัวเอง · ผู้ท้าแข่ง/พ่อค้ามีเพดานของตัวเอง ไม่แย่งที่กัน */
+const isChallenger=p=>!!(p&&(p.raceChallenger||p.tugChallenger||p.eatChallenger||p.throwChallenger));
+const isTrader=p=>!!(p&&(p.wantsSell||p.wholesaleBuyer));
+const isCustomer=p=>!!p&&!isChallenger(p)&&!isTrader(p);
+function customerCount(){let n=0;for(const p of PEOPLE)if(isCustomer(p))n++;return n;}
+function challengerCount(){let n=0;for(const p of PEOPLE)if(isChallenger(p))n++;return n;}
+function traderCount(){let n=0;for(const p of PEOPLE)if(isTrader(p))n++;return n;}
+const CHALLENGER_MAX=10, TRADER_MAX=2;          // เพดานของแต่ละถัง (ไม่เกี่ยวกับความจุลูกค้า)
+function challengerRoom(){return Math.max(0,CHALLENGER_MAX-challengerCount());}
+function traderRoom(){return Math.max(0,TRADER_MAX-traderCount());}
 function visitorAttraction(){const slug=G.objs.reduce((n,o)=>n+(o.type==='tank'&&Array.isArray(o.slugs)?o.slugs.length*(typeof tankAttractionFactor==='function'?tankAttractionFactor(o):1):0),0);const deco=G.objs.reduce((n,o)=>n+((o.type==='deco'&&o._key!=='counter'&&o.def&&Number.isFinite(o.def.attr))?o.def.attr:0),0);const tankDeco=G.objs.reduce((n,o)=>n+((o.type==='tank'&&Array.isArray(o.decor))?o.decor.length*0.5:0),0);return Math.round((slug+deco+tankDeco)*10)/10;}
 function visitorInterval(score){return Math.max(20,60-Math.max(0,Math.ceil(Math.max(0,score)/10)-1)*5);}
 /* ---- พื้นขั้นต่ำของจำนวนลูกค้า (ช่วงเงียบ) ----
@@ -311,12 +328,31 @@ function visitorInterval(score){return Math.max(20,60-Math.max(0,Math.ceil(Math.
    แก้ที่ "อัตราการไหลเข้า" ไม่ใช่ "เวลาที่อยู่": ถ้าในร้านน้อยกว่า VISITOR_MIN
    คนถัดไปจะเข้ามาภายใน QUIET_GAP วินาที (และเลือกกลุ่มเล็กเพื่อเติมให้ไว)
    ลูกค้าช่วงแรกยังเดินเข้า-ดูตู้-เดินออกไวเหมือนเดิม แค่มีคนใหม่ไหลเข้ามาแทนที่ทันที */
-var VISITOR_MIN=2;     // คนขั้นต่ำที่อยากให้มีในร้านตลอด
+var VISITOR_MIN=3;     // คนขั้นต่ำที่อยากให้มีในร้านตลอด (ร้านเพิ่งเปิด ความนิยมยังต่ำ) — 2 → 3 ให้ร้านไม่โล่งตั้งแต่ต้นเกม
 var QUIET_GAP=3;       // วินาทีระหว่างคนเข้า ตอนที่ยังไม่ถึงขั้นต่ำ
-function visitorFloor(capacity){return Math.min(VISITOR_MIN,Math.max(0,capacity));}
+/* ⚠️ 2026-09-19 ผู้เล่น: "ความนิยมจะ 70 แล้วลูกค้ายังมีแค่ 2 คน"
+   เดิมความนิยมมีผลแค่ "ความถี่ที่คนเดินเข้า" (60 วิ → 20 วิ) แต่แต่ละคนอยู่แค่ ~30–40 วิ
+   จำนวนคนเฉลี่ยในร้านเลยตันอยู่ที่ราว 2 คนตลอดเกม ต่อให้แต่งร้านจนความนิยมพุ่ง
+   ตอนนี้ความนิยมกำหนด "จำนวนคนที่อยากให้อยู่ในร้านพร้อมกัน" ตรง ๆ แล้วเติมให้ถึงเป้าเสมอ
+
+   ⚠️ รอบสอง ผู้เล่น: "แค่ตู้กับทากก็ได้ 70 แล้ว หารเท่ากันหมดไม่ดีแน่ ต้องสเกลขึ้นไปเรื่อย ๆ"
+   ความนิยมโตง่ายและไม่มีเพดาน (ทาก 1 ตัว = 1 แต้ม · ปลายเกมทากหลักพันตัว = หลักพันแต้ม)
+   ตัวหารคงที่จึงระเบิด — เปลี่ยนเป็น "ลูกค้าคนที่ n ต้องใช้ความนิยมเพิ่มอีก ATTR_STEP × n"
+     รวมความนิยมที่ต้องใช้เพื่อได้ n คน = STEP·n(n+1)/2  →  n = (√(1+8·score/STEP) − 1) / 2
+   ต้นเกมยังไต่ไว ปลายเกมต้องทุ่มหนักขึ้นเรื่อย ๆ กว่าจะได้อีกหนึ่งคน (แนวเดียวกับราคาขยายร้าน) */
+/* ปรับสดจากคอนโซลได้: ShopBusy.set(2) = คนเยอะขึ้นทั้งเส้น · ShopBusy.set(4) = ฝืดลง · ShopBusy.show() ดูตาราง
+   ค่าที่ชอบแล้วบอกมา จะได้ใส่เป็นค่าตั้งต้นถาวร (ค่านี้ไม่ถูกเซฟ รีเฟรชแล้วกลับเป็นค่าตั้งต้น) */
+var ATTR_STEP=2.5;
+function visitorTarget(capacity,score=visitorAttraction()){
+  const n=Math.floor((Math.sqrt(1+8*Math.max(0,score)/ATTR_STEP)-1)/2);
+  return Math.max(0,Math.min(capacity,VISITOR_MIN+n));
+}
+/* ความนิยมที่ต้องมีเพื่อให้ได้ลูกค้าพร้อมกัน n คน (ใช้โชว์ใน HUD/ดีบัก) */
+function attractionForVisitors(n){const k=Math.max(0,n-VISITOR_MIN);return Math.ceil(ATTR_STEP*k*(k+1)/2);}
+function visitorFloor(capacity){return visitorTarget(capacity);}
 /* คนที่กำลังเดินออก ไม่นับว่าอยู่ในร้านแล้ว — สั่งคนใหม่ตั้งแต่ตอนเขาเริ่มเดินออก
    คนใหม่จะเดินสวนเข้ามาพอดี ร้านเลยไม่มีช่วงโล่งระหว่างรอยต่อ */
-function visitorPresent(){let n=0;for(const p of PEOPLE)if(p.state!=='leave'&&!p.wantsSell)n++;return n;}
+function visitorPresent(){let n=0;for(const p of PEOPLE)if(p.state!=='leave'&&isCustomer(p))n++;return n;}
 /* ตอนเติมให้ถึงขั้นต่ำใช้เฉพาะกลุ่มเล็ก — ครอบครัว 4 คนต้องรอที่ยืนพร้อมกัน 4 จุด ช้ากว่ามาก */
 function chooseQuietKind(need,capacity){
   const room=Math.max(1,Math.min(need,capacity));
@@ -329,7 +365,7 @@ function chooseQuietKind(need,capacity){
 /* ดูกี่ตู้ก่อนกลับ — ผูกกับจำนวนตู้ในร้าน
    ร้านมี 2 ตู้แล้วเดินวน 5 รอบมันประหลาด ช่วงแรกจึงเป็น "เข้ามาดู แล้วออก" */
 /* ตู้ที่ถูกจองให้อีเวนต์ — มีผู้ท้าแข่งชักเย่อ/วิ่งยืนรออยู่ หรือกำลังมีทัวร์นาเมนต์ · ลูกค้าปกติไม่เดินไปดู ไม่ยื่นซื้อ */
-function eventReservedTank(o){return !!(window.SlugTug?.reserved?.(o)||window.SlugRace?.reserved?.(o)||window.SlugEat?.reserved?.(o));}
+function eventReservedTank(o){return !!(window.SlugTug?.reserved?.(o)||window.SlugRace?.reserved?.(o)||window.SlugEat?.reserved?.(o)||window.SlugThrow?.reserved?.(o));}
 function visitorVisits(){
   const tanks=(G.objs||[]).filter(o=>o&&o.type==='tank'&&o!==moving).length;
   const cap=Math.min(VISIT_MAX,tanks),min=Math.min(VISIT_MIN,cap);
@@ -356,8 +392,8 @@ function stepOpeningVisitors(capacity,score){
   if(_peopleT<_openingAt)return true;
   if(!_openingParty){const kind=chooseVisitorKind(_openingRemaining);_openingParty={kind,profiles:visitorProfiles(kind)};}
   const count=_openingParty.profiles.length;
-  if(capacity-PEOPLE.length<count)return true;
-  if(spawnVisitors(capacity-PEOPLE.length,_openingParty.kind,_openingParty.profiles)){
+  if(capacity-customerCount()<count)return true;
+  if(spawnVisitors(capacity-customerCount(),_openingParty.kind,_openingParty.profiles)){
     _openingRemaining-=count;_openingParty=null;
     _openingAt=_peopleT+2+Math.random()*2;
     _arrivalScore=score;_spawnAt=_peopleT+visitorInterval(score);
@@ -394,8 +430,8 @@ function stepVisitorArrivals(){
   }
   if(_peopleT<_spawnAt)return;
   if(!_pendingParty){const kind=quiet?chooseQuietKind(floorN-visitorPresent(),capacity):chooseVisitorKind(capacity);_pendingParty={kind,profiles:visitorProfiles(kind)};}
-  if(capacity-PEOPLE.length<_pendingParty.profiles.length||_peopleT<_arrivalRetryAt)return;
-  if(spawnVisitors(capacity-PEOPLE.length,_pendingParty.kind,_pendingParty.profiles)){
+  if(capacity-customerCount()<_pendingParty.profiles.length||_peopleT<_arrivalRetryAt)return;
+  if(spawnVisitors(capacity-customerCount(),_pendingParty.kind,_pendingParty.profiles)){
     _pendingParty=null;_spawnAt=_peopleT+visitorInterval(score);
   }else _arrivalRetryAt=_peopleT+1; // Entrance physically blocked: retain the same party.
 }
@@ -662,6 +698,7 @@ function nextGoal(p){
   if(p.raceChallenger&&window.SlugRace&&SlugRace.goal(p))return;
   if(p.tugChallenger&&window.SlugTug&&SlugTug.goal(p))return;
   if(p.eatChallenger&&window.SlugEat&&SlugEat.goal(p))return;
+  if(p.throwChallenger&&window.SlugThrow&&SlugThrow.goal(p))return;
   if(p._columnFollower)return;
   if(p._yieldResume)return;
   if(p.tradeOffer)return;
@@ -688,11 +725,20 @@ function nextGoal(p){
    อัปเดตทุกเฟรม
    ============================================================ */
 let _pLast = 0;
+let _peopleTimeDebt = 0;
 function stepPeople(){
   const now = performance.now();
-  let dt = (now - (_pLast || now)) / 1000; _pLast = now;
-  if(!peopleOn) return;
-  if(dt > 0.05) dt = 0.05;
+  if(!_pLast)_peopleTimeDebt=0;
+  const elapsed=Math.max(0,(now-(_pLast||now))/1000);_pLast=now;
+  if(!peopleOn){_peopleTimeDebt=0;return;}
+  _peopleTimeDebt+=elapsed;
+  // Keep elapsed time, but bound each movement step and catch-up work per call.
+  // A normal 100 ms background tick takes two 50 ms steps, not one truncated step.
+  for(let steps=0;steps<20&&_peopleTimeDebt>1e-8;steps++){
+    const dt=Math.min(.05,_peopleTimeDebt);_peopleTimeDebt-=dt;stepPeopleSlice(dt);
+  }
+}
+function stepPeopleSlice(dt){
   _peopleT += dt;
 
   crowdRouteBudget=2;
@@ -720,7 +766,7 @@ function stepPeople(){
     if(p.state === 'look'){
       if(p.focus && G.objs.indexOf(p.focus) < 0){ nextGoal(p); continue; }   // ตู้ถูกย้ายหาย
       /* ผู้ท้าแข่งมาถึงตู้ระหว่างที่ลูกค้ายืนดูอยู่ = ลูกค้าปกติเดินไปดูตู้อื่นแทน (ครอบครัวรอจบรอบดูของกลุ่มแล้วเลือกตู้ใหม่เอง) */
-      if(p.focus && !p.tugChallenger && !p.raceChallenger && !p.eatChallenger && !p.family && eventReservedTank(p.focus)){ nextGoal(p); continue; }
+      if(p.focus && !p.tugChallenger && !p.raceChallenger && !p.eatChallenger && !p.throwChallenger && !p.family && eventReservedTank(p.focus)){ nextGoal(p); continue; }
       if(p.focus){                                   // หันหน้าเข้าหากลางตู้
         p.fdx = (p.focus.cx + oW(p.focus)/2) - p.x;
         p.fdy = (p.focus.cy + oH(p.focus)/2) - p.y;
@@ -820,17 +866,51 @@ function personDepth(p){return p.x+p.y;}
 // A depth buffer resolves intersecting clothing, straps, hair and limbs per pixel.
 let _personGL=null;
 // Opaque furniture writes depth only, allowing a person to be partially hidden.
+/* ---- แคชรูปทรงคงที่ของเฟอร์นิเจอร์/กระจกตู้ ----
+   ⚠️ 2026-09-19 (คู่มือ Two Point Campus บท 05 + 10: "แพน/ซูมต้องไม่ rebuild geometry คงที่")
+   เดิมทุกเฟรมที่วาดคน จะสร้างอาร์เรย์หน้าตัดใหม่ทั้งร้าน — ตู้/ของละ 5 หน้า × 4 จุด และกระจกตู้อีก 3 บาน
+   ร้าน 20 ชิ้น = สร้างอาร์เรย์ใหม่ราว 500 ก้อนต่อเฟรม ทั้งที่รูปทรงเปลี่ยนเฉพาะตอนวาง/ย้าย/หมุน/เก็บของ
+   ตอนนี้จำรูปทรงต่อชิ้นไว้ แล้วต่อเฟรมแค่หยิบชิ้นที่อยู่ในจอมาเรียง (อาร์เรย์นอกเป็นแค่ตัวชี้ ราคาถูก)
+   ตรวจว่าใช้ได้จริง: PeoplePerf.geoBuilds ต้องไม่ขยับเลยระหว่างแพน/ซูม ขยับเฉพาะตอน layout เปลี่ยน */
+let _geoCache=new Map(), _geoSig=null, _geoBuilds=0;
+function layoutSignature(){
+  let s=G.objs.length*7919;
+  for(const o of G.objs)s=(s*31+(o.cx|0)*7+(o.cy|0)*13+((o.rot|0)+1)*17+(o===moving?911:0))|0;
+  return s;
+}
+function objGeometry(o){
+  let g=_geoCache.get(o);
+  if(g)return g;
+  g={opaque:null,glass:null};
+  const x=o.cx,y=o.cy,w=oW(o),h=oH(o);
+  const top=(o.type==='tank'?tankStandH(o.def):decoH(o))/ZUNIT;
+  if(Number.isFinite(top)&&top>0){
+    const a=[x,y,0],b=[x+w,y,0],c=[x+w,y+h,0],d=[x,y+h,0];
+    const A=[x,y,top],B=[x+w,y,top],C=[x+w,y+h,top],D=[x,y+h,top];
+    g.opaque=[[A,B,C,D],[a,b,B,A],[b,c,C,B],[c,d,D,C],[d,a,A,D]];
+  }
+  if(o.type==='tank'){
+    const lo=tankStandH(o.def)/ZUNIT,hi=lo+tankGlassH(o.def)/ZUNIT;
+    g.glass=[[[x,y,hi],[x+w,y,hi],[x+w,y+h,hi],[x,y+h,hi]],
+             [[x+w,y,lo],[x+w,y+h,lo],[x+w,y+h,hi],[x+w,y,hi]],
+             [[x,y+h,lo],[x+w,y+h,lo],[x+w,y+h,hi],[x,y+h,hi]]];
+  }
+  _geoCache.set(o,g);
+  return g;
+}
+function syncGeoCache(){
+  const sig=layoutSignature();
+  if(sig===_geoSig)return;
+  _geoSig=sig;_geoCache=new Map();_geoBuilds++;     // layout เปลี่ยน = ทิ้งทั้งชุด สร้างใหม่แบบขี้เกียจตอนถูกขอ
+}
 function personFurnitureFaces(cull=false){
+  syncGeoCache();
   const out=[];
   for(const o of G.objs){
     if(o===moving||(cull&&!onScreen(o)))continue;
-    if(o.def.playTable){out.push(...playTableDepthFaces(o).opaque);continue;}
-    const x=o.cx,y=o.cy,w=oW(o),h=oH(o);
-    const top=(o.type==='tank'?tankStandH(o.def):decoH(o))/ZUNIT;
-    if(!Number.isFinite(top)||top<=0)continue;
-    const a=[x,y,0],b=[x+w,y,0],c=[x+w,y+h,0],d=[x,y+h,0];
-    const A=[x,y,top],B=[x+w,y,top],C=[x+w,y+h,top],D=[x,y+h,top];
-    for(const v of [[A,B,C,D],[a,b,B,A],[b,c,C,B],[c,d,D,C],[d,a,A,D]])out.push(v);
+    if(o.def.playTable){out.push(...playTableDepthFaces(o).opaque);continue;}   // โต๊ะเล่นมีของบนโต๊ะเปลี่ยนตลอด ไม่แคช
+    const q=objGeometry(o).opaque;
+    if(q)for(const v of q)out.push(v);
   }
   return out;
 }
@@ -944,8 +1024,8 @@ function paintPersonMesh(faces,p,H,snapshot=false){
   for(const o of G.objs){if(o===moving||(!snapshot&&!onScreen(o)))continue;
     if(o.def.playTable){glass.push(...playTableDepthFaces(o).glass);continue;}
     if(o.type!=='tank')continue;
-    const x=o.cx,y=o.cy,w=oW(o),h=oH(o),lo=tankStandH(o.def)/ZUNIT,hi=lo+tankGlassH(o.def)/ZUNIT;
-    glass.push([[x,y,hi],[x+w,y,hi],[x+w,y+h,hi],[x,y+h,hi]],[[x+w,y,lo],[x+w,y+h,lo],[x+w,y+h,hi],[x+w,y,hi]],[[x,y+h,lo],[x+w,y+h,lo],[x+w,y+h,hi],[x,y+h,hi]]);
+    const q=objGeometry(o).glass;                     // แคชไว้แล้ว (ดู objGeometry) ไม่สร้างใหม่ทุกเฟรม
+    if(q)for(const v of q)glass.push(v);
   }
   const total=faces.reduce((n,f)=>n+(f.v.length-2)*18,0)+(blockers.length+glass.length)*36;
   if(_personVertexData.length<total)_personVertexData=new Float32Array(2**Math.ceil(Math.log2(total)));
@@ -1623,3 +1703,24 @@ function drawVisitorAnger(){
   }
 }
 
+
+/* ตัวนับสำหรับตรวจแคชเรขาคณิต (คู่มือบท 10: "mesh builds ระหว่างแพน/ซูมควรเป็นศูนย์")
+   ใช้จากคอนโซล: PeoplePerf.geoBuilds ก่อน/หลังแพนกล้อง ต้องเท่ากัน */
+window.PeoplePerf={
+  get geoBuilds(){return _geoBuilds;},
+  get geoCached(){return _geoCache.size;},
+  counts(){return {ทั้งหมด:PEOPLE.length,ลูกค้า:customerCount(),นักแข่ง:challengerCount(),พ่อค้า:traderCount(),
+                   ในจอ:PEOPLE.filter(p=>personEntered(p)&&personOnScreen(p)).length};}
+};
+function _bumpGeoBuilds(){_geoBuilds++;}   // cat-seller.js เรียกเมื่อทิ้งแคชรูปทรงบัง (ตัวเดียวกับที่ PeoplePerf รายงาน)
+
+/* ตัวหมุนความคึกคักของร้าน — ปรับสดระหว่างเล่น ไม่ต้องรีเฟรช (people.js ATTR_STEP)
+   ค่าน้อย = คนเยอะขึ้นทั้งเส้น · ค่ามาก = ฝืดขึ้น · ShopBusy.show() ดูว่าความนิยมเท่านี้ได้กี่คน */
+window.ShopBusy={
+  get step(){return ATTR_STEP;},
+  set(n){const v=Number(n);if(!(v>0)){console.warn('ใส่ตัวเลขมากกว่า 0');return ATTR_STEP;}
+    ATTR_STEP=v;if(typeof toast==='function')toast('ความคึกคัก: step = '+v,'good');return this.show();},
+  show(){const cap=visitorCapacity();
+    const rows=[5,20,40,70,100,200,400,800].map(s=>({'ความนิยม':s,'เป้าคน':visitorTarget(1e9,s),'ได้จริงในร้านนี้':visitorTarget(cap,s)}));
+    console.table(rows);return {step:ATTR_STEP,ความจุร้าน:cap,ตอนนี้มีลูกค้า:customerCount(),rows};}
+};

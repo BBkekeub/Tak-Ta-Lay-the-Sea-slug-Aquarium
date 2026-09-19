@@ -1,5 +1,5 @@
 import {projectedHeading,intersectsCanvas} from './slug-view-math.js?v=direction16';
-import {SlugCrowd} from './slug-crowd.js?v=gilln4';
+import {SlugCrowd} from './slug-crowd.js?v=glass2';
 import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
