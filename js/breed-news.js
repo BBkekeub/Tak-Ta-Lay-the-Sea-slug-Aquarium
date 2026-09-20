@@ -65,6 +65,8 @@
     if (typeof toast === 'function' && opt.toast !== false) toast(icon + ' ' + text, opt.kind || 'good');
   };
   BN.announce = announce;
+  // breeding.js เรียกใช้ตอนสรุป "ตัวอ่อนรอด/ไม่รอด" ลงบันทึกร้าน จะได้ใช้ชื่อตู้ชุดเดียวกับข้อความอื่น
+  BN.tankName = breederName;
 
   /* ---------- ตรวจจับการเปลี่ยนสเตจผสมพันธุ์ ---------- */
   var snap = {}; // id ตู้ -> { phase, eggs, ready }

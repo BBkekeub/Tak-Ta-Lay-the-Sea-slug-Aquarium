@@ -74,7 +74,8 @@
 
  /* ---------- หาทากในคลัง + ตัดขาย ---------- */
  function eligibleInventory(o){
-  return (G.inv||[]).filter(function(s){return !TRADE_OFFERS.some(function(t){return t!==o&&t.slug===s;});});
+  // ♥ ถูกใจไว้ = พ่อค้าส่งเหมาซื้อยกล็อตไปด้วยไม่ได้ (ผู้เล่นสั่ง 2026-09-20)
+  return (G.inv||[]).filter(function(s){return !s.favorite&&!TRADE_OFFERS.some(function(t){return t!==o&&t.slug===s;});});
  }
  function sellToWholesaler(o){
   var seen={}, ids=[];

@@ -213,6 +213,13 @@ function foodCanPlace(type,level,fx,fy){
 /* โกสต์ติดเมาส์ตอนเปิดโหมด — คืนวัตถุหน้าตาเหมือนอาหารจริงให้ drawFood วาดแบบจาง */
 function foodGhostItem(){
  if(!foodMode||!foodChoice||!foodHover) return null;
+ /* ⚠️ 2026-09-20 ผู้เล่น: "ไม่กดเสร็จสิ้นแล้วไปกดโหมดอื่น จะมีโกสต์อาหารติดอยู่ตลอดเวลา"
+    ต้นเหตุ: foodHover ถูกล้างที่ pointerleave ของแคนวาสตู้ "ทางเดียว"
+    พอมีหน้าต่างโมดอลเปิดคลุมทับ (จัดการทาก / ย้ายทาก / ฯลฯ) เบราว์เซอร์ไม่ยิง pointerleave
+    เงาเลยค้างที่จุดเดิม และถ้าผู้เล่นไม่เอาเมาส์กลับเข้าแคนวาสอีกเลย มันก็ค้างถาวรจริง ๆ
+    มีหน้าต่างเปิดคลุมอยู่ = ไม่ได้กำลังเล็งวางอาหาร ไม่ต้องวาดเงา แล้วล้าง hover ทิ้งเลยให้หายขาด
+    ⚠️ querySelector อยู่หลัง early-return สามชั้น จึงทำงานเฉพาะตอน "จะวาดเงาจริง" ไม่ใช่ทุกเฟรม */
+ if(document.querySelector('dialog[open]')){foodHover=null;return null;}
  return {preview:true,invalid:!foodHover.ok,type:foodChoice.type,level:foodChoice.level,
          spec:FOOD_TYPES[foodChoice.type].levels[foodChoice.level-1],fx:foodHover.fx,fy:foodHover.fy,eaten:[],reserved:{}};
 }
@@ -270,7 +277,9 @@ function foodUI(){
  /* โหมดเก็บอาหาร — คนละโหมดกับวางอาหาร เปิดพร้อมกันไม่ได้ (คลิกเดียวจะสับสนว่าวางหรือเก็บ) */
  function foodPickSet(on){
   if(on&&curTank)enterExclusiveMode('food');
-  foodPick=!!on&&!!curTank; if(foodPick){foodMode=false;syncChoice();}
+  /* ⚠️ ต้องล้าง foodHover ด้วย ไม่ใช่แค่ foodMode — สองโหมดนี้ใช้เงาตัวเดียวกัน
+     สลับมาโหมดเก็บแล้วปล่อย hover ค้างไว้ = เงาโผล่ซ้ำทันทีที่กลับไปโหมดวาง */
+  foodPick=!!on&&!!curTank; if(foodPick){foodMode=false;syncChoice();foodHover=null;}
   chooseBtn.textContent=foodMode?'✓ ปิดโหมดวางอาหาร':'🌸 เปิดโหมดวางอาหาร';
   chooseBtn.setAttribute('aria-pressed',String(foodMode));
   cancelBtn.hidden=!foodMode&&!foodPick;
@@ -279,6 +288,10 @@ function foodUI(){
  }
  window.foodModeSet=foodModeSet;
  registerMode('food','tank',()=>foodMode||foodPick,()=>{foodModeSet(false);foodPickSet(false);});
+ /* "จัดการทาก" ไม่ใช่โหมด (ไม่อยู่ใน APP_MODES) จึงไม่ถูก enterExclusiveMode ปิดให้
+    แต่มันเปิดหน้าต่างคลุมตู้ = เลิกวางอาหารแล้วโดยปริยาย ต้องปิดโหมดเอง
+    แปรงขัดตู้ผูกแบบนี้ไว้อยู่แล้ว (tank-hygiene.js) ของอาหารตกหล่นไป — เติมให้ตรงกัน */
+ document.getElementById('ovAdd')?.addEventListener('click',()=>{foodModeSet(false);foodPickSet(false);});
  type.onchange=levels;level.onchange=()=>{syncChoice();update();};levels();
  chooseBtn.onclick=()=>foodModeSet(!foodMode);
  cancelBtn.onclick=()=>{foodModeSet(false);foodPickSet(false);};

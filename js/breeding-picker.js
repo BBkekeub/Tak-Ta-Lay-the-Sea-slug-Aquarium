@@ -1,7 +1,8 @@
 // Selection is a draft: adults only leave their zone after confirmation.
 const breedingDrafts=new WeakMap();
 function breedingDraft(o){return o.slugs.filter(s=>s.breedZone).map(s=>s.id);}
-function canChooseParent(s){return (s.breedLife??50)>=5&&!TRADE_OFFERS.some(t=>t.slug===s);}
+/* มีข้อเสนอซื้อค้างอยู่ก็เลือกได้แล้ว — startBreeding() จะยกเลิกข้อเสนอให้ตอนเริ่มผสมจริง (trade.js releaseSlugOffers) */
+function canChooseParent(s){return (s.breedLife??50)>=5;}
 function chooseBreedingParent(o,s){if(!isBreeder(o)||breederState(o).phase!=='idle'||!o.slugs.includes(s)||!canChooseParent(s))return false;const ids=breedingDraft(o);if(ids.includes(s.id))return false;if(ids.length>=2)return false;setBreedingZone(o,s,true);if(breedingDraft(o).length===2)openBreedingPicker(o);return true;}
 const breedingPicker=document.createElement('dialog');breedingPicker.id='breedingPicker';breedingPicker.style.cssText='width:min(700px,90vw);max-height:85vh;background:#152328;color:#eee;border:1px solid #bfa260;border-radius:14px;padding:20px';document.body.append(breedingPicker);
 let breedingPickerTank=null;

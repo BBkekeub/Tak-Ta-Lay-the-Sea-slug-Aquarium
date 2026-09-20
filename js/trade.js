@@ -72,11 +72,27 @@ function reflowCounterQueue(counter){
     o.p.tgt=s;o.p.route=route;o.p.routeGoal=s;o.p.state='walk';o.p.stuck=0;o.p.t=0;
   });
 }
+/* ---- ปลดล็อกทากที่มีข้อเสนอซื้อค้างอยู่ (ผู้เล่นสั่ง 2026-09-20) ----
+   ⚠️ เดิมทากที่ถูกเสนอซื้อจะถูก "แช่แข็ง" — ผสมพันธุ์ไม่ได้ ย้ายออกตู้ไม่ได้
+      ผู้เล่น: "กะจะเอาไปผสมอีกรอบก่อนซะหน่อย แถมเอาออกตู้ก็ไม่ได้"
+   ตอนนี้ทำได้ แต่การเอาไปใช้ = สละข้อเสนอนั้น (ลูกค้าซื้อตัวที่ไม่อยู่แล้วไม่ได้)
+   จึงยกเลิกข้อเสนอให้อัตโนมัติพร้อมบอกผู้เล่น ไม่ใช่ปล่อยค้างไว้แล้วพังตอนกดรับ
+   ⚠️ ยกเลิกเฉพาะ "ลูกค้าขอซื้อ" — ข้อเสนอของพ่อค้าเร่ (sell) กับพ่อค้าส่ง (wholesale)
+      ไม่ได้ผูกกับทากในตู้ตัวใดตัวหนึ่ง จึงไม่เกี่ยวและต้องไม่ถูกยกเลิกไปด้วย */
+function releaseSlugOffers(slugs,reason){
+  const list=Array.isArray(slugs)?slugs:[slugs];
+  const hit=TRADE_OFFERS.filter(o=>!o.sell&&!o.wholesale&&list.includes(o.slug));
+  for(const o of hit)finishTrade(o.id);
+  if(hit.length&&typeof toast==='function')
+    toast('ยกเลิกข้อเสนอซื้อ '+hit.length+' รายการ — '+reason,'bad');
+  return hit.length;
+}
 function tryCustomerOffer(p,tank){
   if(!p.wantsBuy||p.tradeDone||p.tradeOffer||!tank||tank.type!=='tank')return false;
   p.preferences ||= makeBuyerPreferences();
   let best=null;
   for(const slug of tank.slugs){
+    if(slug.favorite)continue;                    // ♥ ถูกใจไว้ = ห้ามลูกค้าขอซื้อ (ผู้เล่นสั่ง 2026-09-20)
     if(TRADE_OFFERS.some(o=>o.slug===slug))continue;
     const bid=priceSlugOffer(slug,p.preferences);
     if(bid.price&&(!best||bid.price>best.price))best={slug,...bid};
@@ -147,6 +163,7 @@ function tradeAlternatives(o){
   const choices=[];
   for(const tank of G.objs){if(tank.type!=='tank'||tank===moving)continue;
     for(const slug of tank.slugs){
+      if(slug.favorite)continue;                  // ♥ ถูกใจไว้ = ไม่ขึ้นในตัวเลือกสลับให้ลูกค้าด้วย
       if(TRADE_OFFERS.some(other=>other!==o&&other.slug===slug))continue;
       const bid=priceSlugOffer(slug,o.p.preferences);if(bid.price)choices.push({tank,slug,...bid});
     }
@@ -190,6 +207,9 @@ function paintTradeCard(card){
     const controls=document.createElement('div');controls.className='trade-slug-controls';
     canvas.parentElement.after(controls);
     SlugBrowser.heart(controls,o.slug,()=>renderTradeOffers(true));
+    /* ชี้/กดค้างที่รูปทาก = แผงยีนเต็ม เหมือนหน้าเลือกทากผสมพันธุ์ (ผู้เล่นขอ 2026-09-20)
+       เดิมหน้านี้บอกแค่ยีนที่ "ตรงเงื่อนไขลูกค้า" ไม่เห็นสเตตัสตัวอื่นเลย ตัดสินใจขายยาก */
+    if(typeof SlugHover!=='undefined')SlugHover.mark(canvas.parentElement,o.slug);
     const sprite=slugSprite(o.slug);if(!sprite)continue;
     const ratio=Math.min(112/sprite.c.width,72/sprite.c.height),w=sprite.c.width*ratio,h=sprite.c.height*ratio;
     canvas.getContext('2d').drawImage(sprite.c,(120-w)/2,(80-h)/2,w,h);
@@ -199,6 +219,7 @@ const TRADE_EMPTY='<p style="font-size:12px">ยังไม่มีข้อ�
 function renderTradeOffers(force=false){
   for(const offer of TRADE_OFFERS)notifyTradeArrival(offer);
   const el=document.getElementById('tradeOffers');if(!el)return;
+  if(typeof SlugHover!=='undefined')SlugHover.attach(el);   // ผูกครั้งเดียว (attach กันผูกซ้อนให้เอง)
   /* หลายข้อเสนอพร้อมกันได้ การ์ดกางเต็มทุกใบใน rail กว้าง 310px = เลื่อนยาวมาก จึงยุบเป็น <details> เปิดทีละใบ
      ใบที่เคยอยู่ในแผงแล้ว = ใช้สถานะเปิด/พับเดิมเป๊ะ ๆ (ผู้เล่นพับหมดก็ต้องพับหมด ห้ามเด้งเปิดเอง)
      ใบใหม่ = เปิดให้เฉพาะใบแรกตอนแผงเพิ่งว่างเปล่า · ที่เหลือปล่อยพับไว้ ปุ่มข้อเสนอเรืองแสงบอกอยู่แล้ว */

@@ -14,9 +14,12 @@ function breederAdultSpace(o){return o.slugs.length+breederReserved(o)<tankCap(o
 function startBreeding(o,ids){
  if(!isBreeder(o))return false;const b=breederState(o);
  const parents=[...new Set(ids)].map(id=>o.slugs.find(s=>s.id===id));
- if(b.phase!=='idle'||parents.length!==2||parents.some(s=>!s)||(typeof TRADE_OFFERS!=='undefined'&&parents.some(s=>TRADE_OFFERS.some(x=>x.slug===s)))){toast('เลือกทากว่าง 2 ตัวในตู้นี้','bad');return false;}
+ if(b.phase!=='idle'||parents.length!==2||parents.some(s=>!s)){toast('เลือกทากว่าง 2 ตัวในตู้นี้','bad');return false;}
  if(parents.some(s=>(s.breedLife??50)<5)){toast('พลังผสมพันธุ์ไม่พอ','bad');return false;}
  if(b.larvae.length>=50){toast('พื้นที่ตัวอ่อนเต็ม','bad');return false;}
+ /* ทากที่มีลูกค้าเสนอซื้อค้างอยู่ เอามาผสมได้แล้ว — แต่ต้องสละข้อเสนอนั้นไป
+    (ตัวมันย้ายเข้าโซนผสม ลูกค้าที่รออยู่หน้าเคาน์เตอร์ซื้อไม่ได้แล้ว) */
+ if(typeof releaseSlugOffers==='function')releaseSlugOffers(parents,'เอาทากไปผสมพันธุ์');
  b.parentSatiety=parents.reduce((n,s)=>n+(s.satiety??50),0)/2;
  b.parents=parents;b.parentGenes=parents.map(s=>BreedingGenes.copyGene(s.genes));
  b.strength=parents.reduce((n,s)=>n+Math.min(100,foodGenes(s).vigor+25),0)/2;
@@ -55,13 +58,50 @@ function tickBreeder(o,dt,rnd=Math.random){
    for(const parent of b.parents){parent.breedZone=true;if(!o.slugs.includes(parent))o.slugs.push(parent);}b.parents=[];
   }else if(b.left===0&&b.phase==='eggs')b.phase='hatching';
  }
+ let grownTank=0,grownInv=0,died=0;   // นับไว้สรุปลงบันทึกร้านทีเดียวท้ายรอบ (ดูท้ายฟังก์ชัน)
  for(let i=b.larvae.length-1;i>=0;i--){const larva=b.larvae[i];walkBreedingZone(larva.slug,dt);larva.left=Math.max(0,larva.left-dt);
   if(larva.left>0)continue;
   if(!larva.ready&&larva.growthRoll!==undefined)larva.survives=larva.growthRoll<.7*breedingSatietyFactor(larva.slug.satiety)*breedingCleanFactor(o);
-  if(!larva.survives){if(typeof onBreedLarvaDeath==='function')onBreedLarvaDeath(o,larva);b.larvae.splice(i,1);continue;}
+  if(!larva.survives){if(typeof onBreedLarvaDeath==='function')onBreedLarvaDeath(o,larva);b.larvae.splice(i,1);died++;continue;}
   const newlyReady=!larva.ready;larva.ready=true;
-  if(breederAdultSpace(o)){placeOnFloor(larva.slug,o);o.slugs.push(larva.slug);b.larvae.splice(i,1);}
+  if(breederAdultSpace(o)){placeOnFloor(larva.slug,o);o.slugs.push(larva.slug);b.larvae.splice(i,1);grownTank++;}
+  /* ⚠️ 2026-09-20 ผู้เล่น: "ทากที่เกินมาตอนมันโต ต้องเข้าไปอยู่ในคลังนะ"
+     เดิมถ้าตู้เต็ม (breederAdultSpace เป็นเท็จ) ตัวอ่อนที่โตแล้วจะ "ค้างอยู่ใน b.larvae ตลอดไป"
+     คือโตเต็มวัยแล้วแต่ติดอยู่ในโซนตัวอ่อน ไม่ได้เข้าตู้ ไม่ได้เข้าคลัง และไม่มีทางออก
+     ตอนนี้ตู้เต็มเมื่อไหร่ให้ย้ายเข้าคลังทากแทน (เส้นทางเดียวกับปุ่ม "เก็บทากกลับคลัง")
+     ⚠️ ต้องล้างธงของโซนเพาะให้หมดก่อนส่งออก ไม่งั้นตัวจะติดขนาดครึ่งเดียว (_breedScale)
+        และยังจองอาหารในโซนค้างไว้ (_meal) ทั้งที่ไม่ได้อยู่ในตู้นี้แล้ว */
+  else if(Array.isArray(G.inv)){
+    const s=larva.slug;
+    if(s._meal&&s._meal.food&&s._meal.food.reserved)delete s._meal.food.reserved[s.id];
+    s._meal=null;s._breedVisual=false;s._breedScale=1;s.breedZone=false;
+    s._zoneTank=null;s._foodZoneLo=undefined;s._foodZoneHi=undefined;
+    s.wall=null;s.climbSide=null;s.climbZ=0;s.state='rest';s.stt=1;
+    b.larvae.splice(i,1);G.inv.push(s);
+    grownInv++;
+    if(typeof syncHUD==='function')syncHUD();
+    if(typeof saveGame==='function')saveGame();
+  }
   if(newlyReady&&window.NewSlugNotices)NewSlugNotices.add(larva.slug,'grown');
+ }
+ /* ⚠️ 2026-09-20 ผู้เล่น: "log ของร้านไม่เห็นมีบอกเลยว่าทากที่โตแล้ว รอดหรือไม่รอด"
+    เดิมบันทึกแค่ วางไข่ · พร้อมฟัก · ฟักครบรอบ · รอพื้นที่ (breed-news.js)
+    ส่วน "ตัวอ่อนรอด/ไม่รอดตอนโต" ไม่เคยถูกบันทึกเลย — ตายก็แค่หายไปเงียบ ๆ
+    ⚠️ สรุปรวมเป็นรายการเดียวต่อตู้ต่อรอบ ไม่ใช่ตัวละรายการ
+       เพราะตัวอ่อนโตพร้อมกันได้ถึง 50 ตัว แต่บันทึกเก็บแค่ 20 ฉบับ (COMPUTER_LOG_MAX)
+       ถ้าเขียนทีละตัวจะดันบันทึกเก่าหายหมดในรอบเดียว */
+ if(grownTank||grownInv||died){
+  const parts=[];
+  if(grownTank)parts.push('โตแล้วเข้าตู้ '+grownTank+' ตัว');
+  if(grownInv)parts.push('ตู้เต็ม ย้ายเข้าคลัง '+grownInv+' ตัว');
+  if(died)parts.push('ไม่รอด '+died+' ตัว');
+  const survived=grownTank+grownInv;
+  const name=(typeof BreedNews!=='undefined'&&BreedNews.tankName)?BreedNews.tankName(o):((o.def&&o.def.name)||'ตู้เพาะพันธุ์');
+  const icon=survived?(died?'⚖️':'🦋'):'💀';
+  const title=survived?(died?'ตัวอ่อนโตแล้ว (มีไม่รอดด้วย)':'ตัวอ่อนโตเต็มวัย'):'ตัวอ่อนไม่รอด';
+  if(typeof BreedNews!=='undefined'&&BreedNews.announce)
+   BreedNews.announce(icon,title,name+' · '+parts.join(' · '),{kind:survived?'good':'bad',tag:'grown-'+o.id+'-'+Date.now()});
+  else if(typeof toast==='function')toast(icon+' '+parts.join(' · '),survived?'good':'bad');
  }
 }
 function breederVisualSlugs(o){
@@ -141,9 +181,84 @@ function walkBreedingZone(s,dt){
  s.wall=null;s.climbZ=0;s.fx=Math.max(lo,Math.min(hi,Number.isFinite(s.fx)?s.fx:22.5));s.fy=Math.max(margin,Math.min(10-margin,Number.isFinite(s.fy)?s.fy:5));
  const solid=decorSolidSet(s._zoneTank?.decor||[]),oldX=s.fx,oldY=s.fy;
  if(foodStep(s,dt,s._foodZoneHi||25,10,s._zoneTank?.decor||[],solid)){s.fx=Math.max(lo,Math.min(hi,s.fx));s.fy=Math.max(margin,Math.min(10-margin,s.fy));return;}
- s.stt=(s.stt||0)-dt;if(s.stt<=0){s.state=s.state==='walk'?'rest':'walk';s.stt=1+Math.random()*4;s.dir=Math.random()*Math.PI*2;s.turn=s.dir;}
- if(s.state==='walk'){const speed=.32;s.fx+=Math.cos(s.dir)*speed*dt;s.fy+=Math.sin(s.dir)*speed*dt;s.ph=(s.ph||0)+dt*2;if(s.fx<lo||s.fx>hi)s.dir=Math.PI-s.dir;if(s.fy<margin||s.fy>10-margin)s.dir=-s.dir;s.turn=s.dir;}
- s.fx=Math.max(lo,Math.min(hi,s.fx));s.fy=Math.max(margin,Math.min(10-margin,s.fy));if([[s.fx,s.fy],[s.fx+margin*.6,s.fy],[s.fx-margin*.6,s.fy],[s.fx,s.fy+margin*.6],[s.fx,s.fy-margin*.6]].some(p=>solid.has(ptKey(...p)))){s.fx=oldX;s.fy=oldY;s.dir=(s.dir||0)+Math.PI;s.turn=s.dir;}s._lastGoodFx=s.fx;s._lastGoodFy=s.fy;
+ s._zoneUnstick=Math.max(0,(s._zoneUnstick||0)-dt);   // คูลดาวน์ของการดันออกจากหิน (ดูท้ายฟังก์ชัน)
+ /* จุดตั้งต้นของเฟรม — slugFaceAndCreep() ท้ายฟังก์ชันใช้หา "ที่ขยับจริง" เพื่อตั้งหน้าและจังหวะคืบ
+    ลูปตู้ปกติตั้งค่านี้ให้เอง แต่ทากโซนผสม/ตัวอ่อนไม่ได้ผ่านลูปนั้น ต้องตั้งเอง */
+ s._frameX0=s.fx;s._frameY0=s.fy;
+ s.stt=(s.stt||0)-dt;if(s.stt<=0){s.state=s.state==='walk'?'rest':'walk';s.stt=1+Math.random()*4;s.turn=Math.random()*Math.PI*2;}
+ /* ⚠️ 2026-09-20 ผู้เล่น: "ตัวในโซนผสมพันธุ์ก็เดินแปลก ๆ แถมตัวเล็ก ๆ ก็เดินเหมือนกระตุก"
+    ลูปโซนเพาะเขียนแยกจากลูปตู้ปกติ แล้วใช้คนละสูตรกันหมดทั้ง 3 จุด:
+      1) ความเร็วเป็นค่าคงที่ .32 ช่อง/วิ ไม่สนขนาด/พลัง/ความหิว
+         ตัวจริงในตู้เดิน SLUG_SPEED×slugPace() = 0.112–0.218 ช่อง/วิ
+         → ในโซนเร็วกว่าตัวเอง 1.5 เท่า (ตัวเล็ก) ถึง 2.9 เท่า (ตัวใหญ่)
+         ตัวอ่อนยิ่งเห็นชัด เพราะย่อขนาดครึ่งหนึ่ง (_breedScale .5) แต่ความเร็วเท่าตัวเต็มวัย
+      2) หันหัวแบบสแนป — สุ่มทิศแล้วเซ็ต s.dir ทันที · เด้งขอบด้วย dir=π−dir ทันที
+         ลูปตู้ปกติค่อย ๆ เลี้ยวด้วย SLUG_TURN และเร่ง EDGE_TURN_BOOST ตอนใกล้ขอบ
+      3) จังหวะขยับตัว s.ph เดินคงที่ dt*2 ไม่ผูกกับสถานะ/พลังเหมือนลูปตู้
+    โซนกว้างจริงแค่ ~2.7–3.3 ช่อง (5 ช่องลบระยะขอบสองฝั่ง) ของเร็ว + เด้งทันที
+    เลยชนขอบถี่มากจนดูสั่น — ปรับทั้งสามจุดให้ใช้สูตรเดียวกับลูปตู้ปกติ */
+ const pace=typeof slugPace==='function'?slugPace(s):1;
+ const boost=typeof EDGE_TURN_BOOST==='number'?EDGE_TURN_BOOST:2.5;
+ const edge=s.fx<lo+.45||s.fx>hi-.45||s.fy<margin+.45||s.fy>10-margin-.45;
+ if(edge)s.turn=Math.atan2(5-s.fy,(lo+hi)/2-s.fx);   // ใกล้ขอบ = เล็งกลับเข้ากลางโซน แล้วค่อย ๆ เลี้ยว ไม่เด้งทันที
+ if(!Number.isFinite(s.turn))s.turn=s.dir||0;
+ if(!Number.isFinite(s.dir))s.dir=s.turn;
+ const dd=((s.turn-s.dir+Math.PI*3)%(Math.PI*2))-Math.PI;
+ s.dir+=dd*Math.min(1,dt*SLUG_TURN*(edge?boost:1));
+ if(s.state==='walk'){const v=SLUG_SPEED*pace*dt;s.fx+=Math.cos(s.dir)*v;s.fy+=Math.sin(s.dir)*v;}
+ s.ph=(s.ph||0)+dt*(0.8+((s.traits&&s.traits.energy)||0.5)*0.5)*(s.state==='walk'?1.45:0.62);
+ s.fx=Math.max(lo,Math.min(hi,s.fx));s.fy=Math.max(margin,Math.min(10-margin,s.fy));
+ /* ⚠️ 2026-09-20 ผู้เล่น: "ทากเดินติดบัคแล้วเดินเข้าออกรัวๆ"
+    ของเดิมบรรทัดเดียว: ตัวทากทับหิน → ถอยกลับจุดเดิม + หันกลับหลัง (dir += π)
+    ถูกเฉพาะกรณี "ก้าวนี้เพิ่งเดินชนหิน" เท่านั้น
+    แต่ถ้า "จุดเดิมก็จมอยู่ในหินอยู่แล้ว" (ผู้เล่นวางหินทับตัว · โดนหนีบตอนคลampเข้าโซน ·
+    ย้ายเข้าโซนแล้วตกลงบนหิน) การถอยกลับจะคืนไปที่จุดที่จมเหมือนเดิม เงื่อนไขจึงเป็นจริงทุกเฟรม
+    → หันกลับหลัง 180° ทุกเฟรม ขยับ 0.000 หน่วย ไม่มีวันหลุด = สั่นเข้า-ออกรัว ๆ ค้างถาวร
+    วัดได้: 600 เฟรม = กลับทิศ 600 ครั้ง ระยะที่ขยับรวม 0.000
+    ⚠️ ฝั่งตู้ปกติมี nudgeSlugsOutOfSolid() คอยดันออกให้ แต่โซนเพาะพันธุ์เดินคนละลูป ไม่มีใครดันให้เลย
+    แก้: แยกสองกรณี — ชนสด = ถอย+หันหนีเหมือนเดิม · จมอยู่แล้ว = ดันออกไปจุดว่างใกล้สุด */
+ const bodyHits=(x,y)=>[[x,y],[x+margin*.6,y],[x-margin*.6,y],[x,y+margin*.6],[x,y-margin*.6]].some(p=>solid.has(ptKey(...p)));
+ const centreHits=(x,y)=>solid.has(ptKey(x,y));
+ if(bodyHits(s.fx,s.fy)){
+  if(!bodyHits(oldX,oldY)){                       // ก้าวนี้เพิ่งเดินชน → ถอยกลับแล้วหันหนี
+   /* ⚠️ เดิมสแนป s.dir += π ทันที — โซนตัวอ่อนกว้างแค่ ~3 ช่องและมีหินอยู่
+      ตัวอ่อนจึงชนหินก้อนเดิมซ้ำ ๆ แล้วพลิกหลัง 180° ในเฟรมเดียว ~2 ครั้ง/วินาที
+      (วัดได้: หันแรงสุด 3.14 rad/เฟรม · 135–175 ครั้งต่อ 90 วินาที) = อาการ "เดินกระตุก"
+      ตั้งเป็นเป้าหมาย (turn) แล้วให้ค่อย ๆ เลี้ยวเหมือนทิศอื่น ๆ ในฟังก์ชันนี้
+      ระหว่างเลี้ยวตัวจะถูกกันไว้ที่จุดเดิม = ดูเหมือนชะงักแล้วค่อยหันหนี ซึ่งเป็นธรรมชาติกว่า */
+   s.fx=oldX;s.fy=oldY;s.turn=(s.dir||0)+Math.PI;
+  }else if((s._zoneUnstick||0)<=0){               // จมอยู่ในหินตั้งแต่ต้น → ต้องดันออก ไม่ใช่กลับทิศ
+   /* ⚠️ ต้องมีคูลดาวน์ ไม่งั้นดันซ้ำทุกเฟรม — รอบสองของ breedZoneFreeSpot เช็กแค่จุดกึ่งกลาง
+      จุดที่ได้จึงยัง "ตัวล้ำหิน" อยู่ (bodyHits ยังจริง) เงื่อนไขนี้เลยเป็นจริงอีกในเฟรมถัดไป
+      แล้ววาร์ปใหม่ไม่รู้จบ = ตัวอ่อนกระตุกเป็นชุด (วัดได้: ขยับสะสม 30+ หน่วยทั้งที่ state='rest')
+      ดันทีเดียวแล้วปล่อยให้เดินเองสักพัก ถ้ายังจมจริงค่อยดันใหม่รอบหน้า */
+   const free=breedZoneFreeSpot(s,bodyHits,centreHits,lo,hi,margin);
+   if(free){s.fx=free.x;s.fy=free.y;}
+   s._zoneUnstick=1.2;
+   s.state='rest';s.stt=.5+Math.random()*.5;      // พักแป๊บ ไม่ให้เดินย้อนเข้าไปทันที
+  }
+ }
+ /* หันหน้า + จังหวะคืบ ใช้ฟังก์ชันเดียวกับลูปตู้ปกติ (tank-view.js) — กันมูนวอล์คและก้าวไม่ตรงตัว */
+ if(typeof slugFaceAndCreep==='function')slugFaceAndCreep(s,dt);
+ s._lastGoodFx=s.fx;s._lastGoodFy=s.fy;
+}
+/* จุดว่างใกล้ตัวที่สุดในโซนเพาะพันธุ์ — เรียกเฉพาะตอนทากจมอยู่ในหินจริง ๆ ไม่ใช่ทุกเฟรม
+   ไล่รัศมีทีละครึ่งช่อง รอบละ 12 ทิศ
+   ⚠️ ต้องมีรอบสอง "เช็กแค่จุดกึ่งกลาง" ด้วย — โซนเพาะกว้างจริงแค่ ~2.7 ช่อง
+      ตัวใหญ่ (margin 1.15) ในโซนที่มีหิน 3-4 ก้อน อาจไม่มีจุดไหนเลยที่ "ทั้งตัว" ไม่โดนหิน
+      วัดแล้ว: เช็กทั้งตัวเหลือที่ว่าง 0 จุด แต่เช็กแค่จุดกลางเหลือ 67 จุด
+      ถ้ามีแต่รอบแรก ทากจะค้างจมอยู่ในหินถาวร (ไม่สั่นแล้ว แต่ก็ยังไม่หลุด)
+      รอบสองยอมให้ตัวล้ำหินได้นิดหน่อย แต่ได้ออกมายืนในที่ที่เดินต่อได้จริง */
+function breedZoneFreeSpot(s,bodyHits,centreHits,lo,hi,margin){
+ if(!(hi>lo))return null;
+ for(const blocked of [bodyHits,centreHits])
+  for(let r=.5;r<=6;r+=.5)for(let i=0;i<12;i++){
+   const a=i*Math.PI/6;
+   const x=Math.max(lo,Math.min(hi,s.fx+Math.cos(a)*r));
+   const y=Math.max(margin,Math.min(10-margin,s.fy+Math.sin(a)*r));
+   if(!blocked(x,y))return {x,y};
+  }
+ return null;
 }
 function setBreedingZone(o,s,inside){
  if(inside&&!s.breedZone&&o.slugs.filter(x=>x.breedZone).length>=2)return false;

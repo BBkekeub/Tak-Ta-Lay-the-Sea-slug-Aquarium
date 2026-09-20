@@ -797,18 +797,43 @@ function nextGoal(p){
    ============================================================ */
 let _pLast = 0;
 let _peopleTimeDebt = 0;
+/* ---- เพดานงานค้างของฝั่งลูกค้า ----
+   ⚠️ 2026-09-20 ผู้เล่น: "กดไปดูแท็บอื่นนาน ๆ กลับมาทุกอย่างติดสปีดหนักมาก"
+   ต้นเหตุ: แท็บถูกซ่อน = เบราว์เซอร์หยุดเรียก requestAnimationFrame ทั้งหมด
+   _pLast ค้างอยู่ที่เวลาเก่า พอกลับมา elapsed ก้อนเดียวเป็นหลักร้อย/หลักพันวินาที
+   แล้วลูปนี้ไล่ใช้หนี้รอบละ 20 สไลซ์ × 0.05 = เดินเวลาเกม 1 วินาทีต่อ 1 เฟรม
+     หาย 10 นาที → หนี้ 600 วิ → ทุกคนวิ่ง 60 เท่านาน ~10 วินาทีจริง
+     หาย 1 ชั่วโมง → ~60 วินาที
+   แถมยังโดนคูณอีก เพราะ stepPeople() ถูกเรียกได้หลายจุดในเฟรมเดียว
+   (shop-floor.js 2 จุด + slug-race.js) แต่ละจุดไล่ใช้หนี้ของตัวเองครบ 20 สไลซ์
+
+   นโยบายที่เลือก (ตาม AGENTS.md หมวด 6 ที่ให้ "ระบุว่าจะเก็บ backlog อย่างไร"):
+     ซ่อนแท็บอยู่ = ชีวิตลูกค้าหยุดไปด้วย ไม่เก็บหนี้ ไม่ไล่ชดเชย
+   เหตุผล: ของในลูปนี้เป็นภาพล้วน ๆ (เดิน · ยืนดูตู้ · คิวหน้าเคาน์เตอร์)
+   ไม่มีค่าที่ต้องรักษาข้ามเวลา และ "เร่ง 60 เท่า" ก็ให้ผลปลายทางเท่ากับข้ามไปเลย
+   แต่ดูพังกว่ามาก · ทำแบบเดียวกับลูปอื่นทั้งเกมที่ clamp dt แล้วทิ้งส่วนเกินอยู่แล้ว
+   (ทากในตู้ shop-floor.js:345 · tank-view.js:1730 · บานประตู entrance.js)
+   ความอิ่มก็เดินด้วย dt จากลูปตู้ จึงหยุดพร้อมกัน สอดคล้องกันทั้งเกม
+   ⚠️ ระบบที่ "ต้องเดินต่อแม้ปิดเกม" ไม่ได้อยู่ในลูปนี้เลย — เพาะพันธุ์ · พ่อค้าเร่/พ่อค้าส่ง ·
+      ออเดอร์ออนไลน์ · จดหมายทัวร์นาเมนต์ ใช้ Date.now() ของตัวเอง ตามทันเองอยู่แล้ว
+   เพดานนี้ยังกันเครื่องหลับ/เฟรมกระตุกยาวให้ด้วย ไม่ได้กันแค่เคสซ่อนแท็บ */
+const PEOPLE_DEBT_MAX=0.5;
 function stepPeople(){
   const now = performance.now();
   if(!_pLast)_peopleTimeDebt=0;
   const elapsed=Math.max(0,(now-(_pLast||now))/1000);_pLast=now;
   if(!peopleOn){_peopleTimeDebt=0;return;}
-  _peopleTimeDebt+=elapsed;
+  _peopleTimeDebt=Math.min(_peopleTimeDebt+elapsed,PEOPLE_DEBT_MAX);
   // Keep elapsed time, but bound each movement step and catch-up work per call.
   // A normal 100 ms background tick takes two 50 ms steps, not one truncated step.
   for(let steps=0;steps<20&&_peopleTimeDebt>1e-8;steps++){
     const dt=Math.min(.05,_peopleTimeDebt);_peopleTimeDebt-=dt;stepPeopleSlice(dt);
   }
 }
+/* กลับมาที่แท็บ = เริ่มนับเวลาใหม่จากศูนย์ ไม่ใช่นับต่อจากตอนก่อนสลับออกไป
+   (เพดานด้านบนก็เอาอยู่ แต่ตัดตั้งแต่ต้นทางชัดกว่า และกันเฟรมแรกสะดุด) */
+if(typeof document!=='undefined')
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){_pLast=0;_peopleTimeDebt=0;}});
 function stepPeopleSlice(dt){
   _peopleT += dt;
 

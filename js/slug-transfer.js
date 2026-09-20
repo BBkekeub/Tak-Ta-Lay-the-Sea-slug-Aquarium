@@ -1,4 +1,7 @@
-function slugTransferLocked(s,o){return TRADE_OFFERS.some(t=>t.slug===s)||!!(o&&isBreeder(o)&&breederState(o).phase==='mating'&&breederState(o).parents.includes(s));}
+/* ⚠️ 2026-09-20 ผู้เล่น: "เมื่อมีคนเสนอซื้อทากแล้วทำอะไรกับทากตัวนั้นไม่ได้เลย แถมเอาออกตู้ก็ไม่ได้"
+   ถอดเงื่อนไข TRADE_OFFERS ออกจากการล็อก — ย้ายได้แล้ว แล้ว transferSlugs() จะยกเลิกข้อเสนอให้เอง
+   เหลือล็อกเฉพาะ "กำลังผสมพันธุ์อยู่" ซึ่งดึงออกกลางคันไม่ได้จริง ๆ (วงจรผสมจะพัง) */
+function slugTransferLocked(s,o){return !!(o&&isBreeder(o)&&breederState(o).phase==='mating'&&breederState(o).parents.includes(s));}
 function drawSlugPortrait(canvas,slug){
  const source=slugSprite(slug).c,ctx=canvas.getContext('2d'),pad=10;
  const scale=Math.min((canvas.width-pad*2)/source.width,(canvas.height-pad*2)/source.height);
@@ -10,8 +13,11 @@ function matchesSlugStats(s,filters,current=true){const g=current?foodGenes(s):s
 function transferSlugs(from,to,ids){
  const valid=o=>o===null||G.objs.includes(o)&&o.type==='tank';if(from===to||!valid(from)||!valid(to))return false;
  const source=from?from.slugs:G.inv,dest=to?to.slugs:G.inv,chosen=[...new Set(ids)].map(id=>source.find(s=>s.id===id));
- if(!chosen.length||chosen.some(s=>!s||(from&&isBreeder(from)&&breederState(from).phase==='mating'&&breederState(from).parents.includes(s))||TRADE_OFFERS.some(o=>o.slug===s))){toast('บางตัวมีข้อเสนอซื้ออยู่ หรือถูกย้ายไปแล้ว','bad');return false;}
+ if(!chosen.length||chosen.some(s=>!s||(from&&isBreeder(from)&&breederState(from).phase==='mating'&&breederState(from).parents.includes(s)))){toast('บางตัวกำลังผสมพันธุ์อยู่ หรือถูกย้ายไปแล้ว','bad');return false;}
  if(to&&dest.length+breederReserved(to)+chosen.length>tankCap(to.def)){toast('พื้นที่ปลายทางไม่พอสำหรับตัวที่เลือก','bad');return false;}
+ /* ย้ายออกจากตู้ = ลูกค้าที่รอซื้ออยู่ซื้อไม่ได้แล้ว ยกเลิกข้อเสนอให้ตรงนี้
+    ⚠️ ต้องเรียก "หลัง" ด่านตรวจทั้งหมดผ่าน ไม่งั้นย้ายไม่สำเร็จแต่ข้อเสนอถูกยกเลิกไปแล้ว */
+ if(typeof releaseSlugOffers==='function')releaseSlugOffers(chosen,'ย้ายทากออกจากตู้');
  for(const s of chosen){source.splice(source.indexOf(s),1);s.breedZone=false;dest.push(s);if(to)placeOnFloor(s,to);if(selSlug===s)selSlug=null;if(heldSlug===s)heldSlug=null;}
  syncHUD();syncOv();saveGame();renderBreederUI();return true;
 }

@@ -727,10 +727,17 @@ function canPlace(cx,cy,def, ignore, rot){
   return inBounds(cx,cy,w,h) && !overlaps(cx,cy,w,h,ignore) && layoutAllowsPlacement(cx,cy,def,ignore,rot);
 }
 
+/* จบการกระทำหนึ่งครั้งในโหมดก่อสร้าง (วาง/เก็บ/ขาย/ย้าย/ติดตั้งของติดผนัง)
+   ⚠️ 2026-09-20 ผู้เล่นสั่ง: "ยกเลิกการออกจากโหมดก่อสร้างหลังทำอะไรเสร็จ"
+      เดิมบรรทัดนี้มี setMode('view') ต่อท้าย = วางของชิ้นเดียวแล้วเด้งออกจากโหมดก่อสร้างทุกครั้ง
+      ต้องกด 🔧 เข้าใหม่ก่อนวางชิ้นถัดไป ซึ่งน่ารำคาญตอนจัดร้านทีละหลายชิ้น
+      ตอนนี้แค่ "วางของลงจากมือ" แล้วอยู่ในโหมดก่อสร้างต่อ · ออกเองด้วยปุ่ม "✓ เสร็จสิ้น" หรือ ดู/เล่น */
 function finishConstruction(){
   buyKey=null;moving=null;movingByClick=false;grab=null;
   if(typeof placingWallDoor!=='undefined'){placingWallDoor=false;wallDoorHover=null;}
-  setMode('view');syncRotateBtn();saveGame();
+  if(typeof cv!=='undefined'&&cv.classList)cv.classList.remove('placing');   // เคอร์เซอร์ "กำลังถือของ" ต้องหายไปด้วย
+  if(typeof buildShop==='function')buildShop();                              // ปุ่มของในแผงต้องเลิกไฮไลต์ + ราคาที่เปลี่ยน (เคาน์เตอร์/ประตู) อัปเดตทันที
+  syncRotateBtn();saveGame();
 }
 /* ราคาจริงของชิ้นนี้ ณ ตอนนี้ — เคาน์เตอร์ตัวแรกฟรี ตัวต่อไปตัวละ COUNTER_PRICE (ผู้เล่นกำหนด 2026-09-20)
    ⚠️ แก้ def.price ตรง ๆ ไม่ได้ เพราะ def ใช้ร่วมกันทุกตัวและเป็นฐานของราคาคืนตอนเก็บ

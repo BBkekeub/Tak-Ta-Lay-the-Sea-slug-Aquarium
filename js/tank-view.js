@@ -1271,6 +1271,14 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
   slugs.forEach(s=>{
     const rad=slugCm(s.genes)/CM_PER_CELL*0.35;
     const blk=(x,y)=>blkAt(x,y,rad);
+    /* ⚠️ 2026-09-20 ผู้เล่น: "ทากยังบัคชนรัว ๆ อยู่เลย"
+       ตัวหน่วง "ตัดสินใจหลบแล้วยึดไว้แป๊บนึง" — ดูจุดที่ใช้สองแห่งด้านล่าง (ชนตัวอื่น / ชนช่องตัน)
+       ทั้งสองจุดเดิมสุ่มทิศหลบใหม่ทุกเฟรม ทำให้ s.turn เด้งไปมา 60 ครั้ง/วินาที
+       s.dir ไล่ตามเป้าที่ขยับหนีตลอดจึงเลี้ยวไม่เคยจบ = ติดกันแล้วดันกันรัว ๆ ไม่หลุดสักที
+       วัดได้: ตู้เพาะ 9 ตัว + หิน 18 ก้อน มีคู่ที่แตะกัน 2 คู่ค้างครบ 30 วินาทีเต็ม
+       (ตู้เดียวกันแต่ไม่มีหิน = 0 คู่ → เป็นเคสโดนหนีบระหว่างหินกับทากอีกตัว) */
+    s._avoidHold=Math.max(0,(s._avoidHold||0)-dt);
+    s._solidFix=Math.max(0,(s._solidFix||0)-dt);   // คูลดาวน์ของการวาร์ปออกจากช่องตัน (ดูท้ายลูปนี้)
     if(!s.wall && typeof foodStep==='function'&&foodStep(s,dt,fw,fh,obstacles,SOLID))return;
     /* เซฟเก่า / โค้ดเก่า: สเตตไต่กำแพงแบบเดิม → ย้ายมาระบบ "กำแพงคือพื้นอีกผืน" */
     if(!s.wall && (s.state==='climbUp'||s.state==='climb'||s.state==='climbDown')){
@@ -1487,7 +1495,12 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
             if(side&&!o.wall&&o!==heldSlug&&['rest','walk','inspect','stretch'].includes(o.state)){
               o.state='walk';o.stt=Math.max(o.stt||0,2.8);o.turn=o.dir;   // 2.8 วิ ≈ พ้นความยาวลำตัวของทั้งคู่ (1.2 วิเดิมได้แค่ครึ่งตัว ยังขวางอยู่)   // เดินตรงไปตามทิศที่หันอยู่ ไม่หันมาหาเรา
             }
-            if(!['seekFood','follow','seekNap'].includes(s.state))s.turn=s.dir-Math.PI/2*(0.6+Math.random()*0.3);   // ชนตรง ๆ = เลี้ยวขวาอ้อม (ทิศเดียวกันทุกตัว ไม่เลี้ยวชนกันซ้ำ)
+            /* ⚠️ ต้องยึดทิศหลบไว้ _avoidHold วินาที — เดิมสุ่มใหม่ทุกเฟรม s.dir เลยไล่ตามเป้าที่ขยับหนีตลอด
+               เลี้ยวไม่เคยจบ ทั้งคู่จึงดันกันอยู่กับที่ไม่หลุด (วัดได้: ค้างครบ 30 วินาทีเต็ม) */
+            if(!['seekFood','follow','seekNap'].includes(s.state)&&(s._avoidHold||0)<=0){
+              s.turn=s.dir-Math.PI/2*(0.6+Math.random()*0.3);   // ชนตรง ๆ = เลี้ยวขวาอ้อม (ทิศเดียวกันทุกตัว ไม่เลี้ยวชนกันซ้ำ)
+              s._avoidHold=0.7;
+            }
             break;
           }
         }
@@ -1496,13 +1509,30 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
       if(!blk(nx,ny)){ s.fx=nx; s.fy=ny; }               // ชนช่อง solid → ไถลตามแกน/หันหนี
       else if(!blk(nx,s.fy)){ s.fx=nx; }
       else if(!blk(s.fx,ny)){ s.fy=ny; }
-      else { s.turn=s.dir+Math.PI*(0.6+Math.random()*0.8); s.stt=Math.min(s.stt,0.5); }
+      /* ชนช่องตันทุกแกน — ยึดทิศหลบไว้เหมือนกัน ไม่งั้นสุ่มใหม่ทุกเฟรมแล้วสั่นอยู่หน้าหินไม่หลุด */
+      else if((s._avoidHold||0)<=0){ s.turn=s.dir+Math.PI*(0.6+Math.random()*0.8); s.stt=Math.min(s.stt,0.5); s._avoidHold=0.7; }
     }
     /* (ทิศที่โมเดล 3D หัน `s._motionHeading` ย้ายไปตั้งท้ายเฟรมพร้อม s.flip แล้ว — ดูคอมเมนต์ตรงนั้น) */
     s.ph+=dt*(0.8+((s.traits&&s.traits.energy)||0.5)*0.5)*(s.state==='dash'?3.2:s.state==='flee'?2.35:(s.state==='walk'||s.state==='seekDecor'||s.state==='seekNap'||s.state==='seekClimb'||s.state==='follow')?1.45:s.state==='wake'?2.0:0.62);
-    if(hit(s.fx,s.fy)){                                   // ค้างในช่อง solid → หาที่ว่างใกล้สุดแล้วย้ายไปเลย
-      const g=freeSpotNear(s.fx, s.fy, SOLID, fw, fh, slugCm(s.genes)/CM_PER_CELL*0.55+0.2);
-      s.fx=g.fx; s.fy=g.fy;
+    /* ค้างในช่อง solid → หาที่ว่างใกล้สุดแล้วย้ายไปเลย
+       ⚠️ 2026-09-20 ผู้เล่น: "ทากยังบัคชนรัว ๆ อยู่เลย" — ต้นเหตุจริงอยู่บรรทัดนี้
+       ระยะขอบที่ใช้ "หาที่ว่าง" กับที่ใช้ "บีบกลับเข้ากรอบ" ตอนท้ายเฟรม เป็นคนละค่า:
+         freeSpotNear เดิมใช้ slugCm/CM*0.55+0.2  = 1.08 (ตัว 8 ซม.)
+         ส่วน slugEdgeMargin ตอนท้ายเฟรมใช้ *0.9+0.7 = 2.14
+       จุดที่หามาได้จึงอยู่นอกกรอบของตัวบีบ พอถูกบีบกลับก็ไปลงในหินอีก
+       เฟรมถัดไป hit() จริงอีก → วาร์ปใหม่ → บีบกลับ → วน 60 ครั้ง/วินาทีไม่จบ
+       วัดได้: ทาก 1 ตัวเดินสะสม 636 หน่วยใน 30 วินาที แต่ห่างจุดเริ่มแค่ 0.53
+               กลับทิศ 1798 ครั้งจาก 1800 เฟรม (ทั้งที่สถานะเป็น "sleep")
+       แก้: ใช้ระยะขอบตัวเดียวกัน แล้วลองบีบก่อนว่าจุดใหม่ยังว่างจริงถึงจะย้าย
+            + คูลดาวน์กันยิงซ้ำทุกเฟรมถ้ายังหาที่ลงไม่ได้ */
+    if(hit(s.fx,s.fy)&&(s._solidFix||0)<=0){
+      const mg=slugEdgeMargin(s,fw), mx=Math.min(mg,fw/2), my=Math.min(mg,fh/2);
+      const g=freeSpotNear(s.fx, s.fy, SOLID, fw, fh, mg);
+      const gx=Math.max(mx,Math.min(fw-mx,g.fx)), gy=Math.max(my,Math.min(fh-my,g.fy));
+      /* ย้ายได้จริง = ทำเลย ไม่ต้องรอคูลดาวน์ — จุดที่ได้ผ่านการบีบกรอบแล้วจึงไม่เด้งกลับ
+         คูลดาวน์มีไว้สำหรับเคส "หาที่ลงไม่ได้" เท่านั้น กันไล่ค้นทั้งตู้ซ้ำทุกเฟรม */
+      if(!hit(gx,gy)){ s.fx=gx; s.fy=gy; }
+      else s._solidFix=0.5;
     }
   });
   if(doSep) for(let i=0;i<slugs.length;i++) for(let j=i+1;j<slugs.length;j++){
@@ -1541,9 +1571,19 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
     const mx=Math.min(mg,fw/2),my=Math.min(mg,fh/2);
     s.fx=Math.max(mx,Math.min(fw-mx,s.fx));
     s.fy=Math.max(my,Math.min(fh-my,s.fy));
-    /* ---- หันหน้าตาม "ที่ขยับจริง" ของทั้งเฟรม (รวมแรงผลัก/การถูกบีบขอบ) ----
-       เดิมตั้งจากทิศที่ตั้งใจเดินก่อนขยับ พอถูกดันสวนทางเลยกลายเป็นมูนวอค
-       เกณฑ์ขั้นต่ำ = 20% ของก้าวปกติ → เดินเกือบตั้งฉากกับจอ (ขยับซ้ายขวานิดเดียว) จะคงหน้าเดิม ไม่กระพริบ */
+    slugFaceAndCreep(s,dt);
+    s._lastGoodFx=s.fx;s._lastGoodFy=s.fy;
+  });
+}
+/* ---- หันหน้า + จังหวะคืบ ตาม "ที่ขยับจริง" ของทั้งเฟรม ----
+   ⚠️ 2026-09-20 ผู้เล่น: "ทากในโซนผสมยังเดินมูนวอล์คได้อยู่ · ตัวเล็กระยะก้าวไกลไปเลยเดินกระตุก"
+   ต้นเหตุเดียวกันทั้งคู่: บล็อกนี้เคยอยู่ในลูปท้าย stepTankSlugs ซึ่งทำงานกับ "slugs ที่ถูกกรองแล้ว"
+   ทากในโซนผสม (s.breedZone) ถูก filter ออกตั้งแต่ต้นฟังก์ชัน และตัวอ่อนไม่ได้อยู่ใน o.slugs เลย
+   สองกลุ่มนี้จึงไม่เคยได้อัปเดต s.flip / s._motionHeading / s.creepT สักครั้ง
+     → s.flip กับ _motionHeading ค้างค่าเก่า = มูนวอล์คทั้ง 2D และ 3D
+     → creepT ไม่เดิน = ท่าคืบไม่ขยับตามระยะที่เดินจริง
+   แยกออกมาเป็นฟังก์ชันเพื่อให้ walkBreedingZone (breeding.js) เรียกใช้ชุดเดียวกันได้ */
+function slugFaceAndCreep(s,dt){
     const ndx=s.fx-(s._frameX0??s.fx), ndy=s.fy-(s._frameY0??s.fy);
     /* ⚠️ กล้องในตู้เป็นภาพเฉียง: 1 ช่องลึก (fy) ดันภาพไปทางขวา DEPX=19 px ด้วย
        เดิมตัดสินหน้าจาก cos(dir) = แกน x ของ "โลก" อย่างเดียว → ช่วงมุม 90°–115.4°
@@ -1575,9 +1615,11 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
        เดิมท่าคืบวิ่งด้วยนาฬิกาจริง (sin(performance.now()/700)) รอบละ 4.4 วิเท่ากันหมด
        ตัวเล็กเดินเร็วกว่า จึงไถลไป 0.7 ช่วงตัวต่อการคืบหนึ่งรอบ (ตัวใหญ่ 0.25) = เห็นเป็นไถล/กระตุก */
     const movedCm=Math.hypot(ndx,ndy)*CM_PER_CELL;
-    if(movedCm>0)s.creepT=(s.creepT||0)+movedCm/(CREEP_BODY_PER_CYCLE*slugCm(s.genes))*Math.PI*2;
-    s._lastGoodFx=s.fx;s._lastGoodFy=s.fy;
-  });
+    /* ⚠️ ต้องคูณ _breedScale ด้วย — ตัวอ่อนถูกย่อครึ่ง (_breedScale .5) ตอนวาด
+       แต่ slugCm() คืนความยาว "ตอนโตเต็มวัย" เสมอ ถ้าไม่คูณ ระยะต่อการคืบหนึ่งรอบ
+       จะเท่ากับ 0.35 ช่วงตัวผู้ใหญ่ = 0.7 ช่วงตัวจริงของมัน → ก้าวยาวเกินตัวสองเท่า เห็นเป็นไถล/กระตุก */
+    const bodyCm=slugCm(s.genes)*(Number.isFinite(s._breedScale)?s._breedScale:1);
+    if(movedCm>0&&bodyCm>0)s.creepT=(s.creepT||0)+movedCm/(CREEP_BODY_PER_CYCLE*bodyCm)*Math.PI*2;
 }
 
 /* ---------- ฉากในตู้ (มองจากด้านหน้า — ขอบหน้าตรง ไม่มีมุมแหลม) ----------
@@ -1898,6 +1940,32 @@ function fitText(ctx,parts,sep,max){
   return ctx.measureText(out).width>max?'…':out;
 }
 let geneCardBuffHit=null, geneCardRect=null, geneCardBuffOpen=false, geneCardBuffHover=false, geneCardFor=null;
+/* ⚠️ 2026-09-20 ผู้เล่น: "กดที่ทากแล้วมีสแตตโผล่ด้านข้าง ให้มีไอคอนหัวใจมุมบนขวากดถูกใจได้เลย"
+   การ์ดนี้วาดบนแคนวาส (tctx) ไม่ใช่ DOM จึงใช้ SlugBrowser.heart() ที่สร้าง <span> ไม่ได้
+   ต้องวาดรูปหัวใจเองแล้วทำกรอบกดแยก เหมือนที่แถวบัฟใช้ geneCardBuffHit อยู่แล้ว */
+let geneCardHeartHit=null, geneCardHeartHover=false;
+function drawGeneCardHeart(s,x,y,w){
+  const r=9, cx=x+w-r-8, cy=y+r+5;
+  geneCardHeartHit={x:cx-r-3,y:cy-r-3,w:(r+3)*2,h:(r+3)*2};
+  const on=!!s.favorite;
+  if(geneCardHeartHover){tctx.fillStyle='rgba(95,168,174,0.18)';rrPath(tctx,geneCardHeartHit.x,geneCardHeartHit.y,geneCardHeartHit.w,geneCardHeartHit.h,5);tctx.fill();}
+  /* รูปหัวใจวาดจากเส้นโค้งสองข้าง — สเกลตาม r เพื่อให้คมทุกความละเอียด */
+  const k=r/12;
+  tctx.save();tctx.translate(cx,cy);tctx.scale(k,k);
+  tctx.beginPath();
+  tctx.moveTo(0,9);
+  tctx.bezierCurveTo(-11,1,-10,-7,-5,-7);
+  tctx.bezierCurveTo(-2,-7,0,-4.5,0,-3.2);
+  tctx.bezierCurveTo(0,-4.5,2,-7,5,-7);
+  tctx.bezierCurveTo(10,-7,11,1,0,9);
+  tctx.closePath();tctx.restore();
+  tctx.fillStyle=on?'#E8607A':'rgba(0,0,0,0)';
+  tctx.strokeStyle=on?'#F09AAB':'#9CB4B7';
+  tctx.lineWidth=1.6;
+  if(on)tctx.fill();
+  tctx.stroke();
+}
+const inGeneCardHeart=(mx,my)=>inBox(geneCardHeartHit,mx,my);
 /* ความกว้างมาจากแถบเครื่องมือฝั่งซ้าย (tank-sidebar.js ส่งมาให้) การ์ดจะได้เป็นคอลัมน์เดียวกับปุ่มด้านบน
    ป้ายไทยกับค่ายาวไม่เท่ากันทุกแถว แคบ ๆ แล้วชนกันได้ → ย่อฟอนต์ค่าเฉพาะแถวที่ไม่พอ (ดู VALUE_SM) */
 /* แถวข้อมูลของการ์ดยีน — ใช้ร่วมกันระหว่างการ์ดบนแคนวาสในตู้ (drawGeneCard ข้างล่าง)
@@ -1936,7 +2004,17 @@ function drawGeneCard(s, x, y, cardW){
   tctx.fillStyle='rgba(12,29,34,0.92)'; tctx.strokeStyle='rgba(95,168,174,0.5)';
   rrPath(tctx,x,y,w,h,8); tctx.fill(); tctx.lineWidth=1; tctx.stroke();
   tctx.textAlign='left'; tctx.textBaseline='top';
-  tctx.fillStyle='#D9A03C'; tctx.font='500 10px "IBM Plex Mono",monospace'; tctx.fillText(slugNick(s)+' · '+s.id, x+PAD, y+7);
+  /* ชื่อต้องไม่ไหลไปทับหัวใจมุมบนขวา — กันพื้นที่ไว้ 26px แล้วตัดด้วย … ถ้ายาวเกิน */
+  tctx.fillStyle='#D9A03C'; tctx.font='500 10px "IBM Plex Mono",monospace';
+  {
+    let title=slugNick(s)+' · '+s.id, room=w-PAD*2-26;
+    if(tctx.measureText(title).width>room){
+      while(title.length>3&&tctx.measureText(title+'…').width>room)title=title.slice(0,-1);
+      title+='…';
+    }
+    tctx.fillText(title, x+PAD, y+7);
+  }
+  drawGeneCardHeart(s,x,y,w);
   geneCardBuffHit=null;
   const LABEL='400 12px "IBM Plex Sans Thai",sans-serif',
         VALUE='500 12px "IBM Plex Mono",monospace', VALUE_SM='500 10.5px "IBM Plex Mono",monospace';
@@ -2003,7 +2081,15 @@ tankCv.addEventListener('pointerdown', e=>{
   dragDecor=null; tDrag=false; cancelHold(); pendSlug=null;
   /* กดบนการ์ดยีน = ไม่แพนจอ ไม่ยกเลิกการเลือก (เดิมกดโดนการ์ดแล้วการ์ดหายไปเลย)
      กดแถวบัฟ = สลับกางรายละเอียด — จำเป็นสำหรับจอสัมผัสที่ไม่มี hover */
-  if(selSlug){const q=tankXY(e); if(inGeneCard(q.mx,q.my)){ if(inGeneCardBuff(q.mx,q.my))geneCardBuffOpen=!geneCardBuffOpen; return; }}
+  if(selSlug){const q=tankXY(e); if(inGeneCard(q.mx,q.my)){
+    /* กดหัวใจมุมบนขวาการ์ด = สลับถูกใจทันที (ผู้เล่นขอ 2026-09-20) */
+    if(inGeneCardHeart(q.mx,q.my)){selSlug.favorite=!selSlug.favorite;
+      /* กดถูกใจทั้งที่มีลูกค้ายื่นขอซื้อค้างอยู่ = ต้องถอนข้อเสนอนั้นด้วย
+         ไม่งั้น "ถูกใจแล้วจะไม่โดนซื้อ" เป็นจริงแค่กับข้อเสนอใบใหม่ ใบที่ค้างอยู่ยังกดขายได้ */
+      if(selSlug.favorite&&typeof releaseSlugOffers==='function')releaseSlugOffers(selSlug,'กดถูกใจทากตัวนี้');
+      if(typeof toast==='function')toast(selSlug.favorite?'♥ ถูกใจแล้ว — ทากตัวนี้จะไม่ถูกลูกค้าขอซื้อ':'เลิกถูกใจ — ลูกค้าขอซื้อได้แล้ว',selSlug.favorite?'good':'bad');
+      if(typeof saveGame==='function')saveGame();return;}
+    if(inGeneCardBuff(q.mx,q.my))geneCardBuffOpen=!geneCardBuffOpen; return; }}
   if(!tankBuildMode){
     const {mx,my}=tankXY(e);
     const feedMode=(typeof foodMode!=='undefined'&&foodMode);      // ย้ายอาหารได้เฉพาะตอนเปิดโหมดวางอาหาร
@@ -2022,7 +2108,7 @@ tankCv.addEventListener('pointerdown', e=>{
 tankCv.addEventListener('pointermove', e=>{
   if(!curTank) return;
   /* ชี้แถว "บัฟอาหาร" ในการ์ดยีน = กางรายละเอียด (drawTank วิ่ง rAF อยู่แล้ว ตั้งค่าตัวแปรพอ) */
-  {const q=tankXY(e); geneCardBuffHover=!!selSlug&&inGeneCardBuff(q.mx,q.my);}
+  {const q=tankXY(e); geneCardBuffHover=!!selSlug&&inGeneCardBuff(q.mx,q.my); geneCardHeartHover=!!selSlug&&inGeneCardHeart(q.mx,q.my);}
   if(!tankBuildMode && !heldSlug){
     const q=tankXY(e);
     let near=null, nd=1e9;
