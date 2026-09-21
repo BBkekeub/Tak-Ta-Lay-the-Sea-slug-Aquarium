@@ -80,10 +80,25 @@ function shelfBox(side, u0, u1, z0, z1, d0, d1, top, front, sideCol, stroke) {
 }
 
 let _shelfHits = [];      // [{i, x,y,right,bottom}] สำหรับกดรับเงิน
+/* กรอบชั้นบนจอ (มุมล่างซ้าย–บนขวาของทั้งชั้น) — ใช้คัดทิ้งเมื่อชั้นเลื่อนออกนอกจอ
+   ⚠️ 2026-09-21 เดิมไฟล์นี้เป็นไฟล์เดียวที่ไม่มีการคัดนอกจอเลย (PERFORMANCE_CHECKLIST ข้อ 3)
+   แพนกล้องไปมุมไกล ๆ ก็ยังวาดแผ่นชั้น ฉากยึด ตู้ขาย เหรียญ และป้ายครบทุกเฟรม */
+function shelfOnScreen(r) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const u of [r.offset, r.offset + SHELF_W])
+    for (const z of [SHELF_Z[0] - _cmZ(12), SHELF_Z[SHELF_TIERS - 1] + _cmZ(45)])   // เผื่อฉากยึดใต้ชั้น กับตู้/ป้ายเหนือชั้น
+      for (const d of [0, SHELF_D]) {
+        const p = shelfPt(r.side, u, z, d);
+        if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x;
+        if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y;
+      }
+  return x1 >= 0 && x0 <= CW && y1 >= 0 && y0 <= CH;
+}
 function drawWallShelf(preview) {
   const s = preview || G.shelf, r = shelfRect(s);
   if (!r) { if (!preview) _shelfHits = []; return; }
   if (!preview) _shelfHits = [];
+  if (!preview && !shelfOnScreen(r)) return;   // ชั้นหลุดจอ = ไม่ต้องวาดอะไรเลย (จุดคลิกล้างไปแล้วด้านบน)
   const side = r.side, u0 = r.offset, u1 = r.offset + SHELF_W;
   ctx.save();
   ctx.globalAlpha = preview ? .7 : 1;

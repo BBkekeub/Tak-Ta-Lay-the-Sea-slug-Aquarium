@@ -236,6 +236,27 @@ function drawSaggedSlug(img, stamp, x, y, w, h){
   }
   tctx.drawImage(hit.c,x,y,w,h*hit.ratio);
 }
+/* เงาสัมผัสใต้ตัวทาก — อบครั้งเดียวต่อการรีเฟรชสไปรต์ (ไม่ใช่ต่อเฟรม)
+   คีย์ = เวลาที่สไปรต์ถูกอบล่าสุด (s._tsT) + ขนาด + ความฟุ้ง · สไปรต์เปลี่ยนท่าเมื่อไหร่เงาตามเอง
+   ความฟุ้งคิดใน "พิกัดของสไปรต์" แล้วค่อยยืดตามซูมตอนวาด จึงไม่ต้องอบใหม่ทุกครั้งที่ซูม */
+function tankShadowSprite(s, spr, blur){
+  const b=Math.max(1, Math.round(blur*2)/2), pad=Math.ceil(b*2)+2;
+  const w=Math.ceil(spr.w)+pad*2, h=Math.ceil(spr.h)+pad*2;
+  if(s._sh && s._shT===s._tsT && s._shW===w && s._shH===h && s._shB===b) return {c:s._sh, pad};
+  if(!s._sh || s._shW!==w || s._shH!==h){
+    const c=document.createElement('canvas');
+    c.width=Math.round(w*DPR); c.height=Math.round(h*DPR);
+    s._sh=c; s._shX=c.getContext('2d');
+  }
+  const x=s._shX;
+  x.setTransform(DPR,0,0,DPR,0,0);
+  x.clearRect(0,0,w,h);
+  x.filter='brightness(0) blur('+b.toFixed(1)+'px)';
+  x.drawImage(spr.c, pad, pad, spr.w, spr.h);
+  x.filter='none';
+  s._shT=s._tsT; s._shW=w; s._shH=h; s._shB=b;
+  return {c:s._sh, pad};
+}
 /* แปะทาก 1 ตัวลงฉาก: ตัวทาก (source-over) แล้วค่อยทาบออร่าแบบ lighter "ลงบนซีนจริง"
    ⚠ ห้ามอบออร่าเข้าไปในสไปรต์แล้วแปะทีเดียว — ออร่าเป็นแสง "บวก" กับพื้นหลัง
    อบเข้าสไปรต์เมื่อไหร่มันจะกลายเป็นสีจาง ๆ alpha 6% ที่แปะทับพื้นทราย = แสงหายเกลี้ยง */
@@ -250,11 +271,21 @@ function drawTankSlug(s, P, sa, x, cy, lifted){
        clip เฉพาะแถบล่าง กันไม่ให้เกิดขอบดำใต้พุ่มหงอน */
     const off = Math.max(2, 3*tankCam.zoom);
     const blur = Math.max(1.6, 2.6*tankCam.zoom);        // ฟุ้งให้จางปลาย ไม่เป็นเส้นการ์ตูน
+    /* ⚠️ 2026-09-21 ผู้เล่น: "มือถือแลค" — เดิมบรรทัดนี้ตั้ง ctx.filter='brightness(0) blur()' แล้ววาดสด
+       "ทุกตัว ทุกเฟรม" · ctx.filter บังคับให้เบราว์เซอร์แยกเรนเดอร์เป็นพาสใหม่ต่อการวาดหนึ่งครั้ง
+       ตู้ที่มีทาก 20 ตัว = เบลอ 20 ครั้ง/เฟรม (slug-engine.js:1280 เคยเจอปัญหาเดียวกันแล้วเลิกใช้ filter ไปแล้ว)
+       ตอนนี้อบเงาเป็นสไปรต์ตามจังหวะเดียวกับสไปรต์ตัวทาก (≤20Hz + มีงบต่อเฟรม) แล้วแปะเฉย ๆ */
+    const shadow = tankShadowSprite(s, spr, blur/Math.max(.05,k0));
     tctx.save();
     tctx.beginPath(); tctx.rect(-sw/2, sh*0.12, sw, sh*0.42+off+blur*2); tctx.clip();
     tctx.globalAlpha = 0.22;                              // จางลง (เดิม 0.32 ทึบไป)
-    tctx.filter = 'brightness(0) blur('+blur.toFixed(1)+'px)';
-    tctx.drawImage(spr.c, -sw/2, -sh/2+off, sw, sh);
+    if(shadow){
+      const pad=shadow.pad*k0;
+      tctx.drawImage(shadow.c, -sw/2-pad, -sh/2+off-pad, sw+pad*2, sh+pad*2);
+    }else{                                                // อบไม่ทัน/ไม่ได้ = ใช้ทางเดิมไปก่อน ภาพต้องไม่หาย
+      tctx.filter = 'brightness(0) blur('+blur.toFixed(1)+'px)';
+      tctx.drawImage(spr.c, -sw/2, -sh/2+off, sw, sh);
+    }
     tctx.restore();
   }
   if(lifted) drawSaggedSlug(spr.c,s._tsT,-sw/2,-sh/2,sw,sh);
@@ -1420,13 +1451,7 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
         }
       }
     }
-    if(s.state==='wake') s.wake=Math.max(0,Math.min(1,1-s.stt/WAKE_TIME));
-    if(s.state==='startle') s.startle=Math.max(0,Math.min(1,s.stt/STARTLE_TIME));
-    else s.startle=0;
-    s.look=Math.max(0,(s.look||0)-dt*0.75);
-    s.stretch=s.state==='stretch' ? Math.sin(Math.PI*Math.max(0,1-s.stt/STRETCH_TIME)) : 0;
-    s.sneeze=s.state==='sneeze' ? Math.max(0,Math.min(1,1-s.stt/SNEEZE_TIME)) : 0;
-    s.charge=s.state==='dashCharge' ? Math.max(0,Math.min(1,1-s.stt/DASH_CHARGE_TIME)) : 0;
+    slugPoseTimers(s,dt);
     if(s.wall){
       /* ===== เดินบนกำแพง — พิกัด (fy, climbZ) ความเร็วชุดเดียวกับบนพื้นทุกอย่าง ===== */
       const margin=slugEdgeMargin(s,fw);
@@ -1625,6 +1650,22 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
     slugFaceAndCreep(s,dt);
     s._lastGoodFx=s.fx;s._lastGoodFy=s.fy;
   });
+}
+/* ---- นาฬิกาของ "ท่าทาง" ที่คิดจาก s.stt ----
+   ⚠️ 2026-09-21 ผู้เล่น: "ทากในโซนผสมพันธุ์ กดแล้วหงอนไม่ค่อย ๆ ขึ้นมา"
+   คลิกทาก = ตั้ง state 'startle' + startle=1 (หงอนหดเข้าตัว · slug-engine.js retract)
+   แล้วค่านี้ต้องไล่ลงหา 0 ตามเวลา หงอนถึงจะค่อย ๆ ชูกลับขึ้นมา
+   บล็อกนี้เคยอยู่ในลูปของ stepTankSlugs ซึ่งกรองทากโซนผสม (s.breedZone) ออกตั้งแต่ต้นฟังก์ชัน
+   ทากในโซนจึงค้างที่ startle=1 ตลอดกาล = หงอนหดแล้วไม่กลับขึ้นมาอีกเลยจนกว่าจะย้ายออกจากโซน
+   (บั๊กตระกูลเดียวกับ slugFaceAndCreep ด้านล่าง — โซนผสมเดินคนละลูป ต้องแชร์ฟังก์ชันกัน ไม่ก๊อปสูตร) */
+function slugPoseTimers(s,dt){
+  if(s.state==='wake') s.wake=Math.max(0,Math.min(1,1-s.stt/WAKE_TIME));
+  if(s.state==='startle') s.startle=Math.max(0,Math.min(1,s.stt/STARTLE_TIME));
+  else s.startle=0;
+  s.look=Math.max(0,(s.look||0)-dt*0.75);
+  s.stretch=s.state==='stretch' ? Math.sin(Math.PI*Math.max(0,1-s.stt/STRETCH_TIME)) : 0;
+  s.sneeze=s.state==='sneeze' ? Math.max(0,Math.min(1,1-s.stt/SNEEZE_TIME)) : 0;
+  s.charge=s.state==='dashCharge' ? Math.max(0,Math.min(1,1-s.stt/DASH_CHARGE_TIME)) : 0;
 }
 /* ---- หันหน้า + จังหวะคืบ ตาม "ที่ขยับจริง" ของทั้งเฟรม ----
    ⚠️ 2026-09-20 ผู้เล่น: "ทากในโซนผสมยังเดินมูนวอล์คได้อยู่ · ตัวเล็กระยะก้าวไกลไปเลยเดินกระตุก"

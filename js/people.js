@@ -1149,7 +1149,16 @@ function paintPersonMesh(faces,p,H,snapshot=false){
   const total=faces.reduce((n,f)=>n+(f.v.length-2)*18,0)+(blockers.length+glass.length)*36;
   if(_personVertexData.length<total)_personVertexData=new Float32Array(2**Math.ceil(Math.log2(total)));
   let at=0;const data=_personVertexData;
-  const push=(vs,r,g,b)=>{for(let i=1;i<vs.length-1;i++)for(const j of [0,i,i+1]){const v=vs[j];data[at++]=v[0];data[at++]=v[1];data[at++]=v[2];data[at++]=r;data[at++]=g;data[at++]=b;}};
+  /* ⚠️ 2026-09-21 เดิมบรรทัดนี้เขียน for(const j of [0,i,i+1]) = จองอาร์เรย์ใหม่ "ต่อสามเหลี่ยม"
+     คนหนึ่งคนมีหลายพันหน้า → ขยะ GC หลักหมื่นชิ้นต่อเฟรม · คลี่เป็นสามจุดตรง ๆ ผลลัพธ์เท่าเดิม */
+  const push=(vs,r,g,b)=>{
+    for(let i=1;i<vs.length-1;i++){
+      const a=vs[0],b2=vs[i],c=vs[i+1];
+      data[at++]=a[0];data[at++]=a[1];data[at++]=a[2];data[at++]=r;data[at++]=g;data[at++]=b;
+      data[at++]=b2[0];data[at++]=b2[1];data[at++]=b2[2];data[at++]=r;data[at++]=g;data[at++]=b;
+      data[at++]=c[0];data[at++]=c[1];data[at++]=c[2];data[at++]=r;data[at++]=g;data[at++]=b;
+    }
+  };
   for(const vs of blockers)push(vs,0,0,0);const maskCount=at/6;
   for(const f of faces)push(f.v,f.rgb[0]/255,f.rgb[1]/255,f.rgb[2]/255);const opaqueEnd=at/6;
   for(const vs of glass)push(vs,.48,.66,.71);
@@ -1198,6 +1207,22 @@ function carryPalmTop(part){
   return carryPalmTops.get(part);
 }
 
+/* ⚠️ 2026-09-21 ผู้เล่น: "มือถือแลค" — ท่าทางถูกแคชไว้แล้ว (12–30Hz) แต่ "ตำแหน่ง" ต้องเลื่อนทุกเฟรม
+   เดิมเลื่อนด้วย faces.map(...v.map(...)) = สร้างอาร์เรย์ใหม่ต่อ "ทุกจุดยอดของทุกหน้า ทุกเฟรม"
+   คนเดินหนึ่งคนมีหลายพันจุด → ขยะ GC กองใหญ่ทุกเฟรม ซึ่งบนมือถือคือตัวกระตุกตัวจริง
+   ตอนนี้จองบัฟเฟอร์ปลายทางไว้ต่อคน แล้วเขียนทับค่าเดิม — จองใหม่เฉพาะตอนเปลี่ยนท่าเท่านั้น */
+function translatePoseFaces(p,src,dx,dy){
+  let out=p._poseBuf;
+  if(!out||out._src!==src){
+    out=src.map(f=>({rgb:f.rgb,v:f.v.map(v=>[v[0],v[1],v[2]])}));
+    out._src=src;p._poseBuf=out;
+  }
+  for(let i=0;i<src.length;i++){
+    const sv=src[i].v,dv=out[i].v;
+    for(let j=0;j<sv.length;j++){const s=sv[j],d=dv[j];d[0]=s[0]+dx;d[1]=s[1]+dy;d[2]=s[2];}
+  }
+  return out;
+}
 function drawPerson(p){
   if(!personOnScreen(p))return;
   // Camera movement does not change a person's world-space geometry.
@@ -1205,9 +1230,17 @@ function drawPerson(p){
   // position is translated every frame so walking remains smooth.
   const poseRate=(p.motion>.05||p.action!=='watch')?30:12;
   const poseKey=[Math.floor(p.idle*poseRate),p.action==='watch'?0:Math.round((p.actionT||0)*30),Math.round((p.catchupBoost||1)*10),Math.round(p.phase*20),Math.round((p.motion||0)*20),Math.round(p.fdx*100),Math.round(p.fdy*100),Math.round((p.headYaw||0)*100),p.action,p.state,p._squeezeUntil>_peopleT?1:0,p.focus?.id,['point','crouch'].includes(p.action)?Math.round(p.x*20):0,['point','crouch'].includes(p.action)?Math.round(p.y*20):0,p.hCm,p.outfit,p.hairCut,p.shirt,p.pants,p.skin,p.hair,p.bagged,p.accessory,p.modelHair,p.facial,p.body,p.carryTank?1:0,p.carryTank?p.carryColor:0,p.carryTank?p.carryAccent:0].join('|');
-  if(p._drawPose&&p._drawPose.key===poseKey){
+  /* ⚠️ 2026-09-21 ผู้เล่น: "มือถือแลค" — คอมเมนต์ข้างบนตั้งใจให้ใช้ท่าซ้ำที่ 12/30Hz
+     แต่ของจริงแทบไม่เคยได้ใช้ซ้ำเลย เพราะคีย์มีค่าที่ "ไม่มีวันนิ่ง" ปนอยู่:
+     headYaw กับ fdx/fdy เป็นค่าที่ไล่เข้าเป้าแบบ exponential (บรรทัด 336) จึงขยับทีละนิดตลอดกาล
+     ปัดทศนิยม 2 ตำแหน่งก็ยังเปลี่ยนเกือบทุกเฟรม → คีย์เปลี่ยน → สร้างท่าใหม่ทั้งตัวทุกเฟรม
+     วัดจริง: สร้างท่าใหม่ 8.16 ms/คน (3,042 หน้า) · ใช้ท่าแคช 0.54 ms · พลาดแคช 55 จาก 60 เฟรม
+     ลูกค้า 5 คนบนมือถือจึงกินเวลาเกินงบเฟรมไปหลายเท่า
+     แก้ด้วยการคุม "อัตราเปลี่ยนท่า" ตามเวลาจริงตามที่ตั้งใจไว้แต่แรก: คีย์เปลี่ยนก็รอให้ถึงรอบก่อน
+     (ท่าที่ได้เหมือนเดิมทุกประการ แค่อัปเดตที่ 12/30Hz แทน 60Hz · ตำแหน่งยังเลื่อนทุกเฟรม เดินจึงลื่นเท่าเดิม) */
+  if(p._drawPose&&(p._drawPose.key===poseKey||_peopleT-p._drawPose.t<1/poseRate)){
     const cached=p._drawPose,dx=p.x-cached.x,dy=p.y-cached.y;
-    const faces=dx||dy?cached.faces.map(f=>({rgb:f.rgb,v:f.v.map(v=>[v[0]+dx,v[1]+dy,v[2]])})):cached.faces;
+    const faces=dx||dy?translatePoseFaces(p,cached.faces,dx,dy):cached.faces;
     if(cached.carryQuad)_carriedSlugs.push({p,cm:cached.carryCm,
       quad:dx||dy?cached.carryQuad.map(v=>[v[0]+dx,v[1]+dy,v[2]]):cached.carryQuad});
     paintPersonMesh(faces,p,p.hCm/CM_PER_CELL);return;
@@ -1567,7 +1600,7 @@ function drawPerson(p){
     rings([[0,lean-.073,.565+bob,.055,.023],[0,lean-.081,.62+bob,.063,.031],[0,lean-.078,.727+bob,.055,.030],[0,lean-.068,.754+bob,.035,.020]],p.pants,12);
     for(const side of [-1,1])limb([side*.06,lean-.046,.77+bob],[side*.061,lean+.059,.694+bob],.007,.007,p.pants);
   }
-  p._drawPose={key:poseKey,x:p.x,y:p.y,faces,carryQuad,carryCm};
+  p._drawPose={key:poseKey,x:p.x,y:p.y,faces,carryQuad,carryCm,t:_peopleT};
   if(carryQuad)_carriedSlugs.push({p,quad:carryQuad,cm:carryCm});
   paintPersonMesh(faces,p,H);
 }

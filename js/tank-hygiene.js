@@ -51,35 +51,91 @@ function algaePalette(){
  return algaeTint;
 }
 function algaeEraseStrength(e,now){const age=Math.max(0,now-e.at);return age<ALGAE_GRACE?1:Math.max(0,1-(.15+.85*Math.floor((age-ALGAE_GRACE)/ALGAE_STEP)*ALGAE_STEP/(ALGAE_FULL-ALGAE_GRACE)));}
-function stampAlgaeMask(c,e,strength=1){c.save();c.globalCompositeOperation='destination-out';c.setTransform(e.ax,e.ay,e.bx,e.by,e.cx,e.cy);const g=c.createRadialGradient(0,0,.76,0,0,1);g.addColorStop(0,'rgba(0,0,0,'+strength+')');g.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=g;c.fillRect(-1,-1,2,2);c.restore();}
+/* ⚠️ 2026-09-21 ผู้เล่น: "มือถือแลคตอนทำความสะอาด"
+   เดิมรอยแปรงถูกวาดลงแคนวาสมาสก์ แล้วอ่านกลับด้วย getImageData เพื่อรู้ว่าลบไปเท่าไร
+   ลากนิ้วหนึ่งครั้งแตกเป็นจุดย่อยได้ถึง 10 จุด × 3 หน้า = อ่านกลับ 30 ครั้งในเฟรมเดียว
+   (getImageData คือการรอ GPU→CPU ซึ่งบนมือถือแพงกว่าบนคอมมาก)
+   ตอนนี้เก็บ coverage เป็น Uint8Array แล้วคิดรอยลบด้วยสูตรตรง ๆ — ไม่มีแคนวาสมาสก์ ไม่มีการอ่านกลับเลย
+   โปรไฟล์เดียวกับ radial gradient เดิมเป๊ะ: ทึบเต็มถึง r=0.76 แล้วจางเป็นเส้นตรงจนหมดที่ r=1
+   และ destination-out คือ dst×(1−src) ตามสเปกแคนวาส */
+function algaeEraseBox(e){
+ const rx=Math.hypot(e.ax,e.bx),ry=Math.hypot(e.ay,e.by);
+ return {x0:Math.max(0,Math.floor(e.cx-rx)-1),y0:Math.max(0,Math.floor(e.cy-ry)-1),
+         x1:Math.min(ALGAE_TEXTURE,Math.ceil(e.cx+rx)+1),y1:Math.min(ALGAE_TEXTURE,Math.ceil(e.cy+ry)+1)};
+}
+function applyAlgaeErase(coverage,e,strength=1){
+ const box=algaeEraseBox(e),det=e.ax*e.by-e.ay*e.bx;
+ if(box.x1<=box.x0||box.y1<=box.y0||Math.abs(det)<1e-8)return 0;
+ let removed=0;
+ for(let y=box.y0;y<box.y1;y++){
+  const py=y+.5-e.cy,row=y*ALGAE_TEXTURE;
+  for(let x=box.x0;x<box.x1;x++){
+   const i=row+x,old=coverage[i];if(!old)continue;
+   const px=x+.5-e.cx,u=(px*e.by-py*e.bx)/det,v=(-px*e.ay+py*e.ax)/det,r=Math.hypot(u,v);
+   if(r>=1)continue;
+   const src=strength*(r<=.76?1:(1-r)/.24),next=Math.round(old*(1-src));
+   if(next<old){removed+=old-next;coverage[i]=next;}
+  }
+ }
+ return removed;
+}
+/* กรอบ "ส่วนที่เพิ่งเปลี่ยน" ต่อหน้า — ใช้อัปเดตเท็กซ์เจอร์เฉพาะสี่เหลี่ยมนั้น ไม่ใช่ทั้งผืน */
+const algaeEmptyBox=()=>({x0:ALGAE_TEXTURE,y0:ALGAE_TEXTURE,x1:0,y1:0});
+const algaeFullBox=()=>({x0:0,y0:0,x1:ALGAE_TEXTURE,y1:ALGAE_TEXTURE});
+function growAlgaeBox(box,add){
+ if(add.x0<box.x0)box.x0=add.x0;if(add.y0<box.y0)box.y0=add.y0;
+ if(add.x1>box.x1)box.x1=add.x1;if(add.y1>box.y1)box.y1=add.y1;
+}
 function algaeNextChange(h,now){let next=h.nextUpdate;for(const e of h.erases||[]){const age=now-e.at;next=Math.min(next,age<ALGAE_GRACE?e.at+ALGAE_GRACE:e.at+ALGAE_GRACE+(Math.floor((age-ALGAE_GRACE)/ALGAE_STEP)+1)*ALGAE_STEP);}return next;}
 function rebuildAlgaeSurface(o,h,now){
  let cache=algaeSurfaceCache.get(o);
  if(cache&&cache.revision===(h.eraseRevision||0)&&cache.levels===h.levels&&now<cache.next){h.dirt=cache.dirt;return cache;}
  h.erases=(h.erases||[]).filter(e=>now-e.at<ALGAE_FULL);
- cache={revision:h.eraseRevision||0,levels:h.levels,next:algaeNextChange(h,now),faces:[],masks:[],coverage:[],dirty:new Set(),dirt:0};
- // No coloured texture is allocated for offscreen tanks. Masks are only rebuilt
+ cache={revision:h.eraseRevision||0,levels:h.levels,next:algaeNextChange(h,now),faces:[],coverage:[],boxes:[],dirty:new Set(),dirt:0};
+ // No coloured texture is allocated for offscreen tanks. Coverage is only rebuilt
  // when cleanliness actually changes, because breeding/attraction need that value.
  for(let face=0;face<3;face++){
-  const c=document.createElement('canvas');c.width=c.height=ALGAE_TEXTURE;const x=c.getContext('2d',{willReadFrequently:true});
-  for(let i=0;i<48;i++){x.fillStyle='rgba(255,255,255,'+h.levels[face*48+i]+')';x.fillRect(i%8*24,Math.floor(i/8)*32,24,32);}
-  for(const e of h.erases)if(e.face===face){const strength=algaeEraseStrength(e,now);if(strength>0)stampAlgaeMask(x,e,strength);}
-  const pixels=x.getImageData(0,0,ALGAE_TEXTURE,ALGAE_TEXTURE).data,coverage=new Uint8Array(ALGAE_TEXTURE*ALGAE_TEXTURE);let sum=0;
-  for(let i=0;i<coverage.length;i++){coverage[i]=pixels[i*4+3];sum+=coverage[i];}
-  cache.masks.push(x);cache.coverage.push(coverage);cache.dirt+=sum/(255*ALGAE_TEXTURE*ALGAE_TEXTURE*3);cache.dirty.add(face);
+  const coverage=new Uint8Array(ALGAE_TEXTURE*ALGAE_TEXTURE);
+  /* หนึ่งหน้า = 8×6 ช่อง (ช่องละ 24×32 พิกเซล) ความเข้มคงที่ทั้งช่อง — เติมเป็นแถวด้วย fill() */
+  for(let i=0;i<48;i++){
+   const a=algaeAlphaByte(h.levels[face*48+i]);if(!a)continue;
+   const bx=i%8*24,by=Math.floor(i/8)*32;
+   for(let y=by;y<by+32;y++)coverage.fill(a,y*ALGAE_TEXTURE+bx,y*ALGAE_TEXTURE+bx+24);
+  }
+  for(const e of h.erases)if(e.face===face){const strength=algaeEraseStrength(e,now);if(strength>0)applyAlgaeErase(coverage,e,strength);}
+  let sum=0;for(let i=0;i<coverage.length;i++)sum+=coverage[i];
+  cache.coverage.push(coverage);cache.boxes.push(algaeFullBox());
+  cache.dirt+=sum/(255*ALGAE_TEXTURE*ALGAE_TEXTURE*3);cache.dirty.add(face);
  }
  h.dirt=cache.dirt;algaeSurfaceCache.set(o,cache);return cache;
 }
 function eraseAlgaeRegion(cache,e){
- const rx=Math.hypot(e.ax,e.bx),ry=Math.hypot(e.ay,e.by),left=Math.max(0,Math.floor(e.cx-rx)-1),top=Math.max(0,Math.floor(e.cy-ry)-1),right=Math.min(ALGAE_TEXTURE,Math.ceil(e.cx+rx)+1),bottom=Math.min(ALGAE_TEXTURE,Math.ceil(e.cy+ry)+1);
- if(right<=left||bottom<=top)return false;
- const x=cache.masks[e.face],old=cache.coverage[e.face];stampAlgaeMask(x,e);
- const w=right-left,h=bottom-top,pixels=x.getImageData(left,top,w,h).data;let removed=0;
- for(let y=0;y<h;y++)for(let xx=0;xx<w;xx++){const i=(top+y)*ALGAE_TEXTURE+left+xx,a=pixels[(y*w+xx)*4+3];removed+=old[i]-a;old[i]=a;}
- if(!removed)return false;cache.dirt=Math.max(0,cache.dirt-removed/(255*ALGAE_TEXTURE*ALGAE_TEXTURE*3));cache.dirty.add(e.face);return true;
+ const removed=applyAlgaeErase(cache.coverage[e.face],e);
+ if(!removed)return false;
+ cache.dirt=Math.max(0,cache.dirt-removed/(255*ALGAE_TEXTURE*ALGAE_TEXTURE*3));
+ growAlgaeBox(cache.boxes[e.face],algaeEraseBox(e));cache.dirty.add(e.face);return true;
 }
+/* อัปเดตเท็กซ์เจอร์เฉพาะสี่เหลี่ยมที่เพิ่งเปลี่ยน — เดิมสร้าง ImageData ใหม่ทั้งผืน 192×192 ต่อหน้าทุกเฟรม
+   (110,592 พิกเซล + อัปโหลด 3 ใบ/เฟรม) ทั้งที่แปรงแตะแค่วงเล็ก ๆ */
 function flushAlgaeTextures(cache){
- const tint=algaePalette();for(const face of cache.dirty){let canvas=cache.faces[face];if(!canvas){canvas=document.createElement('canvas');canvas.width=canvas.height=ALGAE_TEXTURE;cache.faces[face]=canvas;}const x=canvas.getContext('2d'),pixels=x.createImageData(ALGAE_TEXTURE,ALGAE_TEXTURE),coverage=cache.coverage[face];for(let i=0;i<coverage.length;i++){const k=i*4;pixels.data[k]=tint[k];pixels.data[k+1]=tint[k+1];pixels.data[k+2]=tint[k+2];pixels.data[k+3]=coverage[i]*tint[k+3];}x.putImageData(pixels,0,0);}cache.dirty.clear();
+ if(!cache.dirty.size)return;
+ const tint=algaePalette();
+ for(const face of cache.dirty){
+  let canvas=cache.faces[face];
+  if(!canvas){canvas=document.createElement('canvas');canvas.width=canvas.height=ALGAE_TEXTURE;cache.faces[face]=canvas;cache.boxes[face]=algaeFullBox();}
+  const box=cache.boxes[face],w=box.x1-box.x0,h=box.y1-box.y0;
+  if(w<=0||h<=0)continue;
+  const x=canvas.getContext('2d'),img=x.createImageData(w,h),coverage=cache.coverage[face],data=img.data;
+  for(let y=0;y<h;y++){
+   let src=((box.y0+y)*ALGAE_TEXTURE+box.x0)*4,cov=(box.y0+y)*ALGAE_TEXTURE+box.x0,dst=y*w*4;
+   for(let i=0;i<w;i++,src+=4,cov++,dst+=4){
+    data[dst]=tint[src];data[dst+1]=tint[src+1];data[dst+2]=tint[src+2];data[dst+3]=coverage[cov]*tint[src+3];
+   }
+  }
+  x.putImageData(img,box.x0,box.y0);
+  cache.boxes[face]=algaeEmptyBox();
+ }
+ cache.dirty.clear();
 }
 
 function drawTankHygiene(o){if(document.hidden||!tankMode||o!==curTank)return;const now=Date.now(),h=tankHygiene(o,now);if(h.dirt<=0)return;const cache=rebuildAlgaeSurface(o,h,now);flushAlgaeTextures(cache);tctx.save();

@@ -12,7 +12,14 @@ let   ctx = cv.getContext('2d');          // let เพราะต้องส�
 const _mainCtx = ctx;
 function withCtx(c, fn){ ctx=c; try{ fn(); } finally { ctx=_mainCtx; } }
 let CW=0, CH=0;
-const DPR = Math.min(2, window.devicePixelRatio || 1);
+/* ⚠️ 2026-09-21 ผู้เล่น: "มือถือแลค" — จอมือถือส่วนใหญ่ devicePixelRatio 2.5–3.5
+   เพดานเดิม 2 แปลว่าโทรศัพท์วาดพิกเซลมากกว่าคอมทั่วไป 4 เท่าต่อพื้นที่เท่ากัน ทั้งที่ GPU อ่อนกว่ามาก
+   บนเครื่องที่เป็น "จอเล็ก + สัมผัส" จึงลดเพดานเหลือ 1.5 = พิกเซลลดลง 44% ทุกเฟรม
+   (คมน้อยลงนิดหน่อยในระยะมือถือมองแทบไม่ออก · อยากได้คมเท่าเดิมแก้เลข 1.5 ตรงนี้ที่เดียว)
+   ⚠️ ค่านี้ถูกใช้ตอนอบสไปรต์/เลเยอร์ทั้งเกม จึงอ่านครั้งเดียวตอนโหลด ห้ามเปลี่ยนกลางเกม
+      ไม่งั้นภาพที่อบไว้ด้วยสเกลเก่าจะเบลอ/แตกเทียบกับแคนวาสใหม่ */
+const PHONE_SCREEN = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) <= 600;
+const DPR = Math.min(PHONE_SCREEN ? 1.5 : 2, window.devicePixelRatio || 1);
 
 function resize(){
   const r = cv.getBoundingClientRect();
@@ -38,6 +45,9 @@ function shade(hex,amt){ return rgb(shadeRgb(hexToRgb(hex),amt)); }
 function rgbaCss(a,al){ return 'rgba('+a[0]+','+a[1]+','+a[2]+','+al+')'; }
 
 /* เงานุ่มขอบฟุ้ง (rx,ry พิกเซล · rot=มุมเอียง) — แสงบนซ้าย เงาทอดล่างขวา */
+/* ⚠️ 2026-09-21 เคยลองเปลี่ยนเป็น "อบเงาเป็นภาพครั้งเดียวแล้วยืดแปะ" เพื่อลดงานตอนวาด
+   วัดจริงแล้วช้ากว่าเดิมทุกขนาดภาพที่ลอง (gradient 0.028 ms · blob 16/32/64 = 0.032/0.034/0.030 ms ต่อคน)
+   เพราะเงาเล็กมาก (รัศมี ~9 px) การไล่สี gradient ถูกกว่าการย่อภาพใหญ่ลงมาแปะ → คงของเดิมไว้ */
 function softShadow(c, px,py, rx,ry, alpha, rot){
   c.save();
   c.translate(px,py); if(rot) c.rotate(rot); c.scale(1, ry/rx);
