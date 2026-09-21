@@ -1024,6 +1024,7 @@ function personFurnitureFaces(cull=false){
   for(const o of G.objs){
     if(o===moving||(cull&&!onScreen(o)))continue;
     if(o.def.playTable){out.push(...playTableDepthFaces(o).opaque);continue;}   // โต๊ะเล่นมีของบนโต๊ะเปลี่ยนตลอด ไม่แคช
+    if(o.def.researchTable){out.push(...researchTableDepthFaces(o).opaque);continue;}
     const q=objGeometry(o).opaque;
     if(q)for(const v of q)out.push(v);
   }
@@ -1138,6 +1139,7 @@ function paintPersonMesh(faces,p,H,snapshot=false){
   const blockers=personFurnitureFaces(!snapshot),glass=[];
   for(const o of G.objs){if(o===moving||(!snapshot&&!onScreen(o)))continue;
     if(o.def.playTable){glass.push(...playTableDepthFaces(o).glass);continue;}
+    if(o.def.researchTable){glass.push(...researchTableDepthFaces(o).glass);continue;}
     if(o.type!=='tank')continue;
     const q=objGeometry(o).glass;                     // แคชไว้แล้ว (ดู objGeometry) ไม่สร้างใหม่ทุกเฟรม
     if(q)for(const v of q)glass.push(v);

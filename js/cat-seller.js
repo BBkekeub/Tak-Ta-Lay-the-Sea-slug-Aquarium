@@ -72,6 +72,7 @@ personFurnitureFaces=function(props=true){
  for(const o of G.objs){
   if(o===moving||(props&&!onScreen(o)))continue;
   if(o.def.playTable){out.push(...playTableDepthFaces(o).opaque);continue;}   // ของบนโต๊ะเปลี่ยนตลอด ไม่แคช
+  if(o.def.researchTable){out.push(...researchTableDepthFaces(o).opaque);continue;}   // โต๊ะวิจัยมีทากตัวอย่างในตู้ ไม่แคชเหมือนกัน
   for(const q of cached(o))out.push(q);
  }
  return out;};
@@ -86,6 +87,7 @@ const _personFurnitureFacesUncached=function(props=true){
  for(const o of G.objs){
   if(o===moving||(props&&!onScreen(o)))continue;
   if(o.def.playTable){out.push(...playTableDepthFaces(o).opaque);continue;}
+  if(o.def.researchTable){out.push(...researchTableDepthFaces(o).opaque);continue;}   // โต๊ะวิจัยมีทากตัวอย่างในตู้ ไม่แคชเหมือนกัน
   if(o._key==='counter'){
    const top=decoH(o)/ZUNIT; // ผิวเคาน์เตอร์ (ราว 14)
    for(const q of [counterBlock(o,0,10,20,10),counterBlock(o,10,0,10,10)]) boxTo(q.x,q.y,q.w,q.h,top);

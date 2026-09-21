@@ -82,7 +82,7 @@
  const tabs=dock.querySelector('.decorTabs'),selection=dock.querySelector('.floorBuildSelection span'),cancel=dock.querySelector('.floorBuildCancel');
  // 'วัสดุ' ต่อจาก 'อุปกรณ์สำคัญ' — แท็บเลือกวัสดุพื้น/กำแพงร้าน ไม่ผูกกับ CATALOG จึงไม่มีของใน #shop ขึ้นตรงนี้ (ดูพาแนล matPanel ด้านล่าง)
  const categories=['ตู้เลี้ยง','ของตกแต่ง','อุปกรณ์สำคัญ','วัสดุ'];let active='ตู้เลี้ยง';
- const category=(k,d)=>(!d||d.playTable||k==='counter')?'อุปกรณ์สำคัญ':d.kind==='tank'?'ตู้เลี้ยง':'ของตกแต่ง';
+ const category=(k,d)=>(!d||d.playTable||d.researchTable||k==='counter')?'อุปกรณ์สำคัญ':d.kind==='tank'?'ตู้เลี้ยง':'ของตกแต่ง';
  const navButtons=[];
  function selectCategory(name){active=name;for(const b of tabs.children){const on=b.textContent===name;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;}for(const b of shop.children)b.hidden=category(b.dataset.k,CATALOG[b.dataset.k])!==name;const onMat=name==='วัสดุ';shop.hidden=onMat;matPanel.hidden=!onMat;for(const b of navButtons)b.hidden=onMat;}
  for(const name of categories){const b=document.createElement('button');b.type='button';b.textContent=name;b.setAttribute('role','tab');b.setAttribute('aria-controls',name==='วัสดุ'?'floorMatPanel':'shop');b.onclick=()=>{selectCategory(name);shop.scrollLeft=0;};b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const next=tabs.children[(categories.indexOf(name)+(e.key==='ArrowRight'?1:categories.length-1))%categories.length];next.click();next.focus();};tabs.append(b);}

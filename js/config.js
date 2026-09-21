@@ -176,6 +176,14 @@ const SLUG_WID_CELLS = 20 / CM_PER_CELL;            // 4 ช่อง
    foodMax = วางอาหารพร้อมกันได้กี่ชิ้นในตู้นั้น (ตู้ใหญ่วางได้เยอะกว่า — ดู feeding.js)   */
 const TANK_GLASS_COLOR='#9fd0f0';                  // ทุกขนาดใช้น้ำ/กระจกสีเดียวกัน
 const BREEDER_MAX=5;                               // ⚙️ ตู้เพาะพันธุ์ต่อร้าน (ผู้เล่นกำหนด 2026-09-18) · ตู้แข่ง/ชักเย่อ/แข่งกิน = อย่างละ 1
+/* ⚙️ ราคาตู้เพาะพันธุ์ไม่คงที่ — ตู้ที่ n ราคา BREEDER_PRICE×n (1500 / 3000 / 4500 / 6000 / 7500)
+   (ผู้เล่นกำหนด 2026-09-21) กันปูตู้เพาะรัว ๆ ตั้งแต่ต้นเกมแล้วปั๊มลูกทากทีละกอง
+   นับรวมตู้ที่เก็บไว้ในที่พักพิงด้วย · เก็บตู้เข้าที่พักพิงแล้ววางใหม่ไม่เสียเงินซ้ำ (ไม่ผ่าน placeBuy) */
+const BREEDER_PRICE=1500;
+const RESEARCH_TABLE_PRICE=3000;                   // ⚙️ โต๊ะวิจัย (research.js) — ซื้อครั้งเดียว ใช้ปลดล็อกได้ทั้งเกม
+/* เพดานตู้เพาะพันธุ์จริง = ฐาน + ขั้นที่วิจัยสำเร็จ (สาย cap ใน research.js ให้ +1 ต่อขั้น สูงสุด 10)
+   ⚠️ research.js โหลดทีหลัง — ต้องกัน typeof ไว้ ไม่งั้นโค้ดที่รันตอนบูตจะพัง */
+function breederMax(){return BREEDER_MAX+(typeof Research!=='undefined'?Research.capBonus():0);}
 const CATALOG = {
   tank_showcase:{kind:'tank',name:'ตู้โชว์',icon:'🔎',price:500,w:SUB,h:SUB,glass:TANK_GLASS_COLOR,foodMax:8,maxSlugs:1,shopSlugScale:7.2,decorScale:1.3},
   tank_race:{kind:'tank',name:'ตู้แข่งทากทะเล',icon:'🏁',price:2500,w:4*SUB,h:2*SUB,glass:TANK_GLASS_COLOR,race:true,foodMax:24},
@@ -183,7 +191,9 @@ const CATALOG = {
   tank_eat:{kind:'tank',name:'ตู้แข่งกินจุ',icon:'🍽️',price:2500,w:2*SUB,h:2*SUB,glass:TANK_GLASS_COLOR,eat:true,foodMax:8},   // 100×100 ซม. · แข่ง 4 ตัว (slug-eat.js)
   tank_throw:{kind:'tank',name:'ตู้ปาหิน',icon:'🪨',price:2500,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,throwing:true,foodMax:8},   // 150×50 ซม. · ปาหินด้วยหงอน 4 ตัว (slug-throw.js)
   play_table:{kind:'deco',name:'โต๊ะเล่นกับทาก',icon:'',price:500,w:SUB,h:SUB,col:'#98744b',playTable:true},
-  tank_breed:{kind:'tank',name:'ตู้เพาะพันธุ์ 3 ส่วน',icon:'🥚',price:2000,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,breeder:true,foodMax:10},   // มีได้ BREEDER_MAX ตู้ (shop-floor.js placeBuy)
+  /* โต๊ะวิจัย 50×100 ซม. — มีได้ตัวเดียวต่อร้าน (ผลวิจัยเป็นของทั้งร้านอยู่แล้ว ดู research.js) */
+  research_table:{kind:'deco',name:'โต๊ะวิจัย',icon:'🔬',price:RESEARCH_TABLE_PRICE,w:SUB,h:2*SUB,col:'#8a6a45',researchTable:true},
+  tank_breed:{kind:'tank',name:'ตู้เพาะพันธุ์ 3 ส่วน',icon:'🥚',price:BREEDER_PRICE,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,breeder:true,foodMax:10},   // มีได้ BREEDER_MAX ตู้ · ราคาตู้ถัดไปแพงขึ้นทีละ BREEDER_PRICE (shop-floor.js objPrice)
   counter: {kind:'deco',name:'เคาน์เตอร์แมวขายทาก',icon:'🐱',price:0,w:2*SUB,h:2*SUB,col:'#826448'},
   tank_s:  {kind:'tank', name:'ตู้เล็ก',  icon:'🐚', price:500,  w:1*SUB, h:1*SUB, glass:TANK_GLASS_COLOR, foodMax:8},
   tank_m:  {kind:'tank', name:'ตู้กลาง', icon:'🪸', price:1500, w:2*SUB, h:1*SUB, glass:TANK_GLASS_COLOR, foodMax:10},
@@ -224,6 +234,7 @@ const G = {
   shelf: null,                  // ชั้นวางติดผนัง {side,offset} — ทากที่ลงขายตลาดโลกไปโชว์บนนี้ (wall-shelf.js)
   shelter: [],                  // ตู้ที่ถอดมาพักชั่วคราว
   inv: [],                      // ทากในคลัง (ยังไม่ลงตู้)
+  research: {cap:0, price:0},   // ขั้นวิจัยที่ทำสำเร็จของแต่ละสาย (research.js)
   seq: 1,
 };
 
@@ -322,7 +333,9 @@ const TANK_DECOR = Object.assign({}, TANK_DECOR_LEGACY,
 /* ราคาของตกแต่งในตู้ — คิดจากความกว้างจริงของชิ้นนั้น */
 /* ราคาคิดจากความกว้าง "จริง" ของชิ้นงาน — ของชุด 3 มิติ wCm เป็นความกว้างบนจอ (รวมการเยื้อง
    ของแกนลึกในภาพเฉียง) ซึ่งกว้างกว่าก้อนจริงราว 1.5 เท่า ถ้าใช้ wCm จะแพงเกินจริงทั้งชุด */
-function decorPrice(key){ const d=TANK_DECOR[key]; return Math.max(20, Math.round(((d&&(d.priceCm||d.wCm))||20)*DECOR_COST_PER_CM)); }
+/* ของตกแต่งในตู้ก็โดนส่วนลดจากสายวิจัย "ลดราคาของทุกอย่าง" ด้วย (research.js) */
+function decorPrice(key){ const d=TANK_DECOR[key], mul=(typeof Research!=='undefined'?Research.priceMul('shop'):1);
+ return Math.max(1, Math.round(Math.max(20, Math.round(((d&&(d.priceCm||d.wCm))||20)*DECOR_COST_PER_CM))*mul)); }
 
 const _decorImg = {};
 function decorImg(key){

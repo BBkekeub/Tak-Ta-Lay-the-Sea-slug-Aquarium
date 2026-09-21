@@ -97,6 +97,7 @@ function drawWallSegment(x,y,side,a,b,tint){
       เหลือรอยต่อเฉพาะตรงที่วัสดุ "เปลี่ยนจริง" ซึ่งตรงนั้นควรเห็นเส้นแบ่งอยู่แล้ว */
 function drawWallRun(side,fixed,run,tint){
   const n=wallLayerCount(), L=run.length, used=new Uint8Array(L*n);
+  const groups=new Map();          // วัสดุ → ผืนทั้งหมดที่ใช้วัสดุนั้น (เทรวมทีเดียวตอนท้าย)
   const cellX=i=>side===0?run[i]:fixed, cellY=i=>side===0?fixed:run[i];
   const matAt=(i,l)=>wallMatIdAt(wallKey(cellX(i),cellY(i),side,l));
   for(let l=0;l<n;l++)for(let i=0;i<L;i++){
@@ -113,8 +114,17 @@ function drawWallRun(side,fixed,run,tint){
     /* ทิศ a→b ต้องเหมือนของเดิมเป๊ะ (side0 = +x, side1 = −y) ไม่งั้นลายวัสดุกลับด้าน */
     const a=side===0?[t0*SUB,fixed*SUB]:[fixed*SUB,(t1+1)*SUB];
     const b=side===0?[(t1+1)*SUB,fixed*SUB]:[fixed*SUB,t0*SUB];
-    drawWall(a,b,tint,wallKey(cellX(i),cellY(i),side,l),wallLayerZ(l)[0],wallLayerZ(l+h-1)[1]);
+    /* ⚠️ ไม่เทที่นี่ทันที — เก็บไว้รวมกับผืนอื่นที่ "วัสดุเดียวกัน" แล้วเทเป็น path เดียวตอนท้าย
+       ไม่งั้นพื้นที่สีเดียวกันที่ถูกหั่นเป็นหลายผืน (รูปตัว U รอบช่องต่างสี) จะมีเส้นตามรอยต่อ */
+    let grp=groups.get(m);
+    if(!grp){ grp={key:wallKey(cellX(i),cellY(i),side,l),quads:[]}; groups.set(m,grp); }
+    grp.quads.push({a,b,z0:wallLayerZ(l)[0],z1:wallLayerZ(l+h-1)[1]});
   }
+  /* ปลายทั้งแนวใช้เป็นจุดยึดลาย+ไล่แสงร่วมกันทุกวัสดุ — ลายจึงต่อเนื่องข้ามผืน ไม่เริ่มนับใหม่ */
+  const first=run[0], last=run[L-1];
+  const anchorA=side===0?[first*SUB,fixed*SUB]:[fixed*SUB,(last+1)*SUB];
+  const anchorB=side===0?[(last+1)*SUB,fixed*SUB]:[fixed*SUB,first*SUB];
+  for(const grp of groups.values()) drawWallQuads(grp.quads,tint,grp.key,anchorA,anchorB);
 }
 function drawTileWalls(){
  const north=(x,y)=>ownsTile(x,y)&&!ownsTile(x,y-1),west=(x,y)=>ownsTile(x,y)&&!ownsTile(x-1,y);

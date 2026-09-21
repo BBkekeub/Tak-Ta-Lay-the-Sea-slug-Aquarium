@@ -306,7 +306,7 @@ function fillDepth(mesh,faces){
  mesh.geometry.setDrawRange(0,i/3);a.needsUpdate=true;mesh.visible=i>0;
 }
 api.queuePeople=faces=>{personFaces=faces.map(f=>f.v);};
-function shopLayoutKey(){return G.objs.map(o=>[o.id,o===moving,o.cx,o.cy,o.rot,oW(o),oH(o),o.type==='tank'?tankStandH(o.def):decoH(o),!!o.def.playTable]).flat().join('|');}
+function shopLayoutKey(){return G.objs.map(o=>[o.id,o===moving,o.cx,o.cy,o.rot,oW(o),oH(o),o.type==='tank'?tankStandH(o.def):decoH(o),!!o.def.playTable,!!o.def.researchTable]).flat().join('|');}
 function updateShopOcclusion(key){
  if(key!==furnitureKey){furnitureKey=key;fillDepth(furnitureDepth,personFurnitureFaces());}
  fillDepth(peopleDepth,personFaces);

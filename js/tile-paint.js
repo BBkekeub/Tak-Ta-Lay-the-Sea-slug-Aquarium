@@ -41,7 +41,16 @@ window.TilePaint = (function(){
 
 /* ============================================================ */
 (function(){
-  const EDGE_ZONE=80, EDGE_MAX=8;
+  /* ⚠️ 2026-09-21 ผู้เล่น: "เลื่อนเองในโหมดทาสีช้าไปหน่อยในคอม เพิ่มความเร็วตามความห่างขอบ"
+     ของเดิม: ความเร็ว = t × 8 ช่อง/วิ โดย t ไล่เชิงเส้น 0→1 ตามความลึกในแถบขอบ
+     แตะขอบสุดได้แค่ 8 ช่อง/วิ และช่วงตื้น ๆ (t=0.1) ได้ 0.8 ช่อง/วิ = แทบไม่ขยับ
+     ตอนนี้: มีความเร็วพื้น EDGE_MIN ทันทีที่เข้าแถบ แล้วไต่แบบเร่ง (t^EDGE_CURVE) ไปจน EDGE_MAX
+       ลึก 10%  : 0.8 → 3.4 ช่อง/วิ
+       ลึก 50%  : 4.0 → 10.7
+       ชิดขอบสุด: 8.0 → 30.0  (เร็วขึ้น ~3.8 เท่า)
+     เส้นโค้งกำลังสองทำให้ "ขยับนิดเดียวตอนเล็งใกล้ขอบ" ยังคุมได้ ส่วนดันสุดขอบถึงจะพุ่ง
+     ⚠️ ไม่ต้องห่วงเส้นสีขาดตอนเลื่อนเร็ว — _paintLineTile() ลากเติมระหว่างช่องเดิมกับช่องใหม่ให้อยู่แล้ว */
+  const EDGE_ZONE=80, EDGE_MIN=3, EDGE_MAX=30, EDGE_CURVE=1.8;
   let _paintDrag=false, _lastTile=null, _target=null;
   let _lastWallKey=null, _wallPainted=false;
   let _hoverTile=null, _hoverWall=null;
@@ -95,8 +104,13 @@ window.TilePaint = (function(){
     };
     const vx=rel(_edgeX,r.left,r.right), vy=rel(_edgeY,r.top,r.bottom);
     if(vx||vy){
-      cam.x+=vx*EDGE_MAX*SUB*dt;
-      cam.y+=vy*EDGE_MAX*SUB*dt;
+      /* t = ความลึกในแถบขอบ 0..1 (เอาแกนที่ลึกกว่าเป็นตัวตั้ง จะได้ไม่ช้าลงตอนเลื่อนทแยง)
+         แล้วแปลงเป็นความเร็วแบบเร่ง — ทิศทางยังมาจากเครื่องหมายของ vx/vy เหมือนเดิม */
+      const t=Math.min(1,Math.max(Math.abs(vx),Math.abs(vy)));
+      const speed=(EDGE_MIN+(EDGE_MAX-EDGE_MIN)*Math.pow(t,EDGE_CURVE))*SUB*dt;
+      const len=Math.hypot(vx,vy)||1;
+      cam.x+=vx/len*speed;
+      cam.y+=vy/len*speed;
       if(_target==='floor'){
         const [nx,ny]=tileUnder(_edgeX,_edgeY);
         if(_lastTile) _paintLineTile(_lastTile[0],_lastTile[1],nx,ny);

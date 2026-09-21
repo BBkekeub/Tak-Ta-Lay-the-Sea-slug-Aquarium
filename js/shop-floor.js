@@ -278,6 +278,45 @@ function drawWall(a, b, tint, wallKeyId, z0=0, z1=ROOM_H){
     ctx.beginPath(); ctx.moveTo(q[3].x,q[3].y); ctx.lineTo(q[2].x,q[2].y); ctx.stroke();
   }
 }
+/* ---- ผนังหลายชิ้นที่ "วัสดุเดียวกัน" — เทเป็น path เดียว ----
+   ⚠️ 2026-09-21 ผู้เล่น: "ต่างสีแค่ 2 ช่องข้างประตู แต่มีเส้นอื่นโผล่ตามแนวทั้งที่สีเดียวกัน"
+   ต้นเหตุ: greedy meshing หั่นพื้นที่สีเดียวกันเป็น "สี่เหลี่ยมหลายผืน" เสมอเมื่อรูปทรงไม่ใช่สี่เหลี่ยม
+   (ช่องต่างสี 2 ช่องที่ชั้นล่าง ทำให้ marble รอบ ๆ กลายเป็นรูปตัว U = ต้องแตกเป็น 4 ผืน — วัดแล้ว)
+   พอเทแยกผืน ขอบที่ชนกันโดน antialias ทั้งคู่ ความทึบรวมไม่ถึง 100% แล้วยังโดนไล่แสง+tint
+   (ซึ่งกึ่งโปร่ง) ทับซ้ำอีกชั้น เส้นจางจึงโผล่ทุกรอยต่อ ทั้งที่เป็นสีเดียวกัน
+   วิธีแก้: รวมทุกผืนที่วัสดุเดียวกันเป็น path เดียวแล้วเทครั้งเดียว — ขอบด้านในหายไปเลย
+   (เทคนิคเดียวกับที่ "ฝาบนกำแพง" ใช้อยู่แล้วใน floor-grid.js drawTileWalls)
+   ⚠️ จุดยึดลาย/ไล่แสงใช้ปลายทั้งแนว (anchorA→anchorB) ไม่ใช่ของแต่ละผืน
+      ลายวัสดุจึงต่อเนื่องข้ามผืนด้วย ไม่เริ่มนับใหม่ทุกชิ้นแบบ drawWall() เดี่ยว ๆ */
+function drawWallQuads(quads, tint, wallKeyId, anchorA, anchorB){
+  if(!quads || !quads.length) return;
+  const proj=quads.map(q=>[P(q.a[0],q.a[1],q.z1), P(q.b[0],q.b[1],q.z1),
+                           P(q.b[0],q.b[1],q.z0), P(q.a[0],q.a[1],q.z0)]);
+  const trace=()=>{ ctx.beginPath();
+    for(const p of proj){ p.forEach((pt,i)=> i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y)); ctx.closePath(); } };
+  const r=wallMatPatFor(wallKeyId!=null ? wallMatAt(wallKeyId) : currentWallMat());
+  const top=P(anchorA[0],anchorA[1],ROOM_H), topE=P(anchorB[0],anchorB[1],ROOM_H), bottom=P(anchorA[0],anchorA[1],0);
+  trace();
+  if(r && r.flat){ ctx.fillStyle=r.flat; }
+  else if(r && r.pat.setTransform && typeof DOMMatrix!=='undefined'){
+    const {pat, img, m}=r;
+    const T=img.naturalWidth/(m.cm/CM_PER_CELL);
+    const L=Math.hypot(anchorB[0]-anchorA[0], anchorB[1]-anchorA[1])||1;
+    const s=Math.hypot(topE.x-top.x, topE.y-top.y)/(L*T);
+    pat.setTransform(new DOMMatrix([(topE.x-top.x)/(L*T), (topE.y-top.y)/(L*T), 0, s, top.x, top.y]));
+    ctx.fillStyle=pat;
+  } else ctx.fillStyle='#14100e';
+  ctx.fill();
+  const g=ctx.createLinearGradient(0,top.y,0,bottom.y);
+  g.addColorStop(0,'rgba(255,240,215,0.08)'); g.addColorStop(1,'rgba(0,0,0,0.18)');
+  ctx.fillStyle=g; ctx.fill();
+  if(tint){ ctx.fillStyle=tint; ctx.fill(); }
+  /* บัวเชิงผนัง — เฉพาะผืนที่แตะพื้น (z0≈0) กันเส้นซ้ำตามรอยต่อชั้น */
+  ctx.strokeStyle='rgba(212,176,120,0.35)'; ctx.lineWidth=1.4;
+  ctx.beginPath();
+  quads.forEach((q,i)=>{ if(q.z0<=0.01){ const p=proj[i]; ctx.moveTo(p[3].x,p[3].y); ctx.lineTo(p[2].x,p[2].y); } });
+  ctx.stroke();
+}
 /* 15 cm masonry extends outside the playable floor. */
 function drawWallThickness(W,H){
   const t=15/CM_PER_CELL;
@@ -302,7 +341,7 @@ const ANIM_MIN_PX = 30;    // ทากบนจอสูง ≥ เท่าน
 let   animBudget  = 0;     // งบตัวที่อนิเมชันได้ต่อเฟรม (กันกระตุกถ้าซูมใกล้แล้วเห็นเยอะ)
 
 /* กรอบวัตถุบนจอ (ก้น z=0 ถึงยอด) → คัดเฉพาะที่เห็นในจอมาวาด/ขยับ (กันกระตุกตอนของเยอะ) */
-function objTopZ(o){ if(o.def.playTable)return 20*ZUNIT; if(o._key==='counter')return 30*ZUNIT;return o.type==='tank' ? tankStandH(o.def)+tankGlassH(o.def) : (o.type==='deco'? decoH(o) : 0); }
+function objTopZ(o){ if(o.def.playTable)return 20*ZUNIT; if(o.def.researchTable)return 22*ZUNIT; if(o._key==='counter')return 30*ZUNIT;return o.type==='tank' ? tankStandH(o.def)+tankGlassH(o.def) : (o.type==='deco'? decoH(o) : 0); }
 function onScreen(o){
   const d=o.def, cx=o.cx, cy=o.cy, tz=objTopZ(o), M=80;
   let minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;
@@ -421,6 +460,9 @@ function drawFloor(){
   if(window.SlugTug)SlugTug.drawChallengers();
   if(window.SlugEat)SlugEat.drawChallengers();
   if(window.SlugThrow)SlugThrow.drawChallengers();
+  /* ตัวเลขเงินลอยตรงจุดที่ทำรายการ — วาดท้ายสุดให้อยู่เหนือของทุกชิ้น (cost-pop.js)
+     ลิสต์ว่าง = คืนทันที ไม่มีงานต่อเฟรมเพิ่มตอนเล่นปกติ */
+  if(typeof CostPop!=='undefined'){ CostPop.draw(); CostPop.idle(); }
   window.DecorGLB?.endShop();
 }
 
@@ -511,6 +553,7 @@ function isoBox(cx,cy,w,h, baseZ, boxH, topCol, rightCol, frontCol, alpha){
 
 function drawObject(o){
   if(o.def.playTable){drawPlayTable(o);return;}
+  if(o.def.researchTable){drawResearchTable(o);return;}
   const d=o.def, cx=o.cx, cy=o.cy;
   if(o.type==='deco'){
     if(o._key==='counter'){drawTradeCounter(o);return;}
@@ -749,8 +792,13 @@ function finishConstruction(){
    ⚠️ แก้ def.price ตรง ๆ ไม่ได้ เพราะ def ใช้ร่วมกันทุกตัวและเป็นฐานของราคาคืนตอนเก็บ
       เก็บราคาที่จ่ายจริงไว้บนวัตถุ (o.paid) แทน แล้วคืนเงินตามนั้น */
 function objPrice(key,def){
-  if(key==='counter')return [...G.objs,...G.shelter].some(o=>o&&o._key==='counter')?COUNTER_PRICE:0;
-  return def.price||0;
+  /* ส่วนลดจากสายวิจัย "ลดราคาของ" (research.js) — 'breeder' โดนทั้งส่วนลดตู้เพาะและส่วนลดรวม */
+  const mul=k=>(typeof Research!=='undefined'?Research.priceMul(k):1);
+  if(key==='counter')return [...G.objs,...G.shelter].some(o=>o&&o._key==='counter')?Math.round(COUNTER_PRICE*mul('shop')):0;
+  /* ตู้เพาะพันธุ์: ราคาขึ้นตามจำนวนที่มีอยู่แล้ว (นับตู้ในที่พักพิงด้วย) 1500 → 3000 → 4500 …
+     ผู้เล่นกำหนด 2026-09-21 — กันซื้อตู้เพาะรัว ๆ แล้วปั๊มลูกทาก */
+  if(def&&def.breeder)return Math.round(BREEDER_PRICE*([...G.objs,...G.shelter].filter(o=>o&&o.def&&o.def.breeder).length+1)*mul('breeder'));
+  return Math.round((def.price||0)*mul('shop'));
 }
 const objPaid=o=>Number.isFinite(o&&o.paid)?o.paid:(o&&o.def&&o.def.price)||0;
 function placeBuy(cell){
@@ -764,8 +812,13 @@ function placeBuy(cell){
   if(def.eat&&[...G.objs,...G.shelter].some(t=>t.def.eat)){toast('มีตู้แข่งกินจุได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   if(def.throwing&&[...G.objs,...G.shelter].some(t=>t.def.throwing)){toast('มีตู้ปาหินได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   /* ⚙️ ตู้เพาะพันธุ์มีได้ 5 ตู้ (ผู้เล่นกำหนด 2026-09-18) — ไม่งั้นปูพรมทั้งร้านแล้วปั๊มลูกทากได้ไม่จำกัด */
-  if(def.breeder&&[...G.objs,...G.shelter].filter(t=>t.def.breeder).length>=BREEDER_MAX){toast('มีตู้เพาะพันธุ์ได้ '+BREEDER_MAX+' ตู้ รวมตู้ที่เก็บไว้','bad');return;}
+  /* เพดานตู้เพาะพันธุ์ขยับได้ด้วยสายวิจัย cap (research.js) — ใช้ breederMax() ไม่ใช่ค่าคงที่ */
+  const bMax=typeof breederMax==='function'?breederMax():BREEDER_MAX;
+  if(def.breeder&&[...G.objs,...G.shelter].filter(t=>t.def.breeder).length>=bMax){toast('มีตู้เพาะพันธุ์ได้ '+bMax+' ตู้ รวมตู้ที่เก็บไว้ (ขยายเพดานได้ที่โต๊ะวิจัย)','bad');return;}
+  if(def.researchTable&&[...G.objs,...G.shelter].some(t=>t.def.researchTable)){toast('มีโต๊ะวิจัยได้ 1 ตัว','bad');return;}
   addCoin(-price);
+  /* ตัวเลขเด้งกลางชิ้นที่เพิ่งวาง — ของฟรีไม่ต้องเด้ง (CostPop ข้ามให้เองเมื่อ amount=0) */
+  if(typeof CostPop!=='undefined') CostPop.at(o.cx+oW({def,rot:buyRot})/2, o.cy+oH({def,rot:buyRot})/2, -price);
   const placed={ id:'o'+(G.seq++), type:def.kind, _key:key, cx:o.cx, cy:o.cy, def, rot:buyRot, slugs:[], paid:price };
   /* เคาน์เตอร์ใหม่เปิดรับทุกคนไว้ก่อน แล้วเด้งหน้าตั้งค่าให้เลือกทันที
      (ตั้งต้นเป็น "ไม่รับใคร" = วางแล้วร้านใช้งานไม่ได้โดยผู้เล่นไม่รู้ตัว) */
@@ -845,11 +898,14 @@ function removeObj(o){
   if(o.type==='tank'){ toShelter(o); return; }
   G.objs=G.objs.filter(x=>x!==o);
   const back=Math.round(objPaid(o)*DECO_REFUND); addCoin(back);
+  if(typeof CostPop!=='undefined') CostPop.at(o.cx+oW(o)/2, o.cy+oH(o)/2, back);
   toast('เก็บ'+o.def.name+' +'+back,'good'); syncHUD();finishConstruction();
 }
 function sellObj(o){
   if(o.type==='tank'){
-    const val=Math.round((o.def.price||0)*0.5);
+    /* คืนครึ่งของ "ราคาที่จ่ายจริง" ไม่ใช่ def.price — ตู้เพาะพันธุ์ตู้หลัง ๆ จ่ายแพงกว่าราคาฐาน
+       (ตู้เก่าก่อนอัปเดตไม่มี o.paid → objPaid ตกกลับไปใช้ def.price เหมือนเดิม) */
+    const val=Math.round(objPaid(o)*0.5);
     const n=(o.slugs||[]).length;
     if(!confirm('ขายตู้ "'+o.def.name+'" ทิ้งถาวร?'+(n?' ทาก '+n+' ตัวจะกลับเข้าคลัง.':'')+' รับคืน '+val+' เหรียญ')) return;
     (o.slugs||[]).forEach(s=>{ if(Array.isArray(G.inv)) G.inv.push(s); });
@@ -859,6 +915,7 @@ function sellObj(o){
   } else {
     G.objs=G.objs.filter(x=>x!==o);
     const back=Math.round(objPaid(o)*DECO_REFUND); addCoin(back);
+  if(typeof CostPop!=='undefined') CostPop.at(o.cx+oW(o)/2, o.cy+oH(o)/2, back);
     toast('ขายทิ้ง'+o.def.name+' +'+back+' เหรียญ','good'); syncHUD(); finishConstruction();
   }
 }
@@ -932,10 +989,19 @@ cv.addEventListener('pointerup', e=>{
      ⚠️ ห้ามตัดสินด้วย cx+cy — นั่นคนละสูตรกับลำดับวาดจริง (isoSortedObjects ดูขนาด+การบังกันด้วย)
         ตู้ใบใหญ่ที่จุดเริ่มอยู่หลังโต๊ะแต่ยื่นมาข้างหน้า จะถูกวาดทับโต๊ะ แต่เดิมกลับเสียคลิกให้โต๊ะ */
   if(appMode==='view'){
+    /* ผู้สมัครที่โดนคลิกพร้อมกันได้: โต๊ะเล่น · โต๊ะวิจัย · ตู้ — ใครถูกวาดทีหลัง (อยู่หน้า) คนนั้นได้คลิก */
+    const cands=[];
     const play=typeof playTableHit==='function'?playTableHit(sx,sy):null;
-    if(play&&th){ const order=isoSortedObjects(); if(order.indexOf(play)>=order.indexOf(th.o)){ openPlayTable(play); return; } }
-    else if(play){ openPlayTable(play); return; }
-    if(th) enterTank(th.o,{fx:th.fx,fy:th.fy}); return;
+    if(play)cands.push({o:play,go:()=>openPlayTable(play)});
+    const rsTable=typeof researchTableHit==='function'?researchTableHit(sx,sy):null;
+    if(rsTable)cands.push({o:rsTable,go:()=>openResearchTable(rsTable)});
+    if(th)cands.push({o:th.o,go:()=>enterTank(th.o,{fx:th.fx,fy:th.fy})});
+    if(cands.length){
+      const order=isoSortedObjects();
+      cands.sort((a,b)=>order.indexOf(b.o)-order.indexOf(a.o));
+      cands[0].go();
+    }
+    return;
   }
   // โหมดก่อสร้าง
   if(tool==='remove'){ if(o) removeObj(o); else if(th) removeObj(th.o); return; }
@@ -983,7 +1049,7 @@ function buildShop(){
   Object.entries(CATALOG).forEach(([k,d])=>{
     const el=document.createElement('button'); el.className='item'+(k===buyKey?' on':''); el.dataset.k=k;
     el.innerHTML='<div class="ic">'+d.icon+'</div><div class="nm">'+d.name+'</div>'+
-      '<div class="pr">'+d.price+' เหรียญ</div><div class="dm">'+(d.w*CM_PER_CELL)+'×'+(d.h*CM_PER_CELL)+(d.kind==='tank'?'×'+tankGlassCm(d):'')+' ซม.'+(d.kind==='tank'?' · จุ '+tankCap(d):'')+'</div>';
+      '<div class="pr">'+objPrice(k,d).toLocaleString()+' เหรียญ</div><div class="dm">'+(d.w*CM_PER_CELL)+'×'+(d.h*CM_PER_CELL)+(d.kind==='tank'?'×'+tankGlassCm(d):'')+' ซม.'+(d.kind==='tank'?' · จุ '+tankCap(d):'')+'</div>';
     el.onclick=()=>{ buyKey = (buyKey===k? null : k);   // กดซ้ำ = วางมือ
       if(buyKey) enterExclusiveMode('holding');          // หยิบของ = เลิกวางประตู/เลิกเลือกช่องขยาย
       buyRot=0; if(buyKey) setTool('place'); buildShop(); };

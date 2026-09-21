@@ -117,7 +117,7 @@ function shopOpeningIssue(){
 let placingWallDoor=false,wallDoorHover=null,wallDoorDown=null;
 registerMode('doorPlace','floor',()=>placingWallDoor,()=>{placingWallDoor=false;wallDoorHover=null;wallDoorDown=null;});
 /* บานแรกฟรี บานต่อไปบานละ DOOR_PRICE (ผู้เล่นกำหนด 2026-09-20) */
-function doorPrice(){return doorList().length?DOOR_PRICE:0;}
+function doorPrice(){return doorList().length?Math.round(DOOR_PRICE*(typeof Research!=='undefined'?Research.priceMul('shop'):1)):0;}
 function placeEntrance(){
   if(peopleOn){toast('ปิดร้านก่อนวาง/ย้ายประตู','bad');return;}
   const cost=doorPrice();
