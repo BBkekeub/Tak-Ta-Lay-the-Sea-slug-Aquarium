@@ -431,11 +431,11 @@ function drawFloor(){
   let ghost=null;
   if(appMode==='build' && hoverCell){            // เงาพรีวิว เฉพาะโหมดก่อสร้าง
     if(moving){
-      const r=moving.rot|0, o=snapFootprint(hoverCell, moving.def, r);
-      ghost={cx:o.cx, cy:o.cy, def:moving.def, rot:r, ok:canPlace(o.cx,o.cy,moving.def,moving,r)};
+      const r=moving.rot|0, o=snapFootprint(hoverCell, moving.def, r), why=placeIssue(o.cx,o.cy,moving.def,moving,r);
+      ghost={cx:o.cx, cy:o.cy, def:moving.def, rot:r, ok:!why, why};
     } else if(tool==='place' && buyKey){
-      const def=CATALOG[buyKey], o=snapFootprint(hoverCell,def,buyRot);
-      ghost={cx:o.cx, cy:o.cy, def, rot:buyRot, ok:canPlace(o.cx,o.cy,def,null,buyRot)};
+      const def=CATALOG[buyKey], o=snapFootprint(hoverCell,def,buyRot), why=placeIssue(o.cx,o.cy,def,null,buyRot);
+      ghost={cx:o.cx, cy:o.cy, def, rot:buyRot, ok:!why, why};
     }
   }
 
@@ -460,6 +460,7 @@ function drawFloor(){
   if(window.SlugTug)SlugTug.drawChallengers();
   if(window.SlugEat)SlugEat.drawChallengers();
   if(window.SlugThrow)SlugThrow.drawChallengers();
+  if(window.SlugSumo)SlugSumo.drawChallengers();
   /* ตัวเลขเงินลอยตรงจุดที่ทำรายการ — วาดท้ายสุดให้อยู่เหนือของทุกชิ้น (cost-pop.js)
      ลิสต์ว่าง = คืนทันที ไม่มีงานต่อเฟรมเพิ่มตอนเล่นปกติ */
   if(typeof CostPop!=='undefined'){ CostPop.draw(); CostPop.idle(); }
@@ -599,6 +600,7 @@ function drawObject(o){
   if(d.tug&&window.SlugTug)SlugTug.drawLane(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);});
   if(d.eat&&window.SlugEat)SlugEat.drawArena(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);},o);
   if(d.throwing&&window.SlugThrow)SlugThrow.drawField(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);},o);
+  if(d.sumo&&window.SlugSumo)SlugSumo.drawArena(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);},o);
   // ทากอยู่ก้นตู้ (ในน้ำ) — clip ให้อยู่ในกรอบตู้ (หัวไม่ทะลุกระจก) · ขนาด = ความยาวลำตัวจริง
   const displaySlugs=[...o.slugs,...breederVisualSlugs(o)];
   const pxPerCm=TW/CM_PER_CELL, shown=window.Slug3D?.ready&&Slug3D.enabled&&Slug3D.all?displaySlugs.length:Math.min(displaySlugs.length,isBreeder(o)?70:20);   // ระยะแนวนอนต่อ 1 ช่อง (ตรงกับในตู้)
@@ -759,6 +761,19 @@ function drawGhost(g){
     isoBox(g.cx+0.15,g.cy+0.15,gw-0.3,gh-0.3,0,sH, col+'0.25)', col+'0.15)', col+'0.15)');
     isoBox(g.cx,g.cy,gw,gh,sH,tH, col+'0.25)', col+'0.15)', col+'0.15)');
   }
+  /* วางไม่ได้ = บอกเหตุผลไว้ใต้เงาเลย ไม่ต้องกดก่อนแล้วค่อยรู้ (ผู้เล่นขอ 2026-09-21) */
+  if(!g.ok&&g.why)ghostWhyLabel(g.why,(c0.x+c2.x)/2,Math.max(c0.y,c1.y,c2.y,c3.y)+10);
+}
+/* ป้ายเหตุผลใต้เงาพรีวิว — ขนาดคงที่บนจอ (ไม่โตตามซูม) และหนีบไม่ให้หลุดขอบจอ */
+function ghostWhyLabel(text,x,y){
+  ctx.save();
+  ctx.font='600 13px "IBM Plex Sans Thai",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const w=Math.min(CW-16,ctx.measureText(text).width+20), h=24;
+  const cx=Math.max(w/2+8,Math.min(CW-w/2-8,x)), cy=Math.max(h/2+8,Math.min(CH-h/2-8,y+h/2));
+  ctx.fillStyle='rgba(58,20,18,.94)'; roundRect(cx-w/2,cy-h/2,w,h,h/2); ctx.fill();
+  ctx.strokeStyle='rgba(255,150,136,.9)'; ctx.lineWidth=1.4; ctx.stroke();
+  ctx.fillStyle='#ffd9d2'; ctx.fillText(text,cx,cy+1);
+  ctx.restore();
 }
 
 /* ============================================================
@@ -766,14 +781,27 @@ function drawGhost(g){
    ============================================================ */
 function snapFootprint(cell, def, rot){ return { cx:Math.round(cell.cx-rotW(def,rot|0)/2), cy:Math.round(cell.cy-rotH(def,rot|0)/2) }; }
 function inBounds(cx,cy,w,h){ return floorRect(cx,cy,w,h); }
-function overlaps(cx,cy,w,h, ignore){
+/* ชิ้นแรกที่ทับกรอบนี้ — คืนตัววัตถุเพื่อบอกผู้เล่นได้ว่าไปทับอะไรอยู่ */
+function overlapObj(cx,cy,w,h, ignore){
   for(const o of G.objs){ if(o===ignore) continue;
-    if(cx<o.cx+oW(o) && cx+w>o.cx && cy<o.cy+oH(o) && cy+h>o.cy) return true; }
-  return false;
+    if(cx<o.cx+oW(o) && cx+w>o.cx && cy<o.cy+oH(o) && cy+h>o.cy) return o; }
+  return null;
+}
+function overlaps(cx,cy,w,h, ignore){ return !!overlapObj(cx,cy,w,h,ignore); }
+/* ⚠️ 2026-09-21 ผู้เล่น: "บอกสาเหตุเวลาวางของไม่ได้ด้วยว่าทำไมถึงวางไม่ได้"
+   เดิมทุกเหตุผลถูกยุบเป็นข้อความเดียว "ของทับกัน บังประตู หรือเหลือทางเข้าตู้ไม่พอ" = ผู้เล่นต้องเดาเอง
+   ตอนนี้แหล่งความจริงเดียวคือ placeIssue() คืนเหตุผลจริงหนึ่งบรรทัด ('' = วางได้)
+   ใช้ทั้งข้อความเตือน และป้ายใต้เงาพรีวิว (เห็นเหตุผลตั้งแต่ก่อนกด) */
+function placeIssue(cx,cy,def, ignore, rot){
+  const w=rotW(def,rot|0), h=rotH(def,rot|0);
+  if(cx<0||cy<0||cx+w>cellsW()||cy+h>cellsH())return 'เลยขอบร้าน — ต้องวางให้ทั้งชิ้นอยู่ในพื้นร้าน';
+  if(!inBounds(cx,cy,w,h))return 'ตรงนี้ยังไม่ใช่พื้นร้าน — ต้องขยายร้านมาถึงช่องนี้ก่อน';
+  const hit=overlapObj(cx,cy,w,h,ignore);
+  if(hit)return 'ทับ'+objLabel(hit)+'อยู่ — เลื่อนไปที่ว่าง';
+  return layoutPlaceIssue(cx,cy,def,ignore,rot);
 }
 function canPlace(cx,cy,def, ignore, rot){
-  const w=rotW(def,rot|0), h=rotH(def,rot|0);
-  return inBounds(cx,cy,w,h) && !overlaps(cx,cy,w,h,ignore) && layoutAllowsPlacement(cx,cy,def,ignore,rot);
+  return !placeIssue(cx,cy,def,ignore,rot);
 }
 
 /* จบการกระทำหนึ่งครั้งในโหมดก่อสร้าง (วาง/เก็บ/ขาย/ย้าย/ติดตั้งของติดผนัง)
@@ -806,11 +834,13 @@ function placeBuy(cell){
   const price=objPrice(key,def);
   if(G.coin<price){ toast('เหรียญไม่พอ ('+price+')','bad'); return; }
   const o=snapFootprint(cell,def,buyRot);
-  if(!canPlace(o.cx,o.cy,def,null,buyRot)){ toast('วางไม่ได้: ของทับกัน บังประตู หรือเหลือทางเข้าตู้ไม่พอ','bad'); return; }
+  const why=placeIssue(o.cx,o.cy,def,null,buyRot);
+  if(why){ toast('วางไม่ได้: '+why,'bad'); return; }
   if(def.race&&[...G.objs,...G.shelter].some(t=>t.def.race)){toast('มีตู้แข่งได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   if(def.tug&&[...G.objs,...G.shelter].some(t=>t.def.tug)){toast('มีตู้ชักเย่อได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   if(def.eat&&[...G.objs,...G.shelter].some(t=>t.def.eat)){toast('มีตู้แข่งกินจุได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   if(def.throwing&&[...G.objs,...G.shelter].some(t=>t.def.throwing)){toast('มีตู้ปาหินได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
+  if(def.sumo&&[...G.objs,...G.shelter].some(t=>t.def.sumo)){toast('มีตู้ดันวงได้ 1 ตู้ รวมตู้ที่เก็บไว้','bad');return;}
   /* ⚙️ ตู้เพาะพันธุ์มีได้ 5 ตู้ (ผู้เล่นกำหนด 2026-09-18) — ไม่งั้นปูพรมทั้งร้านแล้วปั๊มลูกทากได้ไม่จำกัด */
   /* เพดานตู้เพาะพันธุ์ขยับได้ด้วยสายวิจัย cap (research.js) — ใช้ breederMax() ไม่ใช่ค่าคงที่ */
   const bMax=typeof breederMax==='function'?breederMax():BREEDER_MAX;
@@ -828,6 +858,7 @@ function placeBuy(cell){
   if(def.tug&&window.SlugTug)SlugTug.purchased();
   if(def.eat&&window.SlugEat)SlugEat.purchased();
   if(def.throwing&&window.SlugThrow)SlugThrow.purchased();
+  if(def.sumo&&window.SlugSumo)SlugSumo.purchased();
   toast('วาง'+def.name+(price?' −'+price:' (ตัวแรกฟรี)'),'good'); syncHUD();finishConstruction();
   if(key==='counter'&&typeof openCounterSettings==='function')openCounterSettings(placed);
 }
@@ -926,12 +957,21 @@ function sellObj(o){
 let dragging=false, dragMoved=false, lastX=0,lastY=0, downX=0,downY=0;
 let grab=null;                 // ของที่กดค้างไว้ (จะกลายเป็นลากย้าย หรือคลิกเข้าตู้)
 const DRAG_TH=5;               // ระยะที่ถือว่าเป็นการลาก (px)
+/* ⚠️ 2026-09-21 ผู้เล่นสั่ง: "ในโทรศัพท์ ตอนอยู่ในโหมดวางของ หากมีโกสอยู่ จะไม่ขยับฉาก ขยับแค่โกสวางของ"
+   นิ้วไม่มี hover — บนจอสัมผัสจึงต้องลากเพื่อเล็งจุดวาง แต่เดิมการลากถูกตีเป็น "แพนกล้อง"
+   โกสเลยวิ่งตามฉากไปด้วย เล็งไม่ได้ และปล่อยนิ้วก็ไม่วางให้ (โดน dragMoved ตัดทิ้ง)
+   ghostDrag = กดลงด้วยนิ้ว "ตอนที่ถือของอยู่" → ลาก = ขยับโกสอย่างเดียว · ปล่อย = วางตรงนั้น
+   เมาส์ไม่เข้าเงื่อนไขนี้ เพราะชี้เฉย ๆ โกสก็ตามอยู่แล้ว การลากค้างจึงยังเป็นแพนกล้องเหมือนเดิม
+   อยากเลื่อนฉากตอนถือของบนมือถือ = ใช้สองนิ้ว (เลื่อน+ซูม ดู PinchZoom ท้ายไฟล์) */
+let ghostDrag=false;
+const touchPointer=e=>e.pointerType&&e.pointerType!=='mouse';
 function cellUnder(e){ const r=cv.getBoundingClientRect(); return pick(e.clientX-r.left, e.clientY-r.top); }
 
 cv.addEventListener('pointerdown', e=>{
   cv.setPointerCapture(e.pointerId);
   dragging=true; dragMoved=false; grab=null;
   lastX=downX=e.clientX; lastY=downY=e.clientY;
+  ghostDrag = appMode==='build' && touchPointer(e) && (!!buyKey || !!moving);
   if(moving && movingByClick){ return; }                 // กำลังยกของอยู่ — รอปล่อยที่คลิกถัดไป
   restoreHeldRotation(); moving=null;
   // เตรียมลากย้าย (เฉพาะโหมดก่อสร้าง ยกเว้นเครื่องมือเก็บออก)
@@ -950,21 +990,26 @@ cv.addEventListener('pointermove', e=>{
   if(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)>DRAG_TH) dragMoved=true;
   if(grab && dragMoved && !moving){ moving=grab; cv.classList.add('placing'); }  // เริ่มลากย้าย
   if(moving && !movingByClick){ /* ลากค้างอยู่ — ตู้ลอยตาม hover ไม่แพนกล้อง */ }
+  else if(ghostDrag){ /* นิ้วลากตอนถือของ — โกสตาม hoverCell อย่างเดียว ฉากอยู่นิ่ง */ }
   else { cam.x-=dx/cam.zoom; cam.y-=dy/cam.zoom; cv.classList.add('panning'); }   // ไม่ได้ลากของ = แพนกล้อง
   lastX=e.clientX; lastY=e.clientY;
 });
+/* นิ้วหลุด/ระบบยึดอีเวนต์ไป (เช่นสองนิ้วซูมเข้ามาแทรก) = ล้างสถานะลากโกส ไม่งั้นค้างข้ามการแตะครั้งถัดไป */
+cv.addEventListener('pointercancel', ()=>{ dragging=false; ghostDrag=false; cv.classList.remove('panning'); });
 cv.addEventListener('pointerup', e=>{
   dragging=false; cv.classList.remove('panning','placing');
+  const ghost=ghostDrag; ghostDrag=false;   // เก็บค่าไว้ก่อนล้าง — ข้างล่างมี return หลายทาง
   const cell=cellUnder(e);
   // จบการลากย้าย
   if(moving){
-    if(movingByClick && dragMoved){ return; }            // แค่แพนกล้องระหว่างยก ยังไม่ปล่อย
+    if(movingByClick && dragMoved && !ghost){ return; }   // แค่แพนกล้องระหว่างยก ยังไม่ปล่อย (นิ้วลากโกส = ปล่อยตรงนั้นเลย)
     let placed=false;
     const o=snapFootprint(cell, moving.def, moving.rot|0);
-    if(canPlace(o.cx,o.cy,moving.def, moving, moving.rot|0)){ placed=true;moving.cx=o.cx; moving.cy=o.cy; heldRotations.delete(moving);
+    const why=placeIssue(o.cx,o.cy,moving.def, moving, moving.rot|0);
+    if(!why){ placed=true;moving.cx=o.cx; moving.cy=o.cy; heldRotations.delete(moving);
       const shelfIndex=G.shelter.indexOf(moving);
       if(shelfIndex>=0){G.shelter.splice(shelfIndex,1);G.objs.push(moving);syncHUD();saveGame();toast('วาง'+moving.def.name+'แล้ว','good');} }
-    else { toast('วางตรงนี้ไม่ได้','bad'); if(movingByClick) return; }   // ยกด้วยคลิก = ยังถือไว้ ลองที่ใหม่
+    else { toast('วางตรงนี้ไม่ได้: '+why,'bad'); if(movingByClick) return; }   // ยกด้วยคลิก = ยังถือไว้ ลองที่ใหม่
     restoreHeldRotation(); moving=null; movingByClick=false; grab=null;if(placed)finishConstruction(); return;
   }
   const {sx,sy}=screenXY(e);
@@ -981,7 +1026,7 @@ cv.addEventListener('pointerup', e=>{
     toast('ยก'+moving.def.name+' — คลิกอีกครั้งเพื่อวาง · R หมุน · Esc ยกเลิก','good');
     return;
   }
-  if(dragMoved) return;    // เป็นการแพนกล้อง
+  if(dragMoved && !ghost) return;    // เป็นการแพนกล้อง (ลากโกสด้วยนิ้ว = ยังนับเป็นการเลือกจุดวาง)
   // คลิก (ไม่ลาก) — ใช้ tankHit ก่อน (คลิกกระจกตู้ที่ยกสูงก็เข้าได้ + รู้จุดโฟกัส)
   const th=tankHit(sx,sy);
   const o=objAt(cell);
@@ -1033,7 +1078,9 @@ if(typeof PinchZoom!=='undefined')PinchZoom.attach(cv,{
     const after=pick(cx,cy);
     const wB=worldOf(before.cx,before.cy), wA=worldOf(after.cx,after.cy);
     cam.x += wB.X-wA.X; cam.y += wB.Y-wA.Y;
-  }
+  },
+  /* สองนิ้วเลื่อนฉากได้ด้วย — ตอนถือของบนมือถือ นิ้วเดียวถูกจองไว้ขยับโกส (ghostDrag) แล้ว */
+  pan:(dx,dy)=>{ cam.x-=dx/cam.zoom; cam.y-=dy/cam.zoom; }
 });
 function fitCamera(){
   const c=worldOf(cellsW()/2, cellsH()/2); cam.x=c.X; cam.y=c.Y;
@@ -1141,6 +1188,8 @@ document.getElementById('expH').onclick=()=>expand('h');
 /* ระหว่างหน้าโหลด (boot.js) ห้ามวาด — ไม่งั้นลูปจะไปแตะทากก่อน แล้วอบสไปรต์รวดเดียวทั้งฉาก
    = จอค้างยาว ซึ่งคือสิ่งที่หน้าโหลดตั้งใจจะเลี่ยง */
 function loop(){
+  /* แผงเลือกของยุบ/กางตามสถานะ "ถืออยู่ไหม" (tank-decor-ui.js) — คืนทันทีถ้าไม่เปลี่ยน */
+  if(typeof syncFloorBuildDock==='function')syncFloorBuildDock();
   if(!window.BOOTING && !document.hidden && !(typeof tankMode!=='undefined' && tankMode) && !window.SlugRace?.isOpen()) drawFloor();
   else if(document.hidden||window.SlugRace?.isOpen())window.DecorGLB?.hide();
   requestAnimationFrame(loop);

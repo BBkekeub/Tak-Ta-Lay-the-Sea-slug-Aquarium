@@ -19,10 +19,10 @@ function render(md){
 }
 
 const css='body{margin:0;background:#f3f6f2;color:#203833;font:17px/1.85 system-ui,sans-serif}header{background:#193d38;color:white;padding:24px}main{max-width:1000px;margin:24px auto;padding:32px;background:white;border-radius:14px}h1{font-size:30px}h2{font-size:23px;border-top:1px solid #dbe5dd;padding-top:26px;margin-top:36px}a{color:#176a60}li{margin:10px 0}code{background:#eff3ed;padding:2px 5px;overflow-wrap:anywhere}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size:15px}th,td{border:1px solid #dbe5dd;padding:12px;text-align:left;vertical-align:top}th{background:#edf4eb}p,li{overflow-wrap:anywhere}nav{display:flex;gap:16px;flex-wrap:wrap}header a{color:white}@media(max-width:650px){main{padding:18px;margin:12px}h1{font-size:25px}}@media print{header{display:none}main{margin:0;padding:0}}';
-for(const file of ['README.md','completion-template.md']){
+for(const file of ['README.md','contest-tanks.md','completion-template.md']){
  const body=render(fs.readFileSync(path.join(root,file),'utf8'));
- const html='<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(title(file))+'</title><style>'+css+'</style></head><body><header>ทากทาเล · กฎตรวจฟีเจอร์ใหม่<nav><a href="index.html">หนังสือกฎ</a><a href="completion-template.html">แบบฟอร์มส่งงาน</a></nav></header><main>'+body+'</main></body></html>';
+ const html='<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(title(file))+'</title><style>'+css+'</style></head><body><header>ทากทาเล · กฎตรวจฟีเจอร์ใหม่<nav><a href="index.html">หนังสือกฎ</a><a href="contest-tanks.html">กฎตู้เกม</a><a href="completion-template.html">แบบฟอร์มส่งงาน</a></nav></header><main>'+body+'</main></body></html>';
  fs.writeFileSync(path.join(root,htmlFile(file)),html);
 }
-for(const file of ['index.html','completion-template.html'])for(const [,url] of fs.readFileSync(path.join(root,file),'utf8').matchAll(/href="([^"]+)"/g)){if(!/^(https?:|#)/.test(url)&&!fs.existsSync(path.resolve(root,url)))throw Error('Broken link: '+url);}
-console.log('Built 2 handbook pages; local links verified.');
+for(const file of ['index.html','contest-tanks.html','completion-template.html'])for(const [,url] of fs.readFileSync(path.join(root,file),'utf8').matchAll(/href="([^"]+)"/g)){if(!/^(https?:|#)/.test(url)&&!fs.existsSync(path.resolve(root,url)))throw Error('Broken link: '+url);}
+console.log('Built 3 handbook pages; local links verified.');

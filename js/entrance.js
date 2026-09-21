@@ -91,16 +91,30 @@ function accessibleTankSpots(t){
     }
   }return out;
 }
-function tankAccessIssue(objects){
+/* ตู้ตัวแรกที่ไม่เหลือด้านโล่งให้ลูกค้ายืนดู — คืน "ตัวตู้" ไม่ใช่แค่ผ่าน/ไม่ผ่าน
+   เพื่อให้ตอนวางของไม่ได้ บอกได้ว่าไปปิดทางเดินของตู้ไหน (ผู้เล่นขอ 2026-09-21) */
+function tankAccessBlocked(objects){
   for(const t of objects.filter(o=>o.type==='tank')){
-    if(![0,1,2,3].some(s=>tankSideOpen(t,objects,s,2*SUB)))return 'ต้องเหลือหน้าตู้ช่วงว่างติดกันกว้าง 2 ช่องใหญ่ (100 ซม.) และลึกอีก 2 ช่องใหญ่ ให้ลูกค้าเดินสวนกันได้';
+    if(![0,1,2,3].some(s=>tankSideOpen(t,objects,s,2*SUB)))return t;
   }
+  return null;
+}
+const TANK_ACCESS_WHY='ต้องเหลือหน้าตู้ช่วงว่างติดกันกว้าง 2 ช่องใหญ่ (100 ซม.) และลึกอีก 2 ช่องใหญ่ ให้ลูกค้าเดินสวนกันได้';
+function tankAccessIssue(objects){ return tankAccessBlocked(objects)?TANK_ACCESS_WHY:''; }
+const DOOR_SIDE_NAME={north:'กำแพงบน',west:'กำแพงซ้าย',south:'กำแพงล่าง',east:'กำแพงขวา'};
+const objLabel=o=>(o&&o.def?((o.def.icon?o.def.icon:'')+o.def.name):'ของ');
+/* เหตุผลที่วางตรงนี้ไม่ได้ในแง่ "ผังร้าน" — คืน '' = ผ่าน · ข้อความสั้นพอที่จะโชว์ใต้เงาพรีวิวได้ */
+function layoutPlaceIssue(cx,cy,def,ignore,rot){
+  const candidate={cx,cy,def,rot,type:def.kind},objects=G.objs.filter(o=>o!==ignore).concat(candidate);
+  const door=doorList().find(d=>!entranceClear(objects,d));        // ห้ามบังบานไหนก็ตาม
+  if(door)return 'บังประตู'+(DOOR_SIDE_NAME[door.side]||'')+' — หน้าประตูต้องโล่ง 2×2 ช่องใหญ่';
+  const t=tankAccessBlocked(objects);
+  if(t===candidate)return 'ตู้ต้องมีด้านที่โล่งกว้าง 2 ช่องใหญ่ (100 ซม.) ลึก 2 ช่องใหญ่ ให้ลูกค้ายืนดู';
+  if(t)return 'จะไปปิดทางเดินหน้า'+objLabel(t)+' — ทุกตู้ต้องเหลือด้านโล่ง 2×2 ช่องใหญ่';
   return '';
 }
 function layoutAllowsPlacement(cx,cy,def,ignore,rot){
-  const candidate={cx,cy,def,rot,type:def.kind},objects=G.objs.filter(o=>o!==ignore).concat(candidate);
-  if(doorList().some(d=>!entranceClear(objects,d)))return false;   // ห้ามบังบานไหนก็ตาม
-  return !tankAccessIssue(objects);
+  return !layoutPlaceIssue(cx,cy,def,ignore,rot);
 }
 function shopOpeningIssue(){
   if(!doorList().length)return 'ต้องวางประตูก่อนเปิดร้าน';

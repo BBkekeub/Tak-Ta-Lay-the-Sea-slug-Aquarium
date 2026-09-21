@@ -170,7 +170,12 @@
   /* ปุ่มของติดกำแพง (ประตู/ชั้นวาง) ไม่ได้อยู่ใน CATALOG จึงไม่ผ่านลูปข้างบน — รีเฟรชราคาแยก */
   for(const b of shop.querySelectorAll('.item')) if(b._syncPrice) b._syncPrice();
   const d=CATALOG[buyKey];if(d)active=category(buyKey,d);selectCategory(active);
-  selection.textContent=d?d.name+' · '+d.w*CM_PER_CELL+'×'+d.h*CM_PER_CELL+' ซม.':'เลือกของเพื่อวาง';cancel.hidden=!buyKey;
+  /* ยกของเดิมอยู่ (moving) ก็ต้องบอกว่าถืออะไรอยู่ — ไม่งั้นตอนแผงยุบจะเหลือแค่ "เลือกของเพื่อวาง" ซึ่งผิด */
+  selection.textContent=d?d.name+' · '+d.w*CM_PER_CELL+'×'+d.h*CM_PER_CELL+' ซม.'
+   :(typeof moving!=='undefined'&&moving)?'กำลังย้าย '+moving.def.name+' · แตะจุดที่จะวาง'
+   :'เลือกของเพื่อวาง';
+  cancel.hidden=!(buyKey||(typeof moving!=='undefined'&&moving));
+  cancel.textContent=buyKey?'ยกเลิกเลือก':'ยกเลิกการย้าย';
   for(const canvas of visiblePreviews)updatePreview(canvas);
  };
  shop.replaceChildren();
@@ -266,7 +271,40 @@
  },true);
  cv.addEventListener('pointercancel',()=>{wallPress=null;});
 
- cancel.onclick=()=>{buyKey=null;buildShop();};dock.querySelector('.floorBuildDone').onclick=()=>setMode('view');
+ /* ปุ่มยกเลิกต้องเลิกได้ทั้ง "ของใหม่ที่ถือ" และ "ของเดิมที่ยกขึ้นมา" — ทำแบบเดียวกับปุ่ม Esc (shop-floor.js)
+    ตอนแผงยุบ ปุ่มนี้คือทางออกทางเดียวที่เห็นบนจอมือถือ ถ้าเลิกได้แค่อย่างแรกจะค้างถือของเดิมไว้ */
+ cancel.onclick=()=>{
+  if(buyKey)buyKey=null;
+  else if(typeof moving!=='undefined'&&moving){
+   if(typeof restoreHeldRotation==='function')restoreHeldRotation();
+   moving=null;movingByClick=false;grab=null;cv.classList.remove('placing');
+  }
+  buildShop();
+ };
+ dock.querySelector('.floorBuildDone').onclick=()=>setMode('view');
+
+ /* ⚠️ 2026-09-21 ผู้เล่นสั่ง: "กดเลือกของไว้ ให้แผงเลือกของถูกซ่อนลงมา ไม่ให้เกะกะบังพื้นที่วาง จนกว่าเสร็จสิ้น/ยกเลิก"
+    ถืออยู่ (ของใหม่ · ยกของเดิม · กำลังติดประตู) = ยุบแผงจาก 250px เหลือแถบเดียว
+      เหลือไว้แค่ ชื่อของที่ถือ · หมุน · ยกเลิกเลือก · ✓ เสร็จสิ้น — ที่เหลือซ่อนหมด
+    วางลง/ยกเลิก/ออกจากโหมด = กางคืนเอง
+    ⚠️ ต้อง resize() แล้วชดเชย cam.y ครึ่งหนึ่งของส่วนสูงที่เปลี่ยนด้วย
+       เพราะ toScreen() อิง CH/2 — ไม่ชดเชยแล้วฉากจะกระโดดขึ้น-ลงทุกครั้งที่ยุบ/กาง
+    ⚠️ เช็กทุกเฟรมจาก loop() (shop-floor.js) ไม่ใช่ดักทีละปุ่ม — สถานะ "ถืออยู่" เปลี่ยนได้หลายทาง
+       ทั้งกดการ์ด ลากของเดิม กด Esc วางเสร็จ ขายทิ้ง ฯลฯ ดักทีละจุดตกหล่นแน่ (ฟังก์ชันคืนทันทีถ้าไม่เปลี่ยน) */
+ let dockCollapsed=false;
+ const holdingItem=()=>appMode==='build'&&(!!buyKey
+   ||(typeof moving!=='undefined'&&!!moving)
+   ||(typeof placingWallDoor!=='undefined'&&!!placingWallDoor));
+ window.syncFloorBuildDock=function(){
+  const want=holdingItem();
+  if(want===dockCollapsed)return;
+  const before=cv.getBoundingClientRect().height;
+  dockCollapsed=want;document.body.classList.toggle('build-holding',want);
+  resize();
+  const after=cv.getBoundingClientRect().height;
+  if(after!==before&&cam.zoom>0)cam.y+=(after-before)/(2*cam.zoom);
+  buildShop();                      // ข้อความ "ถืออะไรอยู่" + ปุ่มยกเลิกต้องตรงกับสถานะใหม่
+ };
  for(const dir of [-1,1]){const b=document.createElement('button');b.className='floorBuildNav '+(dir<0?'prev':'next');b.textContent=dir<0?'‹':'›';b.setAttribute('aria-label',dir<0?'เลื่อนซ้าย':'เลื่อนขวา');b.onclick=()=>shop.scrollBy({left:dir*Math.max(100,shop.clientWidth-100),behavior:'auto'});dock.append(b);navButtons.push(b);}
  const style=document.createElement('style');style.textContent=`
  #floorBuildDock{display:none;position:absolute;left:0;bottom:0;width:100%;height:250px;box-sizing:border-box;padding:6px 10px;background:#142b2e;border-top:1px solid #997f49;z-index:8;color:#e7d8b4}
@@ -274,6 +312,22 @@
  body.mode-build:not(.inside-tank) #cv{height:calc(100% - 250px)}
  body.mode-build:not(.inside-tank) .zoombar{bottom:266px}
  #floorBuildDock [hidden]{display:none!important}
+ /* ---- ถือของอยู่ = ยุบแผงลงเหลือแถบเดียว (ดู syncFloorBuildDock ด้านบน) ---- */
+ body.build-holding.mode-build:not(.inside-tank) #floorBuildDock{height:88px;overflow:hidden}
+ body.build-holding.mode-build:not(.inside-tank) #cv{height:calc(100% - 88px)}
+ body.build-holding.mode-build:not(.inside-tank) .zoombar{bottom:104px}
+ body.build-holding.mode-build:not(.inside-tank) .rail{bottom:96px}
+ body.build-holding #floorBuildDock .decorTabs,
+ body.build-holding #floorBuildDock #shop,
+ body.build-holding #floorBuildDock .floorMatPanel,
+ body.build-holding #floorBuildDock .floorBuildNav,
+ body.build-holding #floorBuildDock .floorBuildActions .tool,
+ body.build-holding #floorBuildDock .floorBuildExpandBtn,
+ body.build-holding #floorBuildDock .floorBuildExpansion{display:none!important}
+ body.build-holding #floorBuildDock .floorBuildHead{height:44px;flex-wrap:nowrap}
+ body.build-holding #floorBuildDock .floorBuildSelection{height:36px}
+ body.build-holding #floorBuildDock .floorBuildSelection span{font-size:13px;color:#f0d79a}
+ body.build-holding #floorBuildDock .floorBuildCancel{padding:6px 12px;font-size:12px}
  .floorBuildHead{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px;height:88px}.floorBuildHead>.decorTabs{flex-basis:100%!important;height:36px}.floorBuildActions{display:flex;flex:1;gap:5px;min-width:0}.floorBuildActions button{min-height:40px;white-space:nowrap;padding:5px 10px!important;font-size:12px!important}.floorBuildHint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;color:#b5c3ba}.floorBuildExpansion{margin-left:auto;position:relative;flex-shrink:0}.floorBuildExpansion:not([open]){display:none}.floorBuildExpansion>summary[hidden]{display:none}#floorBuildDock .floorBuildExpandBtn{flex-shrink:0;padding:5px 12px;white-space:nowrap}#floorBuildDock .floorBuildExpandBtn[aria-expanded=true]{border-color:#e2cc90;color:#ffe1a0}#floorBuildDock .floorBuildExpansion[open]{bottom:calc(100% + 8px)!important}.floorBuildExpansion summary{cursor:pointer;padding:6px 10px}.floorBuildExpansion[open]{position:absolute;right:8px;bottom:150px;width:min(360px,calc(100% - 32px));padding:12px;background:#20383a;border:1px solid #997f49;border-radius:10px;z-index:3}.floorBuildExpansion h2{display:none}.floorBuildExpansion .hint{font-size:12px}.floorBuildExpansion .toolrow{display:flex}.floorBuildExpansion button{min-height:40px}.floorBuildExpansion [hidden]{display:none!important}
  #floorBuildDock .decorTabs{flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
  #floorBuildDock .decorTabs button{white-space:nowrap;padding:4px 10px}

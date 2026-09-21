@@ -203,6 +203,7 @@ function foodCanPlace(type,level,fx,fy){
  if(tank.def.race&&fy-Math.max(14,spec.cap*1.65)/CM_PER_CELL/2<8)return {ok:false,why:'แถบสนามด้านหน้า 40 ซม. ห้ามวางอาหารและของตกแต่ง'};
  {const half=Math.max(14,spec.cap*1.65)/CM_PER_CELL/2;
   if(tank.def.eat&&window.SlugEat&&fy-half<SlugEat.ARENA_H)return {ok:false,why:'แถบสนามแข่งกินด้านหน้า '+SlugEat.ARENA_H*CM_PER_CELL+' ซม. ห้ามวางอาหารและของตกแต่ง'};
+  if(tank.def.sumo&&window.SlugSumo&&fy-half<SlugSumo.ARENA_H)return {ok:false,why:'สนามดันวงด้านหน้า '+SlugSumo.ARENA_H*CM_PER_CELL+' ซม. ห้ามวางอาหารและของตกแต่ง'};
   if(tank.def.throwing&&window.SlugThrow&&fy-half<SlugThrow.LANE_H)return {ok:false,why:'ลานปาหินด้านหน้า '+Math.round(SlugThrow.LANE_H*CM_PER_CELL)+' ซม. ห้ามวางอาหารและของตกแต่ง'};
   if(tugLaneBlocked(tank.def,fy-half,fy+half))return {ok:false,why:'แถบเลนเชือกด้านหน้าตู้ต้องโล่ง ห้ามวางอาหารและของตกแต่ง'};}
  const foodMax=Number.isFinite(tank.def.foodMax)?tank.def.foodMax:8;

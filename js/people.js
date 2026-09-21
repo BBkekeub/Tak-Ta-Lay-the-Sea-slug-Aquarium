@@ -290,7 +290,7 @@ function personGesture(action,t,dur){
   return ss(Math.max(0,Math.min(1,(d-t)/fall)));
 }
 function beginPersonBrowse(p){
-  p.state='look';p.t=0;p.lookT=(p.raceChallenger||p.tugChallenger||p.eatChallenger||p.throwChallenger)?Infinity:5;p._browseActed=false;
+  p.state='look';p.t=0;p.lookT=(p.raceChallenger||p.tugChallenger||p.eatChallenger||p.throwChallenger||p.sumoChallenger)?Infinity:5;p._browseActed=false;
   p.action='watch';p.actionT=0;p.actionDuration=0;p.socialPartner=null;
   p.socialCooldown=.5+Math.random()*.5;
 }
@@ -345,7 +345,7 @@ function visitorCapacity(){return Math.max(0,Math.floor(floorArea()/3));}
    ⚠️ เดิมผู้ท้าแข่ง 9 คน (กินจุ 3 + ปาหิน 3 + วิ่ง 2 + ชักเย่อ 1) กับพ่อค้า นับรวมโควตาเดียวกับลูกค้า
       ร้าน 48 ช่อง = ความจุ 12 → เหลือที่ให้ลูกค้าจริงแค่ 3 · ร้าน 24 ช่อง = เหลือ 0 (ลูกค้าเข้าไม่ได้เลย)
    ตอนนี้: ลูกค้าใช้ visitorCapacity() ของตัวเอง · ผู้ท้าแข่ง/พ่อค้ามีเพดานของตัวเอง ไม่แย่งที่กัน */
-const isChallenger=p=>!!(p&&(p.raceChallenger||p.tugChallenger||p.eatChallenger||p.throwChallenger));
+const isChallenger=p=>!!(p&&(p.raceChallenger||p.tugChallenger||p.eatChallenger||p.throwChallenger||p.sumoChallenger));
 const isTrader=p=>!!(p&&(p.wantsSell||p.wholesaleBuyer));
 const isCustomer=p=>!!p&&!isChallenger(p)&&!isTrader(p);
 function customerCount(){let n=0;for(const p of PEOPLE)if(isCustomer(p))n++;return n;}
@@ -367,25 +367,26 @@ var QUIET_GAP=3;       // วินาทีระหว่างคนเข้
    แล้วไล่คำนวณทั้งเส้นกว่าจะรู้ว่าได้กี่คน — เปลี่ยนเป็น "ตารางช่วง" อ่านออก แก้ทีละแถวได้
    แต่ละช่วงมีสองค่า: พื้น = เติมคนให้ถึงเร็ว ๆ · เพดาน = ห้ามเกิน
    จำนวนจริงจึงลอยอยู่ระหว่างสองค่าตามจังหวะคนเข้า-ออก = ที่ผู้เล่นเขียนว่า "2-3 คน"
+   ⚠️ 2026-09-21 ผู้เล่น: "คนเยอะไปว่ะ" — ตารางใหม่ตามที่สั่ง (เพดานลดลงทุกช่วงกลาง)
      ดึงดูด   0–19   → 2–3 คน
-     ดึงดูด  20–69   → 5–6 คน   (ผู้เล่นระบุ 20–50 · ช่วง 51–69 ที่ไม่ได้ระบุ ใช้ค่าเดียวกัน)
-     ดึงดูด  70–99   → 6–7 คน
-     ดึงดูด 100 ขึ้นไป → พื้นที่ร้าน ÷ VISITOR_AREA_DIV (ปลายเกมโตตามขนาดร้าน ไม่ตันที่ 7)
-   ⚠️ ช่วงสุดท้ายต้องไม่ต่ำกว่าช่วงก่อนหน้า (Math.max กับ 6–7) ไม่งั้นร้านเริ่มต้น 48 ช่อง ÷ 20 = 2
-      พอดึงดูดแตะ 100 คนจะ "ลดลง" จาก 6-7 เหลือ 2 ซึ่งกลับหัวกลับหาง
-      สูตรพื้นที่จึงมีผลจริงตอนร้านโตเกิน 140 ช่อง ซึ่งเป็นจังหวะที่ควรโตต่อพอดี
+     ดึงดูด  20–49   → 4–5 คน
+     ดึงดูด  50–79   → 5–6 คน
+     ดึงดูด  80–119  → 6–7 คน
+     ดึงดูด 120 ขึ้นไป → ความดึงดูด ÷ VISITOR_SCORE_DIV (ปลายเกมโตตามความดึงดูด ไม่ตันที่ 7)
+   ⚠️ ช่วงสุดท้ายต้องไม่ต่ำกว่าช่วงก่อนหน้า (Math.max กับ 6–7) ไม่งั้นจำนวนคนจะกลับหัวกลับหางตรงรอยต่อ
+      ที่ดึงดูด 120 พอดี สูตรให้ 6 ซึ่งเท่ากับพื้นของช่วงก่อน → ต่อเนื่องกันพอดี แล้วค่อยโตทีละคนทุก 20 แต้ม
    ⚠️ นับเฉพาะ "ลูกค้า" (isCustomer) — ผู้ท้าแข่ง/พ่อค้ามีถังของตัวเอง ไม่กินโควตานี้ */
 /* ปรับสดจากคอนโซลได้: ShopBusy.show() ดูตาราง · ShopBusy.set(20,5,6) แก้พื้น/เพดานของช่วงที่เริ่มที่ 20
    ค่าที่ชอบแล้วบอกมา จะได้ใส่เป็นค่าตั้งต้นถาวร (ค่านี้ไม่ถูกเซฟ รีเฟรชแล้วกลับเป็นค่าตั้งต้น) */
-var VISITOR_BANDS=[[0,2,3],[20,5,6],[70,6,7]];   // [ความดึงดูดที่เริ่มช่วงนี้, พื้น, เพดาน]
-var VISITOR_AREA_FROM=100, VISITOR_AREA_DIV=20;  // ดึงดูดตั้งแต่เท่านี้ → ใช้พื้นที่ร้าน ÷ เท่านี้แทน
+var VISITOR_BANDS=[[0,2,3],[20,4,5],[50,5,6],[80,6,7]];   // [ความดึงดูดที่เริ่มช่วงนี้, พื้น, เพดาน]
+var VISITOR_SCORE_FROM=120, VISITOR_SCORE_DIV=20;         // ดึงดูดตั้งแต่เท่านี้ → ใช้ความดึงดูด ÷ เท่านี้แทน
 function visitorBand(capacity,score=visitorAttraction()){
   const s=Math.max(0,score),top=VISITOR_BANDS[VISITOR_BANDS.length-1];
   let lo=top[1],hi=top[2];
-  if(s>=VISITOR_AREA_FROM){
+  if(s>=VISITOR_SCORE_FROM){
     /* n = เป้าของช่วงนี้ · เว้นช่วง n-1 ถึง n ไว้เหมือนช่วงอื่น ไม่งั้นพื้น=เพดาน
-       จำนวนคนจะแข็งเป๊ะไม่มีจังหวะหายใจ (และต่อเนื่องกับช่วงก่อน: ร้าน 140 ช่อง → 6–7 พอดี) */
-    const n=Math.floor(floorArea()/VISITOR_AREA_DIV);
+       จำนวนคนจะแข็งเป๊ะไม่มีจังหวะหายใจ (และต่อเนื่องกับช่วงก่อน: ดึงดูด 120 → 6–7 พอดี) */
+    const n=Math.floor(s/VISITOR_SCORE_DIV);
     lo=Math.max(lo,n-1);hi=Math.max(hi,n);
   }else{
     const b=VISITOR_BANDS.filter(b=>s>=b[0]).pop()||VISITOR_BANDS[0];
@@ -397,7 +398,7 @@ function visitorBand(capacity,score=visitorAttraction()){
 /* เพดานของช่วง — ใช้เป็น "เป้า" ของชุดเปิดร้านและตัวจัดคิว */
 function visitorTarget(capacity,score=visitorAttraction()){return visitorBand(capacity,score).hi;}
 /* ความนิยมที่ต้องมีเพื่อให้ได้ลูกค้าพร้อมกัน n คน (ใช้โชว์ใน HUD/ดีบัก) */
-function attractionForVisitors(n){const b=VISITOR_BANDS.find(b=>b[2]>=n);return b?b[0]:VISITOR_AREA_FROM;}
+function attractionForVisitors(n){const b=VISITOR_BANDS.find(b=>b[2]>=n);return b?b[0]:Math.max(VISITOR_SCORE_FROM,n*VISITOR_SCORE_DIV);}
 function visitorFloor(capacity){return visitorBand(capacity).lo;}
 /* คนที่กำลังเดินออก ไม่นับว่าอยู่ในร้านแล้ว — สั่งคนใหม่ตั้งแต่ตอนเขาเริ่มเดินออก
    คนใหม่จะเดินสวนเข้ามาพอดี ร้านเลยไม่มีช่วงโล่งระหว่างรอยต่อ */
@@ -414,7 +415,7 @@ function chooseQuietKind(need,capacity){
 /* ดูกี่ตู้ก่อนกลับ — ผูกกับจำนวนตู้ในร้าน
    ร้านมี 2 ตู้แล้วเดินวน 5 รอบมันประหลาด ช่วงแรกจึงเป็น "เข้ามาดู แล้วออก" */
 /* ตู้ที่ถูกจองให้อีเวนต์ — มีผู้ท้าแข่งชักเย่อ/วิ่งยืนรออยู่ หรือกำลังมีทัวร์นาเมนต์ · ลูกค้าปกติไม่เดินไปดู ไม่ยื่นซื้อ */
-function eventReservedTank(o){return !!(window.SlugTug?.reserved?.(o)||window.SlugRace?.reserved?.(o)||window.SlugEat?.reserved?.(o)||window.SlugThrow?.reserved?.(o));}
+function eventReservedTank(o){return !!(window.SlugTug?.reserved?.(o)||window.SlugRace?.reserved?.(o)||window.SlugEat?.reserved?.(o)||window.SlugThrow?.reserved?.(o)||window.SlugSumo?.reserved?.(o));}
 function visitorVisits(){
   const tanks=(G.objs||[]).filter(o=>o&&o.type==='tank'&&o!==moving).length;
   const cap=Math.min(VISIT_MAX,tanks),min=Math.min(VISIT_MIN,cap);
@@ -509,7 +510,7 @@ function personEntered(p){return !(p._enterAt>_peopleT);}
 /* ชนิดกลุ่มที่สปอน → ประเภทสิทธิ์ผ่านประตู · ที่ไม่อยู่ในตารางนี้คือลูกค้าปกติ
    ⚠️ พ่อค้าส่งใช้ kind 'solo' เหมือนลูกค้าเดี่ยว แยกด้วยชื่อไม่ได้
       slug-wholesaler.js จึงส่ง accessKind='wholesale' เข้ามาตรง ๆ */
-const SPAWN_ACCESS={peddler:'peddler',race:'challenger',tug:'challenger',eat:'challenger',throw:'challenger'};
+const SPAWN_ACCESS={peddler:'peddler',race:'challenger',tug:'challenger',eat:'challenger',throw:'challenger',sumo:'challenger'};
 function spawnVisitors(capacity,requestedKind=null,requestedProfiles=null,accessKind=null){
   // คิวยังค้างเกิน 1 คน = ยังไม่รับกลุ่มใหม่ (ผู้เรียกทุกตัวลองใหม่รอบหน้าอยู่แล้ว) คิวจึงไม่ยาวสะสม
   if(_doorFreeAt>_peopleT+DOOR_GAP)return false;
@@ -770,6 +771,7 @@ function nextGoal(p){
   if(p.tugChallenger&&window.SlugTug&&SlugTug.goal(p))return;
   if(p.eatChallenger&&window.SlugEat&&SlugEat.goal(p))return;
   if(p.throwChallenger&&window.SlugThrow&&SlugThrow.goal(p))return;
+  if(p.sumoChallenger&&window.SlugSumo&&SlugSumo.goal(p))return;
   if(p._columnFollower)return;
   if(p._yieldResume)return;
   if(p.tradeOffer)return;
@@ -881,7 +883,7 @@ function stepPeopleSlice(dt){
     if(p.state === 'look'){
       if(p.focus && G.objs.indexOf(p.focus) < 0){ nextGoal(p); continue; }   // ตู้ถูกย้ายหาย
       /* ผู้ท้าแข่งมาถึงตู้ระหว่างที่ลูกค้ายืนดูอยู่ = ลูกค้าปกติเดินไปดูตู้อื่นแทน (ครอบครัวรอจบรอบดูของกลุ่มแล้วเลือกตู้ใหม่เอง) */
-      if(p.focus && !p.tugChallenger && !p.raceChallenger && !p.eatChallenger && !p.throwChallenger && !p.family && eventReservedTank(p.focus)){ nextGoal(p); continue; }
+      if(p.focus && !p.tugChallenger && !p.raceChallenger && !p.eatChallenger && !p.throwChallenger && !p.sumoChallenger && !p.family && eventReservedTank(p.focus)){ nextGoal(p); continue; }
       if(p.focus){                                   // หันหน้าเข้าหากลางตู้
         p.fdx = (p.focus.cx + oW(p.focus)/2) - p.x;
         p.fdy = (p.focus.cy + oH(p.focus)/2) - p.y;
@@ -1843,9 +1845,9 @@ window.ShopBusy={
     if(typeof toast==='function')toast('ความคึกคัก: ดึงดูด '+f+'+ → '+a+'-'+b+' คน','good');
     return this.show();},
   show(){const cap=visitorCapacity();
-    const rows=[0,10,19,20,40,69,70,99,100,200,400].map(s=>{const g=visitorBand(1e9,s),r=visitorBand(cap,s);
+    const rows=[0,10,19,20,40,49,50,79,80,119,120,200,400].map(s=>{const g=visitorBand(1e9,s),r=visitorBand(cap,s);
       return {'ความนิยม':s,'เป้าคน':g.lo+'-'+g.hi,'ได้จริงในร้านนี้':r.lo+'-'+r.hi};});
     console.table(rows);
-    return {ช่วง:this.bands,พื้นที่ร้าน:floorArea(),'สูตรช่วงท้าย':'พื้นที่ ÷ '+VISITOR_AREA_DIV+' (ตั้งแต่ดึงดูด '+VISITOR_AREA_FROM+')',
+    return {ช่วง:this.bands,พื้นที่ร้าน:floorArea(),'สูตรช่วงท้าย':'ความดึงดูด ÷ '+VISITOR_SCORE_DIV+' (ตั้งแต่ดึงดูด '+VISITOR_SCORE_FROM+')',
             ความจุร้าน:cap,ตอนนี้มีลูกค้า:customerCount(),rows};}
 };

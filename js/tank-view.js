@@ -916,24 +916,61 @@ function decorFitsTankWalls(key,fx,fy,flip,tank){
  return lo!==20||b.bottom<=1+eps||b.top>=tank.def.h-1-eps;
 }
 
-function canPlaceDecor(key, fx, fy, flip, ignore){
-  if(!curTank||!decorFitsTankWalls(key,fx,fy,flip,curTank)) return false;
+/* ⚠️ 2026-09-21 ผู้เล่น: "บอกสาเหตุเวลาวางของไม่ได้ด้วยว่าทำไมถึงวางไม่ได้"
+   เหตุผลทุกข้อรวมอยู่ที่นี่ที่เดียว คืน '' = วางได้ · canPlaceDecor เป็นแค่เปลือกของฟังก์ชันนี้
+   ข้อความต้องสั้นพอจะโชว์เป็นป้ายใต้เงาพรีวิวในตู้ได้ */
+function decorPlaceIssue(key, fx, fy, flip, ignore){
+  if(!curTank) return 'ยังไม่ได้เข้าตู้';
+  const cm=n=>Math.round(n*CM_PER_CELL);
+  const b=decorRequiredBounds(key,fx,fy,flip);
+  if(!b) return 'ชิ้นนี้ไม่มีขนาดที่วางได้';
+  const eps=1e-8;
+  if(b.left<-eps||b.top<-eps||b.right>curTank.def.w+eps||b.bottom>curTank.def.h+eps)
+    return 'ล้นขอบตู้ — เลื่อนเข้ามาให้ทั้งชิ้นอยู่ในตู้';
+  /* เหลือแต่กฎของตู้เพาะพันธุ์: ห้ามคร่อมผนังกั้น และช่องผสมวางได้แค่แถบบน–ล่างสุด */
+  if(!decorFitsTankWalls(key,fx,fy,flip,curTank))
+    return 'ตู้เพาะพันธุ์: ห้ามคร่อมผนังกั้น · ช่องผสมตรงกลางวางได้แค่แถบบน–ล่างสุด';
   const NX=Math.round(curTank.def.w/DCELL), NY=Math.round(curTank.def.h/DCELL);
   const mine=decorFootprint(key,fx,fy,flip);
-  if(curTank.def.race&&(fy<8||[...mine].some(k=>(Number(k.split(',')[1])*DCELL)<8)))return false;
+  if(curTank.def.race&&(fy<8||[...mine].some(k=>(Number(k.split(',')[1])*DCELL)<8)))
+    return 'ลู่วิ่ง '+cm(8)+' ซม. หน้าตู้ต้องโล่ง';
   /* ตู้ชักเย่อ: แถบหน้าตู้ (ขอบหน้า → หลังเลน) ต้องโล่งเสมอ แบบตู้แข่งวิ่ง — ของที่อยู่หน้าเลนจะบังการแข่ง (config.js TUG_FRONT) */
-  if(curTank.def.tug){const b=decorRequiredBounds(key,fx,fy,flip);if(!b||tugLaneBlocked(curTank.def,b.top,b.bottom))return false;}
-  /* ตู้แข่งกินจุ: แถบสนามหน้าตู้ต้องโล่งเสมอ แบบตู้แข่งวิ่ง/ชักเย่อ — กันวางหินดักทางคู่แข่ง (slug-eat.js ARENA_H) */
-  if(curTank.def.eat&&window.SlugEat&&!SlugEat.decorOk(curTank,mine,decorRequiredBounds(key,fx,fy,flip)))return false;
+  if(curTank.def.tug&&tugLaneBlocked(curTank.def,b.top,b.bottom))
+    return 'เลนเชือก '+cm(TUG_FRONT)+' ซม. หน้าตู้ต้องโล่ง';
+  /* ตู้แข่งกินจุ: แถบสนามหน้าตู้ต้องโล่งเสมอ — กันวางหินดักทางคู่แข่ง (slug-eat.js ARENA_H) */
+  if(curTank.def.eat&&window.SlugEat&&!SlugEat.decorOk(curTank,mine,b))
+    return 'สนามแข่งกินจุ '+cm(SlugEat.ARENA_H)+' ซม. หน้าตู้ต้องโล่ง';
   /* ตู้ปาหิน: ลานปาอยู่ชิดหน้าตู้ ต้องโล่งเหมือนกัน (ผู้เล่นขอ 2026-09-19 — slug-throw.js LANE_H) */
-  if(curTank.def.throwing&&window.SlugThrow&&!SlugThrow.decorOk(curTank,mine,decorRequiredBounds(key,fx,fy,flip)))return false;
-  if(!mine.size) return true;
-  if(isBreeder(curTank)){const zone=fx<20?[0,20]:fx<25?[20,25]:[25,30];for(const k of mine){const [ix,iy]=k.split(',').map(Number),x=ix*DCELL,y=iy*DCELL;if(x<zone[0]||x+DCELL>zone[1])return false;if(zone[0]===20&&!(fy<1?y>=0&&y+DCELL<=1:fy>=curTank.def.h-1&&y>=curTank.def.h-1&&y+DCELL<=curTank.def.h))return false;}}
+  if(curTank.def.throwing&&window.SlugThrow&&!SlugThrow.decorOk(curTank,mine,b))
+    return 'ลานปาหิน '+cm(SlugThrow.LANE_H)+' ซม. หน้าตู้ต้องโล่ง';
+  /* ตู้ดันวง: วงกลมอยู่ในแถบหน้าตู้ ต้องโล่งเหมือนกัน (slug-sumo.js ARENA_H) */
+  if(curTank.def.sumo&&window.SlugSumo&&!SlugSumo.decorOk(curTank,mine,b))
+    return 'สนามดันวง '+cm(SlugSumo.ARENA_H)+' ซม. หน้าตู้ต้องโล่ง';
+  if(!mine.size) return '';
+  if(isBreeder(curTank)){const zone=fx<20?[0,20]:fx<25?[20,25]:[25,30];for(const k of mine){const [ix,iy]=k.split(',').map(Number),x=ix*DCELL,y=iy*DCELL;
+    if(x<zone[0]||x+DCELL>zone[1])return 'ตู้เพาะพันธุ์: ทั้งชิ้นต้องอยู่ในช่องเดียว ห้ามล้ำผนังกั้น';
+    if(zone[0]===20&&!(fy<1?y>=0&&y+DCELL<=1:fy>=curTank.def.h-1&&y>=curTank.def.h-1&&y+DCELL<=curTank.def.h))return 'ช่องผสมพันธุ์วางของได้แค่แถบบนสุดกับล่างสุด';}}
   for(const k of mine){ const c=k.split(','), ix=+c[0], iy=+c[1];
-    if(ix<0||iy<0||ix>=NX||iy>=NY) return false; }
+    if(ix<0||iy<0||ix>=NX||iy>=NY) return 'ล้นขอบตู้ — เลื่อนเข้ามาให้ทั้งชิ้นอยู่ในตู้'; }
   for(const o of (curTank.decor||[])){ if(o===ignore) continue;
-    for(const k of decorFootprint(o.key,o.fx,o.fy,o.flip)) if(mine.has(k)) return false; }
-  return true;
+    for(const k of decorFootprint(o.key,o.fx,o.fy,o.flip)) if(mine.has(k))
+      return 'ทับ'+(TANK_DECOR[o.key]?.name||'ของอีกชิ้น')+'อยู่ — เลื่อนไปที่ว่าง'; }
+  return '';
+}
+function canPlaceDecor(key, fx, fy, flip, ignore){
+  return !decorPlaceIssue(key, fx, fy, flip, ignore);
+}
+/* ป้ายเหตุผลใต้เงาพรีวิวในตู้ — ขนาดคงที่บนจอ (ไม่โตตามซูม) หนีบไม่ให้หลุดขอบแคนวาส */
+function decorWhyLabel(text,fx,fy){
+  const p=S(fx,fy,SAND_CELLS);
+  tctx.save();
+  tctx.font='600 13px "IBM Plex Sans Thai",sans-serif';tctx.textAlign='center';tctx.textBaseline='middle';
+  const w=Math.min(TCW-16,tctx.measureText(text).width+20),h=24;
+  const cx=Math.max(w/2+8,Math.min(TCW-w/2-8,p.x)),cy=Math.max(h/2+8,Math.min(TCH-h/2-8,p.y+28));
+  tctx.fillStyle='rgba(58,20,18,.94)';tctx.beginPath();tctx.roundRect(cx-w/2,cy-h/2,w,h,h/2);tctx.fill();
+  tctx.strokeStyle='rgba(255,150,136,.9)';tctx.lineWidth=1.4;tctx.stroke();
+  tctx.fillStyle='#ffd9d2';tctx.fillText(text,cx,cy+1);
+  tctx.restore();
 }
 
 /* กรอบจอของแคนวาสตู้ — แคชไว้ อ่านใหม่เฉพาะตอนขนาดเปลี่ยน (ResizeObserver / resize / เข้าตู้)
@@ -1082,8 +1119,8 @@ function flipDecor(){
   if(flipOptions(key).length<2){ toast(TANK_DECOR[key].name+' ตั้งไว้ว่าพลิกไม่ได้','bad'); return; }
   if(!holding && selDecor){
     const f=nextFlip(selDecor.key, selDecor.flip);
-    if(!canPlaceDecor(selDecor.key, selDecor.fx, selDecor.fy, f, selDecor)){
-      toast('พลิกแล้วชนของชิ้นอื่นหรือล้นขอบตู้ — ย้ายที่ก่อน','bad'); return; }
+    const why=decorPlaceIssue(selDecor.key, selDecor.fx, selDecor.fy, f, selDecor);
+    if(why){ toast('พลิกไม่ได้: '+why+' — ย้ายที่ก่อน','bad'); return; }
     selDecor.flip=f;
     nudgeSlugsOutOfSolid(curTank.slugs, curTank.def.w, curTank.def.h, curTank.decor);
     toast(typeof decorRotationName==='function'?decorRotationName(key,f):FLIP_NAME[f],'good');
@@ -1666,6 +1703,7 @@ function drawTankFrame(){
   if(window.SlugTug?.isPulling(curTank))SlugTug.updateTankFrame(performance.now());
   if(window.SlugEat?.isEating(curTank))SlugEat.updateTankFrame(performance.now());
   if(window.SlugThrow?.isThrowing(curTank))SlugThrow.updateTankFrame(performance.now());
+  if(window.SlugSumo?.isSumo(curTank))SlugSumo.updateTankFrame(performance.now());
 
   const fw=curTank.def.w, fh=curTank.def.h;
   const wallH=wallCells(), standH=STAND_CELLS, sandT=SAND_CELLS;   // ความสูง (หน่วยช่อง)
@@ -1715,6 +1753,7 @@ function drawTankFrame(){
     if(curTank.def.tug&&window.SlugTug)SlugTug.drawLane(tctx,(x,y)=>S(x,y,sandT));
     if(curTank.def.eat&&window.SlugEat)SlugEat.drawArena(tctx,(x,y)=>S(x,y,sandT),curTank);
     if(curTank.def.throwing&&window.SlugThrow)SlugThrow.drawField(tctx,(x,y)=>S(x,y,sandT),curTank);
+    if(curTank.def.sumo&&window.SlugSumo)SlugSumo.drawArena(tctx,(x,y)=>S(x,y,sandT),curTank);
   };
   /* ---------- ชั้นนิ่งที่อยู่ "หน้า" ตัวทาก: น้ำ + ผิวน้ำ + กระจกใกล้ ---------- */
   const drawGlass=(x)=>{
@@ -1731,7 +1770,7 @@ function drawTankFrame(){
     SIDES.map(s=>face(s.a,s.b,sandT,wallH)).sort(byFar).slice(2)
          .forEach(f=> qfill(f.p,'rgba(150,205,215,0.05)','rgba(200,235,240,0.24)',1.3));
   };
-  const layKey=[window.DecorGLB?.viewRevision||0,TCW,TCH,DPR,tankCam.zoom.toFixed(4),fw,fh,wallH,!!curTank.def.race,!!curTank.def.tug,!!curTank.def.eat,!!curTank.def.throwing,
+  const layKey=[window.DecorGLB?.viewRevision||0,TCW,TCH,DPR,tankCam.zoom.toFixed(4),fw,fh,wallH,!!curTank.def.race,!!curTank.def.tug,!!curTank.def.eat,!!curTank.def.throwing,!!curTank.def.sumo,
                 (_sandImg&&_sandImg.naturalWidth)?1:0, texOK(woodSrc())?1:0].join('|');
   if(performance.now() >= _zoomBusyT && (_lay.key!==layKey || !layCovers())){
     const box=layBox();
@@ -1790,15 +1829,18 @@ function drawTankFrame(){
   const eating=!racing&&!pulling&&!!window.SlugEat?.isEating(curTank);
   /* ปาหิน: ผู้แข่ง 4 ตัววาดโดย slug-throw.js · ทากอื่นเดินได้แต่อยู่หลังลานปา */
   const throwing=!racing&&!pulling&&!eating&&!!window.SlugThrow?.isThrowing(curTank);
+  /* ดันวง: ผู้แข่ง 4 ตัววาด/เดินโดย slug-sumo.js · ทากอื่นเดินได้แต่อยู่หลังสนาม (SlugSumo.stepNormal) */
+  const sumo=!racing&&!pulling&&!eating&&!throwing&&!!window.SlugSumo?.isSumo(curTank);
   /* ตัวที่ลงแข่งชักเย่อถูกคัดออกจาก slugs — ทั้งเดินและวาดจะถูกคุมโดย slug-tug.js เองทั้งหมด
      (แบบเดียวกับนักวิ่งใน slug-race.js) ที่เหลือในตู้กลายเป็นผู้ชมยืนดูขอบตู้ */
-  const slugs=racing?SlugRace.normalSlugs(curTank):pulling?SlugTug.spectatorSlugs(curTank):eating?SlugEat.normalSlugs(curTank):throwing?SlugThrow.normalSlugs(curTank):curTank.slugs;
+  const slugs=racing?SlugRace.normalSlugs(curTank):pulling?SlugTug.spectatorSlugs(curTank):eating?SlugEat.normalSlugs(curTank):throwing?SlugThrow.normalSlugs(curTank):sumo?SlugSumo.normalSlugs(curTank):curTank.slugs;
   tuneSpriteBudget(dt*1000);
   _tsprBudget = TSPR_MAX;                 // งบเรนเดอร์สไปรต์ต่อเฟรม ปรับตามความเร็วเครื่อง
   if(racing)SlugRace.stepNormal(slugs,dt);
   else if(pulling)SlugTug.stepSpectators(slugs,dt);
   else if(eating)SlugEat.stepNormal(slugs,dt);
   else if(throwing)SlugThrow.stepNormal(slugs,dt);
+  else if(sumo)SlugSumo.stepNormal(slugs,dt);
   else stepTankSlugs(heldSlug? slugs.filter(s=>s!==heldSlug) : slugs, fw, fh, dt, true, curTank.decor, curTank.def);
 
   // --- วาดทาก + ของตกแต่ง รวมกัน เรียงลึก (fy มาก=ไกล วาดก่อน) · clip กล่องแก้วแบบเปิดฝา ---
@@ -1818,6 +1860,7 @@ function drawTankFrame(){
   if(pulling)items.push(...SlugTug.tugItems());
   if(eating)items.push(...SlugEat.items());
   if(throwing)items.push(...SlugThrow.items());
+  if(sumo)items.push(...SlugSumo.items());
   items.sort((a,b)=> b.sortY - a.sortY);
   const ghKey = dragDecor ? dragDecor.key : (tankBuildMode ? selDecorKey : null);
   const ghPos = dragDecor ? dragGhost : decorHover;
@@ -1827,6 +1870,7 @@ function drawTankFrame(){
     if(it.kind==='tug'){SlugTug.drawPart(it);return;}
     if(it.kind==='eat'){SlugEat.drawItem(it);return;}
     if(it.kind==='throw'){SlugThrow.drawItem(it);return;}
+    if(it.kind==='sumo'){SlugSumo.drawItem(it);return;}
     if(it.kind==='food'){drawFood(it.f);return;}
     if(it.kind==='decor'){ drawDecor(it.d); return; }
     const s=it.s;
@@ -1891,8 +1935,10 @@ function drawTankFrame(){
   });
   if(tankBuildMode)for(const d of curTank.decor||[]){if(!decorFitsTankWalls(d.key,d.fx,d.fy,d.flip,curTank))paintCellSet(decorFootprint(d.key,d.fx,d.fy,d.flip),'rgba(232,86,86,.26)','rgba(255,130,130,.95)',2);}
   /* โกสต์: โชว์ก่อนกด ว่าจะลงตรงไหน เขียว=วางได้ แดง=วางไม่ได้ */
+  let ghWhy='';
   if(ghKey && ghPos){
-    const ok = canPlaceDecor(ghKey, ghPos.fx, ghPos.fy, ghFlip, dragDecor||null);
+    ghWhy = decorPlaceIssue(ghKey, ghPos.fx, ghPos.fy, ghFlip, dragDecor||null);
+    const ok=!ghWhy;
     paintCellSet(decorFootprint(ghKey, ghPos.fx, ghPos.fy, ghFlip),
       ok?'rgba(90,210,130,0.34)':'rgba(232,86,86,0.38)',
       ok?'rgba(150,255,190,0.95)':'rgba(255,130,130,0.95)', 2);
@@ -1911,6 +1957,8 @@ function drawTankFrame(){
 
   // ---- น้ำ + ผิวน้ำ + กระจกใกล้ (ชั้นนิ่ง วาดทับตัวทาก) ----
   if(haveLay) blitLayer(_lay.glass, _lay.box, vis); else drawGlass(tctx);
+  /* ป้ายบอกเหตุผลตอนวางไม่ได้ — วาดนอก clip ของกล่องแก้ว ไม่งั้นป้ายโดนตัดตอนเงาอยู่ริมตู้ */
+  if(ghWhy && ghPos) decorWhyLabel(ghWhy, ghPos.fx, ghPos.fy);
   if(selSlug) drawGeneCard(selSlug, 12, 12);
   window.DecorGLB?.endTank();
 }
@@ -2177,9 +2225,10 @@ tankCv.addEventListener('pointerup', e=>{
   tDrag=false; dragDecor=null; dragGhost=null;
   if(wasDecor){                                        // ปล่อยแล้วค่อยคำนวณครั้งเดียว
     if(gh && (gh.fx!==wasDecor.fx || gh.fy!==wasDecor.fy)){
-      if(canPlaceDecor(wasDecor.key, gh.fx, gh.fy, wasDecor.flip, wasDecor)){ wasDecor.fx=gh.fx; wasDecor.fy=gh.fy;
+      const why=decorPlaceIssue(wasDecor.key, gh.fx, gh.fy, wasDecor.flip, wasDecor);
+      if(!why){ wasDecor.fx=gh.fx; wasDecor.fy=gh.fy;
         nudgeSlugsOutOfSolid(curTank.slugs, curTank.def.w, curTank.def.h, curTank.decor); }
-      else toast('พื้นที่จำเป็นในการวางชนผนัง ฉากกั้น หรือของชิ้นอื่น','bad');
+      else toast('ย้ายไปตรงนั้นไม่ได้: '+why,'bad');
     }
     selDecor=wasDecor; syncDecorBar(); return;
   }
@@ -2189,7 +2238,8 @@ tankCv.addEventListener('pointerup', e=>{
     const f=tankFloorAt(mx,my);
     const nx=snapCell(Math.max(DCELL,Math.min(curTank.def.w-DCELL, f.fx)));
     const ny=snapCell(Math.max(DCELL,Math.min(curTank.def.h-DCELL, f.fy)));
-    if(!canPlaceDecor(selDecorKey,nx,ny,placeFlip,null)){ toast('ตรงนี้วางไม่ได้ — ล้นขอบตู้ หรือทับพื้นที่ของชิ้นอื่น','bad'); return; }
+    const _why=decorPlaceIssue(selDecorKey,nx,ny,placeFlip,null);
+    if(_why){ toast('วางตรงนี้ไม่ได้: '+_why,'bad'); return; }
     const _price=decorPrice(selDecorKey);
     let _free=false;
     if(((G.decorCredit||{})[selDecorKey]||0)>0){ G.decorCredit[selDecorKey]--; _free=true; }

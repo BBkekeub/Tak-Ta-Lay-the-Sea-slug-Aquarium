@@ -190,6 +190,7 @@ const CATALOG = {
   tank_tug:{kind:'tank',name:'ตู้ชักเย่อ',icon:'🪢',price:2500,w:2*SUB,h:SUB,glass:TANK_GLASS_COLOR,tug:true,foodMax:12},
   tank_eat:{kind:'tank',name:'ตู้แข่งกินจุ',icon:'🍽️',price:2500,w:2*SUB,h:2*SUB,glass:TANK_GLASS_COLOR,eat:true,foodMax:8},   // 100×100 ซม. · แข่ง 4 ตัว (slug-eat.js)
   tank_throw:{kind:'tank',name:'ตู้ปาหิน',icon:'🪨',price:2500,w:3*SUB,h:SUB,glass:TANK_GLASS_COLOR,throwing:true,foodMax:8},   // 150×50 ซม. · ปาหินด้วยหงอน 4 ตัว (slug-throw.js)
+  tank_sumo:{kind:'tank',name:'ตู้ดันวง',icon:'⭕',price:2500,w:2*SUB,h:2*SUB,glass:TANK_GLASS_COLOR,sumo:true,foodMax:8},   // 100×100 ซม. · ดันออกจากวง 4 ตัว (slug-sumo.js)
   play_table:{kind:'deco',name:'โต๊ะเล่นกับทาก',icon:'',price:500,w:SUB,h:SUB,col:'#98744b',playTable:true},
   /* โต๊ะวิจัย 50×100 ซม. — มีได้ตัวเดียวต่อร้าน (ผลวิจัยเป็นของทั้งร้านอยู่แล้ว ดู research.js) */
   research_table:{kind:'deco',name:'โต๊ะวิจัย',icon:'🔬',price:RESEARCH_TABLE_PRICE,w:SUB,h:2*SUB,col:'#8a6a45',researchTable:true},

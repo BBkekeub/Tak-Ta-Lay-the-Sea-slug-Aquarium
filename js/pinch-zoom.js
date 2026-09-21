@@ -10,7 +10,11 @@
        active : ()=>boolean   ไม่ส่ง = เปิดตลอด (เช่นในตู้ต้องเช็กว่ามี curTank ก่อน)
        zoom   : ()=>number    อ่านค่าซูมปัจจุบัน
        apply  : (z,cx,cy)=>{} ตั้งค่าซูมใหม่ โดยยึดจุด (cx,cy) ซึ่งเป็นพิกัดในกรอบ element
+       pan    : (dx,dy)=>{}   ไม่ส่ง = สองนิ้วซูมอย่างเดียวเหมือนเดิม
+                              ส่งมา = เลื่อนสองนิ้วพร้อมกันก็เลื่อนฉากได้ด้วย (dx,dy = จุดกึ่งกลางขยับไปเท่าไร)
      })
+   ⚠️ หน้าร้านต้องมี pan เพราะตอนถือของบนมือถือ นิ้วเดียว = ขยับโกส (shop-floor.js ghostDrag)
+      ถ้าไม่มีทางเลื่อนฉากด้วยสองนิ้ว จะเล็งจุดวางที่อยู่นอกจอไม่ได้เลย
 
    ⚠️ ต้องดักในเฟส capture และ stopImmediatePropagation ตอนมีสองนิ้ว
       ไม่งั้นตัวจัดการ "ลากเลื่อนจอ" เดิมของแต่ละหน้าจะทำงานพร้อมกัน แล้วภาพจะสะบัดตามนิ้ว
@@ -25,7 +29,7 @@ const PinchZoom=(()=>{
  function attach(el,opt){
   if(!el||el._pinchZoom)return el;el._pinchZoom=true;
   const pts=new Map();
-  let base=0,baseZoom=1,pinching=false,swallow=0;
+  let base=0,baseZoom=1,pinching=false,swallow=0,mid=null;
 
   const spread=()=>{
    const [a,b]=[...pts.values()];
@@ -40,7 +44,7 @@ const PinchZoom=(()=>{
    pts.set(e.pointerId,local(e));
    if(pts.size===2){
     const s=spread();
-    if(s.d>=MIN_START){pinching=true;base=s.d;baseZoom=opt.zoom();}
+    if(s.d>=MIN_START){pinching=true;base=s.d;baseZoom=opt.zoom();mid={x:s.cx,y:s.cy};}
    }
    if(pinching)stop(e);
   },true);
@@ -50,7 +54,11 @@ const PinchZoom=(()=>{
    pts.set(e.pointerId,local(e));
    if(!pinching||pts.size<2)return;
    stop(e);
-   const s=spread();if(!(s.d>0)||!(base>0))return;
+   const s=spread();
+   /* เลื่อนก่อน ค่อยซูม — เลื่อนสองนิ้วพร้อมกันระยะห่างไม่เปลี่ยน opt.apply() จะไม่ขยับอะไรเลย */
+   if(opt.pan&&mid)opt.pan(s.cx-mid.x,s.cy-mid.y);
+   mid={x:s.cx,y:s.cy};
+   if(!(s.d>0)||!(base>0))return;
    opt.apply(baseZoom*(s.d/base),s.cx,s.cy);
   },true);
 
@@ -60,7 +68,7 @@ const PinchZoom=(()=>{
    if(!pinching)return;
    /* ยังเหลือนิ้วอยู่บนจอ = กลืนอีเวนต์ต่อ กันนิ้วที่เหลือกลายเป็นการลากเลื่อนจอ */
    if(pts.size>0){swallow=pts.size;stop(e);return;}
-   pinching=false;swallow=0;stop(e);
+   pinching=false;swallow=0;mid=null;stop(e);
   };
   el.addEventListener('pointerup',release,true);
   el.addEventListener('pointercancel',release,true);

@@ -1,0 +1,73 @@
+/* ตู้ดันวง (js/slug-sumo.js) — โมดอลใช้ธีม .slug-race-dialog ร่วมกัน */
+.sumo-rivals{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 10px}
+.sumo-rival{display:flex;flex-direction:column;align-items:center;padding:6px;border:1px solid #cfb7774d;border-radius:10px;background:#1d2a405c;min-width:0}
+.sumo-rival canvas{width:100%;height:auto;max-height:64px;object-fit:contain}
+.sumo-rival b{font-size:14px;color:#ffe1a0}.sumo-rival small{font-size:11px;color:#c8dbd2;text-align:center;line-height:1.35}
+.slug-sumo-dialog .sumo-rule{font-size:13px;color:#c9ddd1;margin:6px 0}
+
+/* ---- เต็มจอในตู้ (ยกแบบ .eat-in-tank) ---- */
+body.sumo-in-tank{overflow:hidden}
+.sumo-in-tank #ov{position:fixed!important;inset:0!important;z-index:50;padding:env(safe-area-inset-top) 0 0!important;box-sizing:border-box}
+.sumo-in-tank #ov .ov-top{flex:0 0 auto;min-height:38px!important;padding:6px 14px!important}
+.sumo-in-tank #ov .ov-title{font-size:15px!important}
+.sumo-in-tank #ov .ov-body{padding:0!important;overflow:hidden}
+.sumo-in-tank #ovBack,.sumo-in-tank #ov .ov-top .stat,.sumo-in-tank #ov .tank-side,.sumo-in-tank #ov .ov-decor,.sumo-in-tank #ov .mobileTankBar,.sumo-in-tank #ov .mobileTankZoom,.sumo-in-tank #tankDecorDock,.sumo-in-tank #newSlugTray{display:none!important}
+.sumo-in-tank #tankCv{pointer-events:none;touch-action:none}
+
+#sumoTankHUD{position:absolute;inset:0;z-index:15;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;pointer-events:none}
+.sumo-top{position:absolute;top:10px;left:50%;transform:translateX(-50%);max-width:calc(100% - 24px);box-sizing:border-box;padding:6px 22px;background:#2a2340e8;border:1px solid #b69c66;border-radius:12px;text-align:center;color:#f3e8ca;white-space:nowrap;box-shadow:0 4px 16px #0004;pointer-events:none}
+.sumo-time{font-size:24px;line-height:1.2;font-weight:800;color:#ffe19b;font-variant-numeric:tabular-nums}
+.sumo-time.is-urgent{color:#ff8f7e;animation:sumoBlink .5s steps(2) infinite}
+.sumo-status{font-size:13px;color:#c8dbd2;overflow:hidden;text-overflow:ellipsis;max-width:min(78vw,520px)}
+@keyframes sumoBlink{50%{opacity:.45}}
+
+.sumo-board{position:absolute;top:10px;left:12px;margin:0;padding:6px 8px;list-style:none;display:flex;flex-direction:column;gap:3px;min-width:140px;background:#211b2fd9;border:1px solid #b69c6680;border-radius:10px;pointer-events:none}
+.sumo-board li{display:flex;align-items:center;gap:6px;font-size:13px;color:#e6efe8}
+.sumo-board li i{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}
+.sumo-board li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sumo-board li b{font-variant-numeric:tabular-nums;color:var(--c);font-size:12px}
+.sumo-board li.is-me span{font-weight:700;color:#ffe19b}
+.sumo-board li.is-out{opacity:.5}
+.sumo-board li.is-out b{color:#9fb2b0}
+
+.sumo-bigcount{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);font-size:clamp(64px,14vw,130px);font-weight:900;color:#ffe19b;text-shadow:0 6px 0 #6b4a1c,0 10px 30px #000a;pointer-events:none}
+.sumo-bigcount.pop{animation:sumoPop .5s ease-out}
+@keyframes sumoPop{from{transform:translate(-50%,-50%) scale(1.6);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+
+.sumo-hint{position:absolute;left:50%;bottom:calc(10px + env(safe-area-inset-bottom));transform:translateX(-50%);font-size:12px;color:#d9e6df;background:#1a1426cc;padding:4px 12px;border-radius:999px;white-space:nowrap;pointer-events:none}
+
+.sumo-controls{position:absolute;left:16px;right:16px;bottom:calc(40px + env(safe-area-inset-bottom));display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none}
+.sumo-stick{display:none;position:relative;width:132px;height:132px;border-radius:50%;background:radial-gradient(#ffffff14,#0000003d);border:2px solid #ffe19b66;pointer-events:auto;touch-action:none}
+.sumo-stick i{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:linear-gradient(#f6dc98,#c99a45);box-shadow:0 4px 12px #0007}
+.sumo-buttons{display:flex;gap:10px;align-items:flex-end;margin-left:auto}
+.sumo-btn{pointer-events:auto;touch-action:none;position:relative;overflow:hidden;min-width:82px;height:68px;padding:0 14px;border:1px solid #c1a76d;border-bottom:4px solid #78623b;border-radius:14px;font:bold 18px "IBM Plex Sans Thai",sans-serif;background:linear-gradient(#5b4a74,#33294a);color:#fff0c8;box-shadow:0 5px 18px #0005;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15}
+.sumo-btn:disabled{opacity:.45}
+.sumo-btn:active{transform:translateY(3px)}
+.sumo-btn b,.sumo-key{position:relative;z-index:1}
+.sumo-key{font-size:11px;font-weight:600;opacity:.8}
+@media (pointer:coarse){.sumo-key{display:none}}
+.sumo-charge i{position:absolute;left:0;right:0;bottom:0;height:0;background:#8f7ad077;border-top:2px solid #cbb4ff}
+.sumo-charge.ready{border-color:#cbb4ff;box-shadow:0 0 0 2px #cbb4ff55,0 5px 18px #0005}
+.sumo-charge.winding{background:linear-gradient(#f6dc98,#d6ae5c);color:#241d34;border-color:#ffe2a0;animation:sumoWind .35s ease-in-out infinite alternate}
+@keyframes sumoWind{to{transform:scale(1.05)}}
+
+/* ตารางอันดับตอนจบ — เสมอกันหลายตัวได้ จึงไม่ใช้แท่นโพเดียมแบบตู้อื่น */
+.sumo-result-board{list-style:none;margin:10px 0;padding:0;display:flex;flex-direction:column;gap:6px;max-width:460px}
+.sumo-result-board li{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #cfb77733;border-left:4px solid var(--c);border-radius:10px;background:#1d2a4066}
+.sumo-result-board li.is-me{background:#3b2f5a88;border-color:#ffe1a0}
+.sumo-place{font-weight:800;color:#ffe19b;min-width:46px;font-variant-numeric:tabular-nums}
+.sumo-result-board li b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f3e8ca}
+.sumo-result-board li small{color:#c8dbd2;font-size:12px;white-space:nowrap}
+
+@media (pointer:coarse){
+  .sumo-stick{display:block}
+  .sumo-hint{display:none}
+  .sumo-controls{bottom:calc(14px + env(safe-area-inset-bottom))}
+}
+@media (max-width:520px){
+  .sumo-board{top:auto;bottom:calc(172px + env(safe-area-inset-bottom));min-width:124px}
+  .sumo-time{font-size:20px}
+  .sumo-status{font-size:12px;white-space:normal}
+  .sumo-btn{min-width:72px;height:60px;font-size:16px}
+}
+@media (prefers-reduced-motion:reduce){.sumo-time.is-urgent,.sumo-bigcount.pop,.sumo-charge.winding{animation:none}}

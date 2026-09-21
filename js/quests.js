@@ -122,6 +122,10 @@
   {t:'เปิดตู้ปาหิน', h:'กด 🔧 ก่อสร้าง → แท็บ "ตู้เลี้ยง" → ซื้อ 🪨 ตู้ปาหิน มาวาง — ปาหินด้วยหงอน จับจังหวะแถบพลังกับแถบมุมให้พอดี', cond:b=>!!(G.throwing&&G.throwing.purchased), reward:{coin:150, rep:2, txt:'ทากหงอนยาวปาได้ไกลกว่า'}, btn:['#shop .item[data-k="tank_throw"]','#floorBuildDock .decorTabs [data-cat="ตู้เลี้ยง"]','#mBuild'],
    force:()=>{ try{ if(G.throwing&&G.throwing.purchased&&!G.throwing.offer&&!G.throwing.active) G.throwing.nextAt=Date.now(); }catch(e){} }},
   {t:'คว้าแชมป์ทัวร์นาเมนต์', h:'เมื่อมีตู้แข่งวิ่งหรือตู้ชักเย่อ จะมีจดหมายเชิญเข้าทัวร์นาเมนต์ 8 ทีมส่งมาที่คอมประจำร้าน — ผ่านรอบ 8 ทีม → รองชนะเลิศ → ชิงชนะเลิศ ให้ครบ', cond:b=>S().tourWin>b.tourWin, reward:{coin:200, rep:3, box:2, txt:'แชมป์แล้ว! รับกล่องสุ่มระดับแพง 1 กล่องไปเลย'}, btn:['canvas:counter','canvas:contest']},
+
+  /* ⚠️ ต่อท้ายเท่านั้น — id ของเควสมาจากลำดับในอาร์เรย์ (tutorial-<index>) แทรกกลางแล้วรางวัลที่รับไปแล้วจะเพี้ยน */
+  {t:'เปิดตู้ดันวง', h:'กด 🔧 ก่อสร้าง → แท็บ "ตู้เลี้ยง" → ซื้อ ⭕ ตู้ดันวง มาวาง — ดันคู่แข่งออกจากวงด้วยการชนเข้า "ข้างลำตัว" ตอนหัวมันชี้ออกนอกวง แล้วมันจะเดินออกไปเอง', cond:b=>!!(G.sumo&&G.sumo.purchased), reward:{coin:150, rep:2, txt:'จำนวนหงอน = ความเร็วพุ่ง · ขนาดหงอน = ระยะเวลาพุ่ง · ตัวยาวโดนแตะข้างง่าย'}, btn:['#shop .item[data-k="tank_sumo"]','#floorBuildDock .decorTabs [data-cat="ตู้เลี้ยง"]','#mBuild'],
+   force:()=>{ try{ if(G.sumo&&G.sumo.purchased&&!G.sumo.offer&&!G.sumo.active) G.sumo.nextAt=Date.now(); }catch(e){} }},
  ];
 
  // Stable IDs preserve earned rewards when tutorial order changes.
@@ -288,7 +292,7 @@
  let _ptr=null,_ptrRAF=0,_ptrTok=null;
  function ensurePtr(){ if(_ptr&&document.body.contains(_ptr))return; _ptr=document.createElement('div'); _ptr.id='questPointer'; _ptr.textContent='▼'; document.body.appendChild(_ptr); }
  function tankOverlayOn(){ const ov=document.getElementById('ov'); return !!(ov&&ov.classList.contains('on')); }
- const isContest=o=>!!(o&&o.def&&(o.def.race||o.def.tug||o.def.eat||o.def.throwing));
+ const isContest=o=>!!(o&&o.def&&(o.def.race||o.def.tug||o.def.eat||o.def.throwing||o.def.sumo));
  function canvasTarget(tok){
   const objs=G.objs||[];
   if(tok==='counter')   return objs.find(o=>o&&o._key==='counter');

@@ -67,12 +67,28 @@ const Research=(()=>{
   return kind==='breeder'?(1-breederDiscount())*shop:shop;
  }
 
- /* ---------- อ่านลักษณะทากจากยีนกำเนิด ---------- */
+ /* ---------- อ่านลักษณะทากจากยีนกำเนิด ----------
+    ⚠️ 2026-09-21 ผู้เล่นกำหนด: สีต้องเข้าเป้า ±COLOR_TOL "ไม่ใช่ชื่อสีตรงกันก็พอ"
+       เดิมตัดสินด้วย SlugEngine.colorName() ซึ่งปัดเข้าหาหลักสีที่ใกล้สุด (หลักห่างกัน 50)
+       = ยอมรับกว้างถึง ±25 · ทาก 278 กับ 322 ชื่อ "เขียวมิ้นต์" เหมือนกันแต่สีต่างกันชัด
+       ตอนนี้เทียบ "ตัวเลขยีน" ตรง ๆ กับหลักสี (ดำ 0 · ม่วง 50 · แดง 100 … ทอง 400)
+       ตัวเลขนี้คือค่าเดียวกับช่อง "สีลำตัว / สีหงอนเหงือก" บนการ์ดยีน ผู้เล่นเทียบเองได้
+    ⚠️ จำนวนหงอนต้องตรงเป๊ะ (ผู้เล่นย้ำ 2026-09-21) — nGill เป็นค่าไม่ต่อเนื่อง 2/3/5/6/8/9 อยู่แล้ว */
+ const COLOR_TOL=10;
  const genesOf=s=>(s&&s.genes)||{};
+ const _colorGene={};
+ function colorGene(name){                       // ชื่อสี → เลขยีนของหลักสีนั้น (อ่านจากตารางของเอนจิน ไม่ฮาร์ดโค้ดซ้ำ)
+  if(name in _colorGene)return _colorGene[name];
+  const a=((SlugEngine&&SlugEngine.BODY_ANCH)||[]).find(x=>x.n===name);
+  return (_colorGene[name]=a?a.g:null);
+ }
+ const nearColor=(v,name)=>{const g=colorGene(name);return g!=null&&Number.isFinite(v)&&Math.abs(v-g)<=COLOR_TOL;};
  function bodyName(s){try{return SlugEngine.colorName(genesOf(s).mainC);}catch(e){return '';}}
  function gillName(s){try{return SlugEngine.colorName(genesOf(s).accC);}catch(e){return '';}}
  function gillCount(s){try{return SlugEngine.derived(genesOf(s)).nGill;}catch(e){return null;}}
- const matches=(s,req)=>(!req.body||bodyName(s)===req.body)&&(!req.gill||gillName(s)===req.gill)&&(!req.gills||gillCount(s)===req.gills);
+ const matches=(s,req)=>(!req.body||nearColor(genesOf(s).mainC,req.body))
+                      &&(!req.gill||nearColor(genesOf(s).accC,req.gill))
+                      &&(!req.gills||gillCount(s)===req.gills);
 
  /* สีตัวอย่างสำหรับป้ายสี — ใช้โทนกลาง (M) จากตารางเดียวกับที่เอนจินย้อมทากจริง */
  function swatch(name,gill){
@@ -154,6 +170,7 @@ const Research=(()=>{
  #researchView header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 22px;background:#1c3639;border-bottom:1px solid #d8bd7a38}
  #researchView h2{margin:0;font-size:21px;font-weight:600}#researchView header small{display:block;color:#c2ac80;font-size:11px}
  #researchView .rsBody{padding:14px 22px 22px;overflow:auto;max-height:calc(92dvh - 64px)}
+ #researchView .rsRule{font-size:12px;line-height:1.7;color:#a7bdb8;border-left:3px solid #c9a35f;padding:2px 0 2px 10px;margin-bottom:12px}
  #researchView .rsNow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
  #researchView .rsNow b{background:#20383a;border:1px solid #4d6360;border-radius:999px;padding:5px 13px;font-size:12px;font-weight:500;color:#e9d7a6}
  #researchView .rsLine{border:1px solid #50605f;border-radius:13px;padding:13px 15px;margin-bottom:14px;background:#142b2e}
@@ -196,10 +213,12 @@ const Research=(()=>{
   el.className=g.take.length>=req.n?'ok':'miss';
   if(req.body)el.append(dot(req.body,false));
   if(req.gill)el.append(dot(req.gill,true));
+  /* ต้องโชว์ "เลขยีน ±10" ด้วย ไม่ใช่แค่ชื่อสี — ชื่อสีบนการ์ดยีนกว้างกว่าเกณฑ์นี้
+     ถ้าโชว์แค่ "เขียวมิ้นต์" ผู้เล่นจะงงว่าทำไมตัวที่การ์ดเขียนว่าเขียวมิ้นต์กลับไม่ถูกนับ */
   const text=[];
-  if(req.body)text.push('ตัว'+req.body);
-  if(req.gill)text.push('หงอน'+req.gill);
-  if(req.gills)text.push('หงอน '+req.gills+' ก้าน');
+  if(req.body)text.push('สีตัว '+req.body+' '+colorGene(req.body)+'±'+COLOR_TOL);
+  if(req.gill)text.push('สีหงอน '+req.gill+' '+colorGene(req.gill)+'±'+COLOR_TOL);
+  if(req.gills)text.push('หงอน '+req.gills+' ก้านเป๊ะ');
   const b=document.createElement('b');b.style.fontWeight='500';
   b.textContent=(text.join(' · ')||'ทากตัวไหนก็ได้')+' — '+Math.min(g.have,req.n)+'/'+req.n+' ตัว';
   el.append(b);return el;
@@ -214,6 +233,9 @@ const Research=(()=>{
   head.append(close);dialog.append(head);
 
   const body=document.createElement('div');body.className='rsBody';dialog.append(body);
+  const rule=document.createElement('div');rule.className='rsRule';
+  rule.textContent='เกณฑ์: เทียบ "ยีนกำเนิด" (ไม่รวมบัฟอาหาร) · สียอมรับ ±'+COLOR_TOL+' จากเลขหลักสี — ดูเลขได้ที่ช่องสีลำตัว/สีหงอนบนการ์ดยีน · จำนวนหงอนต้องตรงเป๊ะ · ทากที่กดถูกใจ ♥ ไม่ถูกนับและไม่ถูกใช้';
+  body.append(rule);
   const now=document.createElement('div');now.className='rsNow';
   const cap=typeof breederMax==='function'?breederMax():5;
   for(const text of ['เพดานตู้เพาะพันธุ์ '+cap+' ตู้',
@@ -259,7 +281,8 @@ const Research=(()=>{
       for(const e of p2.take){
        const li=document.createElement('li');
        const nm=typeof SlugBrowser==='object'&&SlugBrowser.name?SlugBrowser.name(e.slug):e.slug.id;
-       li.textContent=nm+' — ตัว'+bodyName(e.slug)+' · หงอน'+gillName(e.slug)+' '+gillCount(e.slug)+' ก้าน · '+(e.tank?e.tank.def.name:'คลังทาก');
+       const g=genesOf(e.slug);
+       li.textContent=nm+' — ตัว'+bodyName(e.slug)+' ('+g.mainC+') · หงอน'+gillName(e.slug)+' ('+g.accC+') '+gillCount(e.slug)+' ก้าน · '+(e.tank?e.tank.def.name:'คลังทาก');
        ul.append(li);
       }
       const row2=document.createElement('div');row2.className='row';
