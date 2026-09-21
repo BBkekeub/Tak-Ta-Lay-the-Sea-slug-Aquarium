@@ -352,6 +352,7 @@ function customerCount(){let n=0;for(const p of PEOPLE)if(isCustomer(p))n++;retu
 function challengerCount(){let n=0;for(const p of PEOPLE)if(isChallenger(p))n++;return n;}
 function traderCount(){let n=0;for(const p of PEOPLE)if(isTrader(p))n++;return n;}
 const CHALLENGER_MAX=10, TRADER_MAX=2;          // เพดานของแต่ละถัง (ไม่เกี่ยวกับความจุลูกค้า)
+const ENTRY_FEE=1;                              // ⚙️ ค่าเข้าร้าน ลูกค้าคนละกี่ทอง (ผู้เล่นกำหนด 2026-09-21)
 function challengerRoom(){return Math.max(0,CHALLENGER_MAX-challengerCount());}
 function traderRoom(){return Math.max(0,TRADER_MAX-traderCount());}
 function visitorAttraction(){const slug=G.objs.reduce((n,o)=>n+(o.type==='tank'&&Array.isArray(o.slugs)?o.slugs.length*(typeof tankAttractionFactor==='function'?tankAttractionFactor(o):1):0),0);const deco=G.objs.reduce((n,o)=>n+((o.type==='deco'&&o._key!=='counter'&&o.def&&Number.isFinite(o.def.attr))?o.def.attr:0),0);const tankDeco=G.objs.reduce((n,o)=>n+((o.type==='tank'&&Array.isArray(o.decor))?o.decor.length*0.5:0),0);return Math.round((slug+deco+tankDeco)*10)/10;}
@@ -853,6 +854,15 @@ function stepPeopleSlice(dt){
     const p = PEOPLE[i];
     p._stepX=p.x;p._stepY=p.y;
     if(!personEntered(p)) continue;                  // ยังไม่ถึงคิวเข้าประตู (DOOR_GAP)
+    /* ค่าเข้าร้าน คนละ ENTRY_FEE ทอง จ่ายตอนเดินพ้นประตูเข้ามาจริง (ผู้เล่นกำหนด 2026-09-21)
+       ธง _paidEntry กันจ่ายซ้ำ · คนหนึ่งคนจ่ายครั้งเดียวต่อการเข้าร้านหนึ่งรอบ
+       นับเฉพาะ "ลูกค้า" — ผู้ท้าแข่งกับพ่อค้ามาทำธุระ ไม่ใช่คนมาเที่ยวร้าน จึงไม่เก็บ
+       (รายได้ก้อนนี้เข้าสถิติเองอยู่แล้ว เพราะ econ-stats.js อ่านส่วนต่างของ G.coin) */
+    if(!p._paidEntry&&isCustomer(p)){
+      p._paidEntry=true;
+      addCoin(ENTRY_FEE);
+      if(typeof CostPop!=='undefined')CostPop.at(p.x,p.y,ENTRY_FEE);
+    }
     p.t += dt; p.idle += dt;
     stepPersonLife(p,dt);
     p.motion *= Math.exp(-dt*12);
