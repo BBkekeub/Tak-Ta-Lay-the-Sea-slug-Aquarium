@@ -208,12 +208,16 @@ function facePatShop(name, texCm, a, b, zt){
    pattern แคชแยกต่อไฟล์ภาพ (ใช้ชุดเดียวกับ matImage() ใน materials.js
    จึงไม่โหลดภาพซ้ำกับตอนมองผ่านกระจกตู้ใน tank-view.js) */
 const _floorPatCache={}, _wallPatCache={};
+/* วัสดุสีเรียบ (ไม่มีไฟล์ภาพ เช่น ขาวล้วนที่เป็นค่าเริ่มต้น) — คืน flat ไปให้เติมสีตรง ๆ
+   ต้องเช็กก่อน matImage() เสมอ ไม่งั้นจะไปเรียกโหลดภาพจาก undefined */
 function floorMatPatFor(m){
+  if(m&&m.color) return {flat:m.color, m};
   const img=matImage(m.file); if(!img) return null;
   let pat=_floorPatCache[m.file]; if(!pat) pat=_floorPatCache[m.file]=ctx.createPattern(img,'repeat');
   return {pat, img, m};
 }
 function wallMatPatFor(m){
+  if(m&&m.color) return {flat:m.color, m};
   const img=matImage(m.file); if(!img) return null;
   let pat=_wallPatCache[m.file]; if(!pat) pat=_wallPatCache[m.file]=ctx.createPattern(img,'repeat');
   return {pat, img, m};
@@ -228,7 +232,8 @@ function drawFloorTile(bx,by,m){
   const r=floorMatPatFor(m), W=bx*SUB,H=by*SUB;
   const q=[P(W,H),P(W+SUB,H),P(W+SUB,H+SUB),P(W,H+SUB)];
   ctx.beginPath(); q.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.closePath();
-  if(r && r.pat.setTransform && typeof DOMMatrix!=='undefined'){
+  if(r && r.flat){ ctx.fillStyle=r.flat; }
+  else if(r && r.pat.setTransform && typeof DOMMatrix!=='undefined'){
     const {pat, img}=r;
     const T=img.naturalWidth/(m.cm/CM_PER_CELL), z=cam.zoom, o=P(0,0,0);
     pat.setTransform(new DOMMatrix([TW*z/T, TH*z/T, -TW*z/T, TH*z/T, o.x, o.y]));
@@ -248,7 +253,8 @@ function drawWall(a, b, tint, wallKeyId, z0=0, z1=ROOM_H){
   ctx.beginPath(); q.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.closePath();
   const r=wallMatPatFor(wallKeyId!=null ? wallMatAt(wallKeyId) : currentWallMat());
   const top=P(a[0],a[1],ROOM_H), topE=P(b[0],b[1],ROOM_H), bottom=P(a[0],a[1],0);
-  if(r && r.pat.setTransform && typeof DOMMatrix!=='undefined'){
+  if(r && r.flat){ ctx.fillStyle=r.flat; }
+  else if(r && r.pat.setTransform && typeof DOMMatrix!=='undefined'){
     const {pat, img, m}=r;
     const T=img.naturalWidth/(m.cm/CM_PER_CELL);   // px เท็กซ์เจอร์ ต่อ 1 ช่องเล็ก
     const L=Math.hypot(b[0]-a[0], b[1]-a[1])||1;
@@ -952,6 +958,17 @@ cv.addEventListener('wheel', e=>{
   cam.x += wB.X-wA.X; cam.y += wB.Y-wA.Y;
 }, {passive:false});
 
+/* สองนิ้วซูมหน้าร้าน — ใช้เพดาน/พื้นเดียวกับล้อเมาส์ และยึดจุดกึ่งกลางสองนิ้วแบบเดียวกัน */
+if(typeof PinchZoom!=='undefined')PinchZoom.attach(cv,{
+  zoom:()=>cam.zoom,
+  apply:(z,cx,cy)=>{
+    const before=pick(cx,cy);
+    cam.zoom=Math.max(0.3*phoneZoomOutScale(), Math.min(3, z));
+    const after=pick(cx,cy);
+    const wB=worldOf(before.cx,before.cy), wA=worldOf(after.cx,after.cy);
+    cam.x += wB.X-wA.X; cam.y += wB.Y-wA.Y;
+  }
+});
 function fitCamera(){
   const c=worldOf(cellsW()/2, cellsH()/2); cam.x=c.X; cam.y=c.Y;
   const wSpan=(cellsW()+cellsH())*TW, hSpan=(cellsW()+cellsH())*TH;

@@ -103,7 +103,9 @@
   for(const opt of FLOOR_MATERIALS){
    const b=document.createElement('button');b.type='button';b.className='matSwatch';b.title=opt.label;
    b.setAttribute('aria-pressed',String(opt.id===TilePaint.current()));
-   const thumb=document.createElement('span');thumb.className='thumb';thumb.style.backgroundImage='url("'+opt.file+'")';
+   /* วัสดุสีเรียบ (ขาวล้วน) ไม่มีไฟล์ภาพ — โชว์เป็นสีพื้นแทน ไม่งั้นจะได้ url("undefined") */
+   const thumb=document.createElement('span');thumb.className='thumb';
+   if(opt.color)thumb.style.background=opt.color;else thumb.style.backgroundImage='url("'+opt.file+'")';
    const name=document.createElement('b');name.textContent=opt.label;
    b.append(thumb,name);
    b.onclick=()=>{TilePaint.pick(opt.id);for(const [o,el] of swatches)el.setAttribute('aria-pressed',String(o.id===TilePaint.current()));};

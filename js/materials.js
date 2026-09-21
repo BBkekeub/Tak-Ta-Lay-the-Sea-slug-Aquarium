@@ -38,15 +38,26 @@ const ALL_MORE_TEXTURES = [
   {id:'painted-plank',            label:'ไม้กระดานทาสี',         file:'assets/textures/More/painted-wooden-plank-textured-backdrop.jpg',   cm:160},
   {id:'retro-gray-wood',          label:'ไม้เรโทรเทา',           file:'assets/textures/More/retro-gray-wooden-textured-background.jpg',   cm:180},
 ];
-// พื้น: ใช้แกรนิตดำเป็นลายเริ่มต้น (ตัวแรก) แล้วตามด้วยลายอื่นๆ ทั้งหมด
+/* ⚠️ 2026-09-20 ผู้เล่น: "สีเริ่มต้นของผนังให้เป็นสีขาว และพื้นให้เป็นสีขาว · ฝังลงไฟล์เกมเลยจะได้โหลดไว"
+   วัสดุตัวนี้ไม่มีไฟล์ภาพ — ใช้ color เติมสีเรียบ ๆ ตรง ๆ
+   เดิมค่าเริ่มต้นคือ แกรนิตดำ (พื้น) + หินอ่อนขาว (ผนัง) ซึ่งเป็น .jpg ทั้งคู่
+   เท่ากับเปิดเกมมาต้องรอโหลด 2 ไฟล์ก่อนถึงจะเห็นห้องเป็นรูปเป็นร่าง
+   ตอนนี้ค่าเริ่มต้นวาดได้ทันทีตั้งแต่เฟรมแรก ไม่มี fetch ไม่มี decode
+   ⚠️ ตัวที่มี color ต้องไม่ถูกส่งเข้า matImage()/createPattern() — ฝั่งที่วาดเช็ก .color ก่อนเสมอ
+      (shop-floor.js floorMatPatFor/wallMatPatFor · tank-view.js roomPat · tank-decor-ui.js ปุ่มตัวอย่าง)
+   ลายอื่นทั้งหมดยังอยู่ครบ ผู้เล่นทาทับได้เหมือนเดิม เปลี่ยนแค่ "ค่าเริ่มต้น" */
+const PLAIN_WHITE = {id:'plain-white', label:'ขาวล้วน (ไม่มีลาย)', color:'#ffffff', cm:120};
+
+// พื้น: ขาวล้วนเป็นค่าเริ่มต้น (ตัวแรก) แล้วตามด้วยลายอื่นๆ ทั้งหมด
 const FLOOR_MATERIALS = [
+  PLAIN_WHITE,
   ...ALL_MORE_TEXTURES
 ];
 
-// กำแพง: สลับเอาหินอ่อนขาวขึ้นเป็นลายเริ่มต้น (ตัวแรก) แล้วตามด้วยลายอื่นๆ ทั้งหมด
+// กำแพง: ขาวล้วนเป็นค่าเริ่มต้น (ตัวแรก) แล้วตามด้วยลายอื่นๆ ทั้งหมด
 const WALL_MATERIALS = [
-  ALL_MORE_TEXTURES.find(m => m.id === 'marble'),
-  ...ALL_MORE_TEXTURES.filter(m => m.id !== 'marble')
+  PLAIN_WHITE,
+  ...ALL_MORE_TEXTURES
 ];
 
 function floorMatDef(id){ return FLOOR_MATERIALS.find(m=>m.id===id) || FLOOR_MATERIALS[0]; }

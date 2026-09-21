@@ -325,6 +325,7 @@ function tankRoomMats(o){
 }
 const _bgPats=new Map();          // ไฟล์ภาพ → pattern (ภาพโหลดผ่าน matImage() ชุดเดียวกับหน้าร้าน ไม่โหลดซ้ำ)
 function roomPat(ctx, m){
+  if(m&&m.color) return {flat:m.color, m};   // วัสดุสีเรียบ (ขาวล้วน) — ไม่มีไฟล์ให้โหลด
   const img=matImage(m.file); if(!img) return null;
   let pat=_bgPats.get(m.file); if(!pat){ pat=ctx.createPattern(img,'repeat'); _bgPats.set(m.file,pat); }
   return (pat && pat.setTransform && typeof DOMMatrix!=='undefined') ? {pat,img,m} : null;
@@ -336,11 +337,19 @@ function drawRoomFloor(ctx){
   const fw=curTank.def.w, fh=curTank.def.h, zf=-STAND_CELLS;
   const q=[ S(-FLOOR_SIDE, fh+FLOOR_BACK, zf), S(fw+FLOOR_SIDE, fh+FLOOR_BACK, zf),
             S(fw+FLOOR_SIDE, -FLOOR_BACK, zf), S(-FLOOR_SIDE, -FLOOR_BACK, zf) ];
-  const T=img.naturalWidth/(m.cm/CM_PER_CELL), o=S(0,0,zf);
-  const ux=S(1,0,zf),uy=S(0,1,zf);
-  pat.setTransform(new DOMMatrix([(ux.x-o.x)/T,(ux.y-o.y)/T,(uy.x-o.x)/T,(uy.y-o.y)/T,o.x,o.y]));
+  const o=S(0,0,zf);
+  /* วัสดุสีเรียบ (ขาวล้วน) เติมสีตรง ๆ · วัสดุที่มีลายค่อยตั้ง pattern
+     ⚠️ ไล่แสง/บัวเชิงผนังด้านล่างต้องทำงานกับทั้งสองแบบ ห้ามยกเข้ามาในสาขาใดสาขาหนึ่ง
+        ไม่งั้นพื้นขาวจะแบนสนิท ไม่เข้ากับผนังที่ยังมีไล่แสงอยู่ */
   ctx.beginPath(); q.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.closePath();
-  ctx.fillStyle=pat; ctx.fill();
+  if(r.flat) ctx.fillStyle=r.flat;
+  else{
+    const T=img.naturalWidth/(m.cm/CM_PER_CELL);
+    const ux=S(1,0,zf),uy=S(0,1,zf);
+    pat.setTransform(new DOMMatrix([(ux.x-o.x)/T,(ux.y-o.y)/T,(uy.x-o.x)/T,(uy.y-o.y)/T,o.x,o.y]));
+    ctx.fillStyle=pat;
+  }
+  ctx.fill();
   /* ไล่แสง: ไกล(บน)จมมืดกลืนกับผนัง ใกล้(ล่าง)สว่างขึ้นเล็กน้อยเหมือนมีไฟจากเพดาน */
   const gy0=Math.min(q[0].y,q[1].y), gy1=Math.max(q[2].y,q[3].y);
   const g=ctx.createLinearGradient(0,gy0,0,gy1);
@@ -350,6 +359,7 @@ function drawRoomFloor(ctx){
   ctx.strokeStyle='rgba(190,205,212,0.16)'; ctx.lineWidth=1.5;   // บัวเชิงผนัง
   ctx.beginPath(); ctx.moveTo(q[0].x,q[0].y); ctx.lineTo(q[1].x,q[1].y); ctx.stroke();
 }
+
 let _bgC=null, _bgX=null, _bgKey='';
 function drawTankBg(ctx){                 // แคชไว้ เปลี่ยนเฉพาะตอนกล้องขยับ/จอเปลี่ยนขนาด/วัสดุเปลี่ยน/ภาพโหลดเสร็จ
   /* ⚠️ แคนวาสกว้าง/สูง 0 (เข้าตู้ตอนหน้าต่างยังไม่จัดเลย์เอาต์ / ย่อหน้าต่างจนสุด) → drawImage โยน
@@ -372,10 +382,14 @@ function drawTankBg(ctx){                 // แคชไว้ เปลี่�
 function _bgPaint(ctx){
   const r=curTank&&roomPat(ctx, tankRoomMats(curTank).wall); if(!r) return false;
   const {pat,img,m}=r;
-  const z=0.75+0.25*tankCam.zoom;                     // ผนังไกล ซูมมีผลน้อยกว่าตัวตู้
-  const s=(m.cm*BG_PX_PER_CM*z)/img.naturalWidth;     // ลายใหญ่เท่าของจริง (วัสดุแต่ละตัวบอกขนาดผืนเป็น ซม.)
-  pat.setTransform(new DOMMatrix([s,0,0,s, tankCam.ox*BG_PARALLAX, tankCam.oy*BG_PARALLAX]));
-  ctx.fillStyle=pat; ctx.fillRect(0,0,TCW,TCH);
+  if(r.flat) ctx.fillStyle=r.flat;                    // ผนังสีเรียบ (ขาวล้วน) — ไม่มีลายให้สเกล
+  else{
+    const z=0.75+0.25*tankCam.zoom;                   // ผนังไกล ซูมมีผลน้อยกว่าตัวตู้
+    const s=(m.cm*BG_PX_PER_CM*z)/img.naturalWidth;   // ลายใหญ่เท่าของจริง (วัสดุแต่ละตัวบอกขนาดผืนเป็น ซม.)
+    pat.setTransform(new DOMMatrix([s,0,0,s, tankCam.ox*BG_PARALLAX, tankCam.oy*BG_PARALLAX]));
+    ctx.fillStyle=pat;
+  }
+  ctx.fillRect(0,0,TCW,TCH);
   drawRoomFloor(ctx);                                 // พื้นจริงของร้านทับครึ่งล่าง = ตู้มีที่ยืน
   const g=ctx.createLinearGradient(0,0,0,TCH);        // บนสว่างอมทอง ล่างจมมืด
   g.addColorStop(0,'rgba(255,236,205,0.05)');
@@ -2210,3 +2224,17 @@ tankCv.addEventListener('wheel', e=>{
   tankCam.oy = my - r*(my - tankCam.oy);
   clampTankPan();                               // ซูมออกสุด = ตู้เต็มจอพอดี ไม่มีที่ให้แพนหลุด
 }, {passive:false});
+/* สองนิ้วซูมในตู้ — เส้นทางเดียวกับล้อเมาส์ด้านบนเป๊ะ (เพดาน/พื้น · ยึดจุด · แคชตอนซูม · กันแพนหลุด) */
+if(typeof PinchZoom!=='undefined')PinchZoom.attach(tankCv,{
+  active:()=>!!curTank,
+  zoom:()=>tankCam.zoom,
+  apply:(z,mx,my)=>{
+    const z0=tankCam.zoom, R=tankZoomRange();
+    tankCam.zoom=Math.max(R.min, Math.min(R.max, z));
+    _zoomBusyT = performance.now() + 180;
+    const r=tankCam.zoom/z0;
+    tankCam.ox = mx - r*(mx - tankCam.ox);
+    tankCam.oy = my - r*(my - tankCam.oy);
+    clampTankPan();
+  }
+});

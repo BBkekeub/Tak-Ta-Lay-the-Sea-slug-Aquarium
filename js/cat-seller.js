@@ -262,7 +262,8 @@ function renderComputer(){
   +'<button class="tbtn" data-offers>ข้อเสนอหน้าร้าน ('+TRADE_OFFERS.length+')</button>'
   +'<button class="tbtn" data-orderbox>🛒 สั่งซื้อกล่องทาก'+(typeof slugDeliveryReadyCount==='function'&&slugDeliveryReadyCount()?' · 📦'+slugDeliveryReadyCount():'')+'</button>'
   +'<button class="tbtn" data-market>🌐 ตลาดโลก</button>'
-  +'<button class="tbtn" data-codex>📓 สมุดสายพันธุ์'+(typeof slugCodexCount==='function'?' ('+slugCodexCount()+'/486)':'')+'</button>'
+  /* 📓 สมุดสายพันธุ์ ย้ายไปอยู่หน้า "⚙ ตั้งค่า" แล้ว (ผู้เล่นสั่ง 2026-09-20) — ดู context-ui.js #navCodex
+     ไม่เก็บปุ่มไว้ที่นี่ด้วย เพราะสองทางเข้าไปหน้าเดียวกันทำให้หาไม่เจอทั้งคู่ */
   +'</div>'
   +(computerTab==='log'
     ?'<div style="max-height:52vh;overflow:auto" data-log></div>'
@@ -300,7 +301,7 @@ function renderComputer(){
  computerDialog.querySelector('[data-offers]').onclick=()=>{computerDialog.close();const b=document.getElementById('navOffers');if(b&&b.getAttribute('aria-expanded')!=='true')b.click();renderTradeOffers(true);};
  computerDialog.querySelector('[data-orderbox]').onclick=()=>{computerDialog.close();if(typeof openSlugShopDialog==='function')openSlugShopDialog();};
  computerDialog.querySelector('[data-market]').onclick=()=>{computerDialog.close();if(typeof openWorldMarket==='function')openWorldMarket();};
- computerDialog.querySelector('[data-codex]').onclick=()=>{computerDialog.close();if(typeof openSlugCodex==='function')openSlugCodex();};
+ // (ปุ่มสมุดสายพันธุ์ย้ายไปหน้าตั้งค่าแล้ว — ไม่มี [data-codex] ในหน้านี้อีก)
 }
 computerDialog.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape'){e.preventDefault();computerDialog.close();}},true);
 let computerPointer=null;

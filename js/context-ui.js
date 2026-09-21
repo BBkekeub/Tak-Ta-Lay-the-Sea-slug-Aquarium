@@ -26,7 +26,16 @@
  for(const s of sections){for(const p of s.querySelectorAll(':scope > p:not(#shopStatus):not(#doorPosition):not(#shelfStatus)'))p.hidden=true;}
  document.querySelector('.brand small')?.remove();
  const settings=document.createElement('div');settings.className='sec';settings.dataset.panel='settings';settings.innerHTML='<h2>ตั้งค่า</h2>';rail.append(settings);
- for(const id of ['bMusic','bAnim','bFit'])settings.append(document.getElementById(id));
+ /* ⚠️ 2026-09-20 ผู้เล่น: "หน้าปรับ 2D/3D ตัวทาก · สมุดบันทึกทาก ให้ย้ายไปอยู่ในหน้า setting"
+    bSlug3D เดิมอยู่บนแถบบนสุด (index.html) — ย้ายทั้งปุ่มมาเลย ไม่ได้สร้างใหม่
+    ตัวสลับ 2D/3D ยังผูก onclick ไว้ใน slug-3d-toggle.js เหมือนเดิม ย้ายที่อยู่อย่างเดียว */
+ for(const id of ['bMusic','bAnim','bFit','bSlug3D'])settings.append(document.getElementById(id));
+ /* สมุดบันทึกสายพันธุ์ — เดิมเปิดได้จากคอมพิวเตอร์ร้านที่เดียว ย้ายมาไว้ในตั้งค่าตามที่ผู้เล่นสั่ง */
+ const codexBtn=document.createElement('button');codexBtn.className='tbtn';codexBtn.id='navCodex';
+ const codexLabel=()=>'📓 สมุดบันทึกทาก'+(typeof slugCodexCount==='function'?' ('+slugCodexCount()+'/486)':'');
+ codexBtn.textContent=codexLabel();
+ codexBtn.onclick=()=>{if(typeof openSlugCodex==='function')openSlugCodex();else toast('สมุดบันทึกยังโหลดไม่เสร็จ','bad');};
+ settings.append(codexBtn);
  const volume=document.createElement('div');volume.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:10px';
  volume.innerHTML='<span>ระดับเสียงเพลง</span><button class="tbtn" id="musicQuieter" aria-label="ลดเสียงเพลง">−</button><output id="musicVolume" aria-live="polite" style="min-width:42px;text-align:center"></output><button class="tbtn" id="musicLouder" aria-label="เพิ่มเสียงเพลง">＋</button>';
  document.getElementById('bMusic').after(volume);
@@ -47,6 +56,8 @@
    active=name;for(const s of rail.querySelectorAll(':scope > .sec'))s.hidden=s.dataset.panel!==name;
    rail.hidden=!name;
    for(const [key,b] of buttons){const on=key===name||(key==='inventory'&&STORAGE.includes(name));b.classList.toggle('on',on);b.setAttribute('aria-expanded',String(on));}
+   /* จำนวนช่องในสมุดเพิ่มขึ้นเรื่อย ๆ ระหว่างเล่น — อัปเดตป้ายตอนเปิดแผง ไม่ใช่ทุกเฟรม */
+   if(name==='settings'&&codexBtn.textContent!==codexLabel())codexBtn.textContent=codexLabel();
    tabs.hidden=!STORAGE.includes(name);
    for(const t of tabs.children)t.classList.toggle('on',t.dataset.tab===name);
    window.dispatchEvent(new Event('resize'));
