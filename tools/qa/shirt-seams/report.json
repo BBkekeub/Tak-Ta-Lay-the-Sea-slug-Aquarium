@@ -1,0 +1,2667 @@
+{
+  "Before": [
+    {
+      "arms": [
+        {
+          "side": -1,
+          "shoulder": [
+            -0.09898,
+            -0.012570000000000001,
+            0.7828111749720716
+          ],
+          "elbow": [
+            -0.13478667758919236,
+            -0.06841308316935295,
+            0.6076419454920038
+          ],
+          "hand": [
+            -0.0648,
+            0.052000000000000005,
+            0.5600807749720715
+          ],
+          "upper": 0.1873094419789785,
+          "lower": 0.14717170441205452
+        },
+        {
+          "side": 1,
+          "shoulder": [
+            0.09898,
+            -0.013659999999999999,
+            0.7828111749720716
+          ],
+          "elbow": [
+            0.13413427296374503,
+            -0.06892233662603604,
+            0.6073193372910721
+          ],
+          "hand": [
+            0.0648,
+            0.052,
+            0.5600807749720715
+          ],
+          "upper": 0.18731559958965807,
+          "lower": 0.14717654253473134
+        }
+      ],
+      "tank": {
+        "x0": -0.09,
+        "x1": 0.09,
+        "y0": 0.082,
+        "y1": 0.172,
+        "z0": 0.5778807749720716,
+        "z1": 0.6978807749720717
+      },
+      "triangles": 3046
+    },
+    {
+      "arms": [
+        {
+          "side": -1,
+          "shoulder": [
+            -0.09898,
+            -0.012570000000000001,
+            0.7828111749720716
+          ],
+          "elbow": [
+            -0.13478667758919236,
+            -0.06841308316935295,
+            0.6076419454920038
+          ],
+          "hand": [
+            -0.0648,
+            0.052000000000000005,
+            0.5600807749720715
+          ],
+          "upper": 0.1873094419789785,
+          "lower": 0.14717170441205452
+        },
+        {
+          "side": 1,
+          "shoulder": [
+            0.09898,
+            -0.013659999999999999,
+            0.7828111749720716
+          ],
+          "elbow": [
+            0.13413427296374503,
+            -0.06892233662603604,
+            0.6073193372910721
+          ],
+          "hand": [
+            0.0648,
+            0.052,
+            0.5600807749720715
+          ],
+          "upper": 0.18731559958965807,
+          "lower": 0.14717654253473134
+        }
+      ],
+      "tank": {
+        "x0": -0.09,
+        "x1": 0.09,
+        "y0": 0.082,
+        "y1": 0.172,
+        "z0": 0.5778807749720716,
+        "z1": 0.6978807749720717
+      },
+      "triangles": 3048
+    },
+    {
+      "arms": [
+        {
+          "side": -1,
+          "shoulder": [
+            -0.09898,
+            -0.012570000000000001,
+            0.7828111749720716
+          ],
+          "elbow": [
+            -0.13478667758919236,
+            -0.06841308316935295,
+            0.6076419454920038
+          ],
+          "hand": [
+            -0.0648,
+            0.052000000000000005,
+            0.5600807749720715
+          ],
+          "upper": 0.1873094419789785,
+          "lower": 0.14717170441205452
+        },
+        {
+          "side": 1,
+          "shoulder": [
+            0.09898,
+            -0.013659999999999999,
+            0.7828111749720716
+          ],
+          "elbow": [
+            0.13413427296374503,
+            -0.06892233662603604,
+            0.6073193372910721
+          ],
+          "hand": [
+            0.0648,
+            0.052,
+            0.5600807749720715
+          ],
+          "upper": 0.18731559958965807,
+          "lower": 0.14717654253473134
+        }
+      ],
+      "tank": {
+        "x0": -0.09,
+        "x1": 0.09,
+        "y0": 0.082,
+        "y1": 0.172,
+        "z0": 0.5778807749720716,
+        "z1": 0.6978807749720717
+      },
+      "triangles": 3048
+    },
+    {
+      "arms": [
+        {
+          "side": -1,
+          "shoulder": [
+            -0.09898,
+            -0.012570000000000001,
+            0.7828111749720716
+          ],
+          "elbow": [
+            -0.13478667758919236,
+            -0.06841308316935295,
+            0.6076419454920038
+          ],
+          "hand": [
+            -0.0648,
+            0.052000000000000005,
+            0.5600807749720715
+          ],
+          "upper": 0.1873094419789785,
+          "lower": 0.14717170441205452
+        },
+        {
+          "side": 1,
+          "shoulder": [
+            0.09898,
+            -0.013659999999999999,
+            0.7828111749720716
+          ],
+          "elbow": [
+            0.13413427296374503,
+            -0.06892233662603604,
+            0.6073193372910721
+          ],
+          "hand": [
+            0.0648,
+            0.052,
+            0.5600807749720715
+          ],
+          "upper": 0.18731559958965807,
+          "lower": 0.14717654253473134
+        }
+      ],
+      "tank": {
+        "x0": -0.09,
+        "x1": 0.09,
+        "y0": 0.082,
+        "y1": 0.172,
+        "z0": 0.5778807749720716,
+        "z1": 0.6978807749720717
+      },
+      "triangles": 3048
+    }
+  ],
+  "After": [
+    {
+      "arms": [
+        {
+          "side": -1,
+          "shoulder": [
+            -0.09898,
+            -0.012570000000000001,
+            0.7828111749720716
+          ],
+          "elbow": [
+            -0.13478667758919236,
+            -0.06841308316935295,
+            0.6076419454920038
+          ],
+          "hand": [
+            -0.0648,
+            0.052000000000000005,
+            0.5600807749720715
+          ],
+          "upper": 0.1873094419789785,
+          "lower": 0.14717170441205452
+        },
+        {
+          "side": 1,
+          "shoulder": [
+            0.09898,
+            -0.013659999999999999,
+            0.7828111749720716
+          ],
+          "elbow": [
+            0.13413427296374503,
+            -0.06892233662603604,
+            0.6073193372910721
+          ],
+          "hand": [
+            0.0648,
+            0.052,
+            0.5600807749720715
+          ],
+          "upper": 0.18731559958965807,
+          "lower": 0.14717654253473134
+        }
+      ],
+      "tank": {
+        "x0": -0.09,
+        "x1": 0.09,
+        "y0": 0.082,
+        "y1": 0.172,
+        "z0": 0.5778807749720716,
+        "z1": 0.6978807749720717
+      },
+      "triangles": 3046
+    },
+    {
+      "arms": [
+        {
+          "side": -1,
+          "shoulder": [
+            -0.09898,
+            -0.012570000000000001,
+            0.7828111749720716
+          ],
+          "elbow": [
+            -0.13478667758919236,
+            -0.06841308316935295,
+            0.6076419454920038
+          ],
+          "hand": [
+            -0.0648,
+            0.052000000000000005,
+            0.5600807749720715
+          ],
+          "upper": 0.1873094419789785,
+          "lower": 0.14717170441205452
+        },
+        {
+          "side": 1,
+          "shoulder": [
+            0.09898,
+            -0.013659999999999999,
+            0.7828111749720716
+          ],
+          "elbow": [
+            0.13413427296374503,
+            -0.06892233662603604,
+            0.6073193372910721
+          ],
+          "hand": [
+            0.0648,
+            0.052,
+            0.5600807749720715
+          ],
+          "upper": 0.18731559958965807,
+          "lower": 0.14717654253473134
+        }
+      ],
+      "tank": {
+        "x0": -0.09,
+        "x1": 0.09,
+        "y0": 0.082,
+        "y1": 0.172,
+        "z0": 0.5778807749720716,
+        "z1": 0.6978807749720717
+      },
+      "triangles": 3048
+    },
+    {
+      "arms": [
+        {
+          "side": -1,
+          "shoulder": [
+            -0.09898,
+            -0.012570000000000001,
+            0.7828111749720716
+          ],
+          "elbow": [
+            -0.13478667758919236,
+            -0.06841308316935295,
+            0.6076419454920038
+          ],
+          "hand": [
+            -0.0648,
+            0.052000000000000005,
+            0.5600807749720715
+          ],
+          "upper": 0.1873094419789785,
+          "lower": 0.14717170441205452
+        },
+        {
+          "side": 1,
+          "shoulder": [
+            0.09898,
+            -0.013659999999999999,
+            0.7828111749720716
+          ],
+          "elbow": [
+            0.13413427296374503,
+            -0.06892233662603604,
+            0.6073193372910721
+          ],
+          "hand": [
+            0.0648,
+            0.052,
+            0.5600807749720715
+          ],
+          "upper": 0.18731559958965807,
+          "lower": 0.14717654253473134
+        }
+      ],
+      "tank": {
+        "x0": -0.09,
+        "x1": 0.09,
+        "y0": 0.082,
+        "y1": 0.172,
+        "z0": 0.5778807749720716,
+        "z1": 0.6978807749720717
+      },
+      "triangles": 3048
+    },
+    {
+      "arms": [
+        {
+          "side": -1,
+          "shoulder": [
+            -0.09898,
+            -0.012570000000000001,
+            0.7828111749720716
+          ],
+          "elbow": [
+            -0.13478667758919236,
+            -0.06841308316935295,
+            0.6076419454920038
+          ],
+          "hand": [
+            -0.0648,
+            0.052000000000000005,
+            0.5600807749720715
+          ],
+          "upper": 0.1873094419789785,
+          "lower": 0.14717170441205452
+        },
+        {
+          "side": 1,
+          "shoulder": [
+            0.09898,
+            -0.013659999999999999,
+            0.7828111749720716
+          ],
+          "elbow": [
+            0.13413427296374503,
+            -0.06892233662603604,
+            0.6073193372910721
+          ],
+          "hand": [
+            0.0648,
+            0.052,
+            0.5600807749720715
+          ],
+          "upper": 0.18731559958965807,
+          "lower": 0.14717654253473134
+        }
+      ],
+      "tank": {
+        "x0": -0.09,
+        "x1": 0.09,
+        "y0": 0.082,
+        "y1": 0.172,
+        "z0": 0.5778807749720716,
+        "z1": 0.6978807749720717
+      },
+      "triangles": 3048
+    }
+  ],
+  "variants": [
+    {
+      "body": "male",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.03323086720672415
+    },
+    {
+      "body": "male",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.03323086720672415
+    },
+    {
+      "body": "male",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.03323086720672415
+    },
+    {
+      "body": "male",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.03323086720672415
+    },
+    {
+      "body": "male",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.039296279435840825
+    },
+    {
+      "body": "male",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.035799156459515424
+    },
+    {
+      "body": "male",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 1.1102230246251565e-16,
+      "elbowOut": 0.039968017018242416
+    },
+    {
+      "body": "male",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.035146943330017
+    },
+    {
+      "body": "male",
+      "build": 1,
+      "motion": 0,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.03580667758919236
+    },
+    {
+      "body": "male",
+      "build": 1,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.03580667758919236
+    },
+    {
+      "body": "male",
+      "build": 1,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.03580667758919236
+    },
+    {
+      "body": "male",
+      "build": 1,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.03580667758919236
+    },
+    {
+      "body": "male",
+      "build": 1,
+      "motion": 1,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.0418934421085107
+    },
+    {
+      "body": "male",
+      "build": 1,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.036496170122678556
+    },
+    {
+      "body": "male",
+      "build": 1,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.042627740038310116
+    },
+    {
+      "body": "male",
+      "build": 1,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 1.1102230246251565e-16,
+      "elbowOut": 0.03582121897812637
+    },
+    {
+      "body": "male",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.036418035353317765
+    },
+    {
+      "body": "male",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.036418035353317765
+    },
+    {
+      "body": "male",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.036418035353317765
+    },
+    {
+      "body": "male",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.036418035353317765
+    },
+    {
+      "body": "male",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 1.1102230246251565e-16,
+      "elbowOut": 0.042363550940361844
+    },
+    {
+      "body": "male",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.03610778670483647
+    },
+    {
+      "body": "male",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.043111025566255
+    },
+    {
+      "body": "male",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.035433757648525716
+    },
+    {
+      "body": "female",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.022608458326405137
+    },
+    {
+      "body": "female",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.022608458326405137
+    },
+    {
+      "body": "female",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.022608458326405137
+    },
+    {
+      "body": "female",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.022608458326405137
+    },
+    {
+      "body": "female",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 1.1102230246251565e-16,
+      "elbowOut": 0.026542482511934237
+    },
+    {
+      "body": "female",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.024962997696861527
+    },
+    {
+      "body": "female",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02663489745222737
+    },
+    {
+      "body": "female",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.024861712586784462
+    },
+    {
+      "body": "female",
+      "build": 1,
+      "motion": 0,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02497029321259779
+    },
+    {
+      "body": "female",
+      "build": 1,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02497029321259779
+    },
+    {
+      "body": "female",
+      "build": 1,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02497029321259779
+    },
+    {
+      "body": "female",
+      "build": 1,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02497029321259779
+    },
+    {
+      "body": "female",
+      "build": 1,
+      "motion": 1,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.029382371979219793
+    },
+    {
+      "body": "female",
+      "build": 1,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.025717050662028604
+    },
+    {
+      "body": "female",
+      "build": 1,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.029496748004497877
+    },
+    {
+      "body": "female",
+      "build": 1,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.02560505869315366
+    },
+    {
+      "body": "female",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02559143286674062
+    },
+    {
+      "body": "female",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02559143286674062
+    },
+    {
+      "body": "female",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02559143286674062
+    },
+    {
+      "body": "female",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02559143286674062
+    },
+    {
+      "body": "female",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.03009437983314585
+    },
+    {
+      "body": "female",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 1.1102230246251565e-16,
+      "elbowOut": 0.025421075371128088
+    },
+    {
+      "body": "female",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.03021607922060142
+    },
+    {
+      "body": "female",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 1.1102230246251565e-16,
+      "elbowOut": 0.025306338047228094
+    },
+    {
+      "body": "male2",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.020716341461802526
+    },
+    {
+      "body": "male2",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.020716341461802526
+    },
+    {
+      "body": "male2",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.020716341461802526
+    },
+    {
+      "body": "male2",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.020716341461802526
+    },
+    {
+      "body": "male2",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.0254510927753355
+    },
+    {
+      "body": "male2",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02002188937053126
+    },
+    {
+      "body": "male2",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02529148064466015
+    },
+    {
+      "body": "male2",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.02017106333614571
+    },
+    {
+      "body": "male2",
+      "build": 1,
+      "motion": 0,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.020165302778346203
+    },
+    {
+      "body": "male2",
+      "build": 1,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.020165302778346203
+    },
+    {
+      "body": "male2",
+      "build": 1,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.020165302778346203
+    },
+    {
+      "body": "male2",
+      "build": 1,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.020165302778346203
+    },
+    {
+      "body": "male2",
+      "build": 1,
+      "motion": 1,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02491913975110363
+    },
+    {
+      "body": "male2",
+      "build": 1,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.020716993372555573
+    },
+    {
+      "body": "male2",
+      "build": 1,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.024747835485782313
+    },
+    {
+      "body": "male2",
+      "build": 1,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.020579864370211906
+    },
+    {
+      "body": "male2",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.019253920177278824
+    },
+    {
+      "body": "male2",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.019253920177278824
+    },
+    {
+      "body": "male2",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.019253920177278824
+    },
+    {
+      "body": "male2",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.019253920177278824
+    },
+    {
+      "body": "male2",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.023907189400871998
+    },
+    {
+      "body": "male2",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.020577536222381343
+    },
+    {
+      "body": "male2",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.02373340333051112
+    },
+    {
+      "body": "male2",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.002000000000000113,
+      "lengthError": 1.1102230246251565e-16,
+      "elbowOut": 0.020432538553167068
+    },
+    {
+      "body": "female2",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.020122281707490183
+    },
+    {
+      "body": "female2",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.020122281707490183
+    },
+    {
+      "body": "female2",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.020122281707490183
+    },
+    {
+      "body": "female2",
+      "build": 0.86,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.020122281707490183
+    },
+    {
+      "body": "female2",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.02382306379927275
+    },
+    {
+      "body": "female2",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0019999999999998908,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.022524048468263336
+    },
+    {
+      "body": "female2",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.02378226696983675
+    },
+    {
+      "body": "female2",
+      "build": 0.86,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0019999999999998908,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.022570968197206387
+    },
+    {
+      "body": "female2",
+      "build": 1,
+      "motion": 0,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.022579495561773952
+    },
+    {
+      "body": "female2",
+      "build": 1,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.022579495561773952
+    },
+    {
+      "body": "female2",
+      "build": 1,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.022579495561773952
+    },
+    {
+      "body": "female2",
+      "build": 1,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.022579495561773952
+    },
+    {
+      "body": "female2",
+      "build": 1,
+      "motion": 1,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.02677290956169645
+    },
+    {
+      "body": "female2",
+      "build": 1,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0019999999999998908,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.023679727644029674
+    },
+    {
+      "body": "female2",
+      "build": 1,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.026719043345629523
+    },
+    {
+      "body": "female2",
+      "build": 1,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0019999999999998908,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.023734459604871527
+    },
+    {
+      "body": "female2",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.023396703248266273
+    },
+    {
+      "body": "female2",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.023396703248266273
+    },
+    {
+      "body": "female2",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.023396703248266273
+    },
+    {
+      "body": "female2",
+      "build": 1.1,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 8.326672684688674e-17,
+      "elbowOut": 0.023396703248266273
+    },
+    {
+      "body": "female2",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 0,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.02770548272509142
+    },
+    {
+      "body": "female2",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0019999999999998908,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.023712795798536468
+    },
+    {
+      "body": "female2",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0020000000000000018,
+      "lengthError": 2.7755575615628914e-17,
+      "elbowOut": 0.027646446647675377
+    },
+    {
+      "body": "female2",
+      "build": 1.1,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "inside": 0,
+      "trianglesInside": 0,
+      "palmGap": 0.0019999999999998908,
+      "lengthError": 5.551115123125783e-17,
+      "elbowOut": 0.023770295522421256
+    }
+  ],
+  "cache": {
+    "reused": true,
+    "offscreenUnchanged": true
+  },
+  "seams": [
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 0,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 0,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 0,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 0,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 0,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 0,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 0,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 0,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "male",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 44,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 0,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 0,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 0,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 0,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 0,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 0,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 0,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 0,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "female",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 41,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 0,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 0,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 0,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 0,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 0,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 0,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 0,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 0,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "male2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 20,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 0,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 0,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 0,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 0,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": false,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 0,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 0,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": false,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 0,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 1.5707963267948966,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 3.141592653589793,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 0,
+      "phase": 4.71238898038469,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 0,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 1.5707963267948966,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 3.141592653589793,
+      "seams": 18,
+      "maxGap": 0
+    },
+    {
+      "body": "female2",
+      "kid": true,
+      "carryTank": true,
+      "motion": 1,
+      "phase": 4.71238898038469,
+      "seams": 18,
+      "maxGap": 0
+    }
+  ],
+  "cost": {
+    "before": {
+      "poseBuildMedianMs": 1.800000011920929,
+      "poseBuildP95Ms": 3,
+      "triangles": 3090
+    },
+    "after": {
+      "poseBuildMedianMs": 2.100000023841858,
+      "poseBuildP95Ms": 3.900000035762787,
+      "triangles": 3090
+    }
+  },
+  "summary": {
+    "cases": 96,
+    "verticesInside": 0,
+    "trianglesInside": 0,
+    "maxLengthError": 1.1102230246251565e-16,
+    "maxElbowOut": 0.043111025566255
+  },
+  "passed": true,
+  "errors": []
+}

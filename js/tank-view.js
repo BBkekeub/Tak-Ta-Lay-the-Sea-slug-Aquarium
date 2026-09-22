@@ -119,10 +119,15 @@ let _layOK = false;      // layer ที่มีอยู่ตรงกับ�
 /* ลูปปิด: จอ 60Hz ที่ยังไหวจะได้ระยะห่างเฟรม ~16.7ms คงที่ → ดันงบขึ้นเรื่อย ๆ จนทุกตัว
    เปลี่ยนท่าทุกเฟรม พอเครื่องเริ่มตามไม่ทันระยะห่างจะยืดเกิน 22ms → ถอยงบลง
    ผลคือเครื่องแรงได้ 60fps เต็ม เครื่องอืดค่อย ๆ ลดความถี่ "เปลี่ยนท่า" แทนที่จะเฟรมตก */
+/* ⚠️ 2026-09-22 เกณฑ์ 18/22 ms เดิมผูกกับสมมติฐาน "เล่นที่ 60 fps เสมอ"
+   พอมี frame-cap.js ล็อกเฟรม ระยะห่างระหว่างเฟรมจะเท่ากับคาบเป้าหมายตลอด (33.3 ms ที่ 30 fps)
+   เกณฑ์เดิมจะอ่านว่าเครื่องช้าแล้วหั่นงบสไปรต์ทากทิ้งทันที ทั้งที่ช่องเวลากว้างขึ้นเป็นเท่าตัว
+   จึงเทียบกับช่องเวลาจริงแทน (เหมือน tuneAnimBudget ของหน้าร้าน) */
 function tuneSpriteBudget(dtms){
   _frameEMA += (Math.min(dtms,120) - _frameEMA)*0.12;
-  if(_frameEMA < 18.0)      TSPR_MAX = Math.min(64, TSPR_MAX+1);
-  else if(_frameEMA > 22.0) TSPR_MAX = Math.max(2,  TSPR_MAX-1);
+  const slot=window.FrameCap?FrameCap.intervalMs:16.7;
+  if(_frameEMA < slot*1.08)      TSPR_MAX = Math.min(64, TSPR_MAX+1);
+  else if(_frameEMA > slot*1.32) TSPR_MAX = Math.max(2,  TSPR_MAX-1);
 }
 function tankSlugSprite(s, P, sa, walking, lifted){
   const pad = 6;                     // สไปรต์นี้คือ "ตัวทาก" ล้วน ๆ · ออร่าแปะแยกตอนวาดลงซีน
@@ -867,21 +872,33 @@ function flipOptions(key){                      // ท่าที่ชิ้�
   if(s.includes('h') && s.includes('v')) o.push(3);
   return o;
 }
-function decorCellSet(o, listName){                       // เซ็ตช่องโลก (index) ของ list นั้น
-  const def=TANK_DECOR[o.key], set=new Set(); if(!def) return set;
-  const arr=def[listName]; if(!isCellList(arr)) return set;
-  for(const [cx,cy] of arr) set.add(Math.round((o.fx+fcx(cx,o.flip))/DCELL)+','+Math.round((o.fy+cy)/DCELL));
-  return set;
-}
-function decorSolidSet(decor){                            // รวมช่อง solid ของทุกก้อน
-  const set=new Set(); if(!decor) return set;
-  for(const o of decor){ const def=TANK_DECOR[o.key]; if(!def||!def.solid) continue;
-    if(isCellList(def.solid)){ for(const [cx,cy] of def.solid) set.add(Math.round((o.fx+fcx(cx,o.flip))/DCELL)+','+Math.round((o.fy+cy)/DCELL)); }
-    else { const w=def.solid[0],h=def.solid[1];           // rect เก่า → เติมช่อง 0.5
-      for(let dx=-w/2; dx<w/2-1e-6; dx+=DCELL) for(let dy=-h/2; dy<h/2-1e-6; dy+=DCELL)
-        set.add(Math.round((o.fx+dx)/DCELL)+','+Math.round((o.fy+dy)/DCELL)); }
+// Definitions are immutable during play (the editor writes a new definitions
+// file). Cache world-space masks by definition/placement, independent of camera.
+const decorMaskCache=new WeakMap(),decorSolidCache=new WeakMap(),emptyDecorMask=new Set();
+function decorCellSet(o,listName){
+  const arr=TANK_DECOR[o.key]?.[listName],cells=isCellList(arr);
+  let cache=decorMaskCache.get(o);if(!cache){cache={};decorMaskCache.set(o,cache);}
+  const old=cache[listName],shape=cells?arr.length:arr?.join(',');
+  if(old&&old.arr===arr&&old.shape===shape&&old.key===o.key&&old.x===o.fx&&old.y===o.fy&&old.flip===o.flip)return old.set;
+  const set=new Set();
+  if(cells){
+    for(const [cx,cy] of arr)set.add(Math.round((o.fx+fcx(cx,o.flip))/DCELL)+','+Math.round((o.fy+cy)/DCELL));
+  }else if(listName==='solid'&&arr){
+    const [w,h]=arr;
+    for(let dx=-w/2;dx<w/2-1e-6;dx+=DCELL)for(let dy=-h/2;dy<h/2-1e-6;dy+=DCELL)
+      set.add(Math.round((o.fx+dx)/DCELL)+','+Math.round((o.fy+dy)/DCELL));
   }
-  return set;
+  cache[listName]={arr,shape,key:o.key,x:o.fx,y:o.fy,flip:o.flip,set};return set;
+}
+function decorSolidSet(decor){
+  if(!decor?.length)return emptyDecorMask;
+  const old=decorSolidCache.get(decor);let same=old?.parts.length===decor.length;
+  // Checking a few placements is cheap; rebuilding thousands of cell strings is not.
+  const parts=[];
+  for(let i=0;i<decor.length;i++){const set=decorCellSet(decor[i],'solid');parts.push(set);if(old?.parts[i]!==set)same=false;}
+  if(same)return old.set;
+  const set=new Set();for(const part of parts)for(const cell of part)set.add(cell);
+  decorSolidCache.set(decor,{parts,set});return set;
 }
 function ptKey(x,y){ return Math.floor(x/DCELL)+','+Math.floor(y/DCELL); }
 
@@ -1238,6 +1255,7 @@ function slugOnWall(s){ return !!s.wall; }
    ส่วน eat/greet/inspect ตั้งหน้าไว้เองอยู่แล้ว ห้ามให้แรงผลักมาพลิกหน้า */
 const FACE_STATES = ['walk','seekFood','seekDecor','seekNap','seekClimb','follow','dash','flee'];
 const SEP_PUSH_MAX = 3.0;      // แรงผลักแยกตัวต่อเฟรม ไม่เกินกี่เท่าของความเร็วเดินปกติ
+const JAM_GIVEUP = 1.2;        // ตัวที่มีเป้าหมาย ถ้าดันไม่ผ่านนานเกินนี้ (วิ) ให้ยอมเดินอ้อม
 const EDGE_TURN_BOOST = 2.5;   // ใกล้ขอบตู้ให้หันไวขึ้นกี่เท่า (กันเดินชนขอบแล้วค้าง)
 /* ระยะเผื่อจากขอบตู้ (หน่วยช่อง) — ต้องเป็น "ค่าเดียวกัน" ทั้งสามที่ ไม่งั้นทากไต่กำแพงไม่ขึ้น
    ⚠️ 2026-09-13 เคยเพี้ยนมาแล้ว: บล็อกบีบขอบท้ายเฟรมถูกขยายเป็น ×0.9+0.7 ("เผื่อเต็มความยาวลำตัว
@@ -1530,11 +1548,25 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
     }
     /* เผื่อ "ระยะเลี้ยว" ตามความเร็วจริง — ตัวเล็กเดินเร็วกว่าตัวใหญ่ 1.7 เท่า (slugPace)
        เดิมเผื่อเท่ากันทุกตัว ตัวเล็กเลยถึงขอบก่อนหันเสร็จ → โดนบีบติดขอบ = เดินอยู่กับที่ */
-    const m=slugCm(s.genes)/CM_PER_CELL*0.55 + 0.5 + SLUG_SPEED*slugPace(s)*1.6;
+    /* ⚠️ 2026-09-22 ผู้เล่น: "ดันไปชนขอบไปไม่ได้แล้ว มันจะดันค้างกันอยู่แบบนั้น"
+       ต้นเหตุคือระยะขอบสองตัวไม่ตรงกัน (บั๊กตระกูลเดียวกับ 2026-09-13 ที่ทากไต่กำแพงไม่ขึ้น):
+         บล็อกบีบท้ายเฟรมใช้ slugEdgeMargin = ความยาวตัว×0.9+0.7  (ตัว 8 ซม. = 2.14)
+         ส่วนเกณฑ์ "ใกล้ขอบแล้วนะ หันกลับเข้ากลาง" ใช้สูตรเก่า ×0.55+0.5+ระยะเลี้ยว (= 1.64)
+       ทากที่ถูกบีบติดผนังอยู่ที่ 2.14 จึง "ไม่เข้าเงื่อนไขใกล้ขอบ" = ไม่มีวันหันหนีผนัง
+       มันเลยดันเข้าผนังค้างอยู่อย่างนั้น และถ้ามีอีกตัวดันอยู่ข้างหลังก็ค้างกันทั้งคู่
+       วัดได้ตอนค้าง: ทากอยู่ที่ x=2.23 พอดีเป๊ะกับกรอบบีบ แต่เกณฑ์หันหนีอยู่ที่ 1.64
+       แก้: ใช้กรอบเดียวกับตัวบีบ แล้วเผื่อระยะเลี้ยวตามความเร็วจริงต่อท้าย */
+    const m=slugEdgeMargin(s,fw) + SLUG_SPEED*slugPace(s)*1.6;
     const climbing = !!s.wall || s.state==='seekClimb';
     const nearEdge = !climbing && (s.fx<m||s.fx>fw-m||s.fy<m||s.fy>fh-m);
     if(nearEdge){
-      s.turn=Math.atan2((fh/2)-s.fy,(fw/2)-s.fx);
+      /* ⚠️ 2026-09-22 ผู้เล่น: "ดันไปชนขอบไปไม่ได้แล้ว มันจะดันค้างกันอยู่แบบนั้น"
+         ติดผนังแล้วโค้ดนี้สั่ง "หันเข้ากลางตู้" ทุกเฟรม — แต่ถ้ามีทากอีกตัวยืนขวางอยู่กลางทางพอดี
+         ทิศเข้ากลาง = ทิศที่ชนตัวมันเป๊ะ ๆ · แถมยังไปเขียนทับ "ทิศหลบ" ที่บล็อกหลบกันเพิ่งตั้งไว้ทุกเฟรม
+         ตัวที่ติดผนังเลยหลบไม่เคยสำเร็จสักครั้ง = ค้างอยู่กับที่จนกว่าอีกตัวจะเดินไปเอง
+         วัดได้: ติดกันเกิน 8 วิ โดยตัวหน้า dir ชี้เข้ากลาง แต่ทางตรงนั้นมีอีกตัวจอดอยู่
+         แก้: ระหว่างที่ยังอยู่ในช่วง "ยึดทิศหลบ" (_avoidHold) ห้ามเขียนทับ ปล่อยให้เลาะข้างไปก่อน */
+      if((s._avoidHold||0)<=0)s.turn=Math.atan2((fh/2)-s.fy,(fw/2)-s.fx);
       if(s.state!=='walk' && s.state!=='sleep' && s.state!=='wake' && s.state!=='startle' && s.state!=='stretch' && s.state!=='sneeze' && s.state!=='dashCharge' && s.state!=='flee'){
         s.state='walk'; s.stt=1.5+Math.random()*2; delete s.intentX; delete s.intentY;
       }
@@ -1553,6 +1585,7 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
          วัดได้: ทาก 10 ตัวเดินเข้ากลาง 20 วิ หน้าพลิก >90° 40 ครั้ง · ถอยหลัง 61 เฟรม
          ตอนนี้: ถ้าก้าวนี้พาเข้าใกล้ตัวที่อยู่ข้างหน้าในระยะชน ตัด "ส่วนที่พุ่งเข้าหา" ทิ้ง เหลือแต่ส่วนที่ไถลเลียบข้าง
          เดินอ้อมไปเองแบบลื่น ๆ · ไถลต่อไม่ได้ (ชนตรง ๆ) ค่อยเลี้ยวหลบทางขวา */
+      let jammed=false;
       if(!s.wall && s.state!=='dash' && s.state!=='flee'){
         for(const o of slugs){
           if(o===s||o.wall)continue;
@@ -1564,23 +1597,44 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
           mvx-=ux*toward; mvy-=uy*toward;                          // เหลือแต่ส่วนเลียบข้าง
           /* เลียบข้างได้น้อย (เดินชนเกือบตรง) = หยุดยืนแทนการไถลนิด ๆ — ไถลเศษก้าวแล้วโดนดันกลับทุกเฟรมคือต้นเหตุตัวสั่นกลางฝูง */
           if(Math.hypot(mvx,mvy)<v*0.5){
-            mvx=0;mvy=0;
+            mvx=0;mvy=0;jammed=true;
+            s._jam=(s._jam||0)+dt;
             /* ชนเข้า "ข้างตัว" อีกตัว = ให้ตัวนั้นเดินไปข้างหน้าหน่อยเพื่อหลบทาง (ผู้เล่นขอ 2026-09-17)
-               ข้างตัว = ทิศหัวของมันเกือบตั้งฉากกับทิศที่เราเข้าหา · ไม่ปลุกตัวที่หลับ/กิน/ทักทาย/อยู่บนกระจก/ถูกยก */
+               ข้างตัว = ทิศหัวของมันเกือบตั้งฉากกับทิศที่เราเข้าหา · ไม่ปลุกตัวที่หลับ/กิน/ทักทาย/อยู่บนกระจก/ถูกยก
+               ⚠️ 2026-09-22 ผู้เล่น: "ดันไปชนขอบไปไม่ได้แล้ว ถึงดันกลับออกมามันจะดันค้างกันอยู่แบบนั้น"
+                  ถ้าหน้าตัวที่โดนดันคือกำแพง/หิน การสั่ง "เดินตรงไป" = สั่งให้มันเดินชนกำแพง
+                  แถม o.turn=o.dir ยังไปล้างทิศที่โค้ดกันขอบเพิ่งหันให้มันกลับเข้ากลางตู้ด้วย
+                  → มันขยับไม่ได้ เราก็ดันไม่ผ่าน ค้างกันทั้งคู่ · ตรงนี้จึงเช็กก่อนว่า "หน้ามันโล่งจริงไหม" */
             const side=Math.abs(Math.cos(o.dir)*ux+Math.sin(o.dir)*uy)<0.55;
-            if(side&&!o.wall&&o!==heldSlug&&['rest','walk','inspect','stretch'].includes(o.state)){
+            const oRad=slugCm(o.genes)/CM_PER_CELL*0.35, oMg=slugEdgeMargin(o,fw);
+            const oMx=Math.min(oMg,fw/2), oMy=Math.min(oMg,fh/2);
+            const ahead=0.6+oRad, fx2=o.fx+Math.cos(o.dir)*ahead, fy2=o.fy+Math.sin(o.dir)*ahead;
+            const roomAhead=fx2>oMx&&fx2<fw-oMx&&fy2>oMy&&fy2<fh-oMy&&!blkAt(fx2,fy2,oRad);
+            if(side&&roomAhead&&!o.wall&&o!==heldSlug&&['rest','walk','inspect','stretch'].includes(o.state)){
               o.state='walk';o.stt=Math.max(o.stt||0,2.8);o.turn=o.dir;   // 2.8 วิ ≈ พ้นความยาวลำตัวของทั้งคู่ (1.2 วิเดิมได้แค่ครึ่งตัว ยังขวางอยู่)   // เดินตรงไปตามทิศที่หันอยู่ ไม่หันมาหาเรา
             }
             /* ⚠️ ต้องยึดทิศหลบไว้ _avoidHold วินาที — เดิมสุ่มใหม่ทุกเฟรม s.dir เลยไล่ตามเป้าที่ขยับหนีตลอด
-               เลี้ยวไม่เคยจบ ทั้งคู่จึงดันกันอยู่กับที่ไม่หลุด (วัดได้: ค้างครบ 30 วินาทีเต็ม) */
-            if(!['seekFood','follow','seekNap'].includes(s.state)&&(s._avoidHold||0)<=0){
-              s.turn=s.dir-Math.PI/2*(0.6+Math.random()*0.3);   // ชนตรง ๆ = เลี้ยวขวาอ้อม (ทิศเดียวกันทุกตัว ไม่เลี้ยวชนกันซ้ำ)
-              s._avoidHold=0.7;
+               เลี้ยวไม่เคยจบ ทั้งคู่จึงดันกันอยู่กับที่ไม่หลุด (วัดได้: ค้างครบ 30 วินาทีเต็ม)
+               ⚠️ ตัวที่มีเป้าหมาย (ไปกินอาหาร/ตามเพื่อน/ไปนอนข้างเพื่อน) เดิมไม่ยอมเลี้ยวเลย กันเป้าหลุด
+                  แต่ถ้าเป้าอยู่หลังตัวที่ติดกำแพง มันจะดันค้างอยู่อย่างนั้นจนหมดเวลาสเตต (วัดได้ 100% ของ 30 วิ)
+                  ตอนนี้ดันไม่ผ่านเกิน JAM_GIVEUP วิ = ยอมอ้อมสักที (เป้ายังอยู่ แค่เดินอ้อมไป) */
+            if((!['seekFood','follow','seekNap'].includes(s.state)||s._jam>JAM_GIVEUP)&&(s._avoidHold||0)<=0){
+              if(nearEdge){
+                /* ติดผนังแล้วมีตัวขวางทางเข้ากลางตู้ = ต้อง "เลาะไปตามผนัง" ไม่ใช่เลี้ยวมั่ว
+                   เลือกข้างที่ออกห่างจากตัวที่ขวาง ไม่งั้นเลี้ยวไปชนมันซ้ำแล้วค้างเหมือนเดิม */
+                const cx=fw/2-s.fx, cy=fh/2-s.fy, len=Math.hypot(cx,cy)||1;
+                const tx=-cy/len, ty=cx/len, away=(tx*(s.fx-o.fx)+ty*(s.fy-o.fy))>=0?1:-1;
+                s.turn=Math.atan2(ty*away,tx*away);
+              }else{
+                s.turn=s.dir-Math.PI/2*(0.6+Math.random()*0.3);   // ชนตรง ๆ กลางตู้ = เลี้ยวขวาอ้อม (ทิศเดียวกันทุกตัว ไม่เลี้ยวชนกันซ้ำ)
+              }
+              s._avoidHold=0.7;s._jam=0;
             }
             break;
           }
         }
       }
+      if(!jammed)s._jam=0;                                // ก้าวออกได้แล้ว = เลิกนับเวลาที่ถูกขวาง
       const nx=s.fx+mvx, ny=s.fy+mvy;
       if(!blk(nx,ny)){ s.fx=nx; s.fy=ny; }               // ชนช่อง solid → ไถลตามแกน/หันหนี
       else if(!blk(nx,s.fy)){ s.fx=nx; }
@@ -1611,6 +1665,17 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
       else s._solidFix=0.5;
     }
   });
+  /* ดันตัวหนึ่งตัวออกตามแรงแยกตัว แล้วคืน "สัดส่วนที่ดันไม่ไป" (0 = ไปได้หมด · 1 = ติดแน่นขยับไม่ได้)
+     ⚠️ ต้องใช้กรอบขอบตัวเดียวกับบล็อกบีบท้ายเฟรม ไม่งั้นดันออกไปแล้วโดนบีบกลับมาทับกันเหมือนเดิม */
+  const sepPush=(s,dx,dy)=>{
+    const mg=slugEdgeMargin(s,fw), mx=Math.min(mg,fw/2), my=Math.min(mg,fh/2);
+    const rad=slugCm(s.genes)/CM_PER_CELL*0.35;
+    const nx=Math.max(mx,Math.min(fw-mx,s.fx+dx)), ny=Math.max(my,Math.min(fh-my,s.fy+dy));
+    const gx=blkAt(nx,s.fy,rad)?s.fx:nx, gy=blkAt(s.fx,ny,rad)?s.fy:ny;
+    const want=Math.hypot(dx,dy)||1e-6, got=Math.hypot(gx-s.fx,gy-s.fy);
+    s.fx=gx;s.fy=gy;
+    return Math.max(0,Math.min(1,1-got/want));
+  };
   if(doSep) for(let i=0;i<slugs.length;i++) for(let j=i+1;j<slugs.length;j++){
     const a=slugs[i], b2=slugs[j];
     if(slugOnWall(a)||slugOnWall(b2))continue;
@@ -1632,9 +1697,16 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
         b2.turn=Math.atan2(a.fy-b2.fy,a.fx-b2.fx);
       }
       /* เดิมดันให้พ้นกันในเฟรมเดียว = กระโดดข้างละครึ่งของระยะซ้อน (แรงกว่าก้าวเดินได้เป็นสิบเท่า)
-         → เห็นเป็นตัวไถลถอยหลังทั้งที่ท่าเดินไปข้างหน้า · ตอนนี้จำกัดไม่เกิน SEP_PUSH_MAX เท่าของก้าวปกติ */
-      const room=(min-ds)/2, step=Math.min(room, SLUG_SPEED*dt*SEP_PUSH_MAX), k=step/ds;
-      a.fx+=ex*k; a.fy+=ey*k; b2.fx-=ex*k; b2.fy-=ey*k;
+         → เห็นเป็นตัวไถลถอยหลังทั้งที่ท่าเดินไปข้างหน้า · ตอนนี้จำกัดไม่เกิน SEP_PUSH_MAX เท่าของก้าวปกติ
+         ⚠️ 2026-09-22 ผู้เล่น: "ดันไปชนขอบไปไม่ได้แล้ว มันจะดันค้างกันอยู่แบบนั้น"
+            ตัวที่ติดขอบตู้ถูกดันออกไม่ได้ (บล็อกบีบขอบท้ายเฟรมดึงกลับมาที่เดิมทุกเฟรม)
+            แรงครึ่งที่มันควรถอยจึงหายไปเฉย ๆ สองตัวเลยทับกันค้างที่ระยะเดิมไม่เลิก
+            ตอนนี้ "ส่วนที่ดันไม่ไป" ถูกโอนไปให้อีกตัวถอยแทน = แยกกันได้จริงแม้ตัวหนึ่งติดผนัง */
+      const room=(min-ds)/2, step=Math.min(room, SLUG_SPEED*dt*SEP_PUSH_MAX), ux=ex/ds, uy=ey/ds;
+      const leftA=sepPush(a, ux*step, uy*step);
+      const leftB=sepPush(b2,-ux*step,-uy*step);
+      if(leftA>.02)sepPush(b2,-ux*step*leftA,-uy*step*leftA);
+      if(leftB>.02)sepPush(a,  ux*step*leftB, uy*step*leftB);
     }
   }
   // จำกัดขอบ "วัดที่ขอบตัว" — เผื่อครึ่งความยาวลำตัว (หน่วยช่อง) ไม่ให้หัว-ท้ายล้น
@@ -1720,8 +1792,16 @@ function slugFaceAndCreep(s,dt){
       enterTank จึงไม่สตาร์ทลูปใหม่ → ตู้ค้างดำทั้งเกมจนกว่าจะรีเฟรชหน้า
       ตอนนี้แยกตัวห่อ: วาดพังก็แค่ข้ามเฟรมนั้น แล้วต่อเฟรมถัดไปเสมอ */
 function drawTank(){
+  /* ตัวคุมจังหวะเฟรม (frame-cap.js) — รอบจอที่ยังไม่ถึงคิวก็ต่อเฟรมถัดไปเลย ไม่วาด
+     จังหวะสม่ำเสมอกว่าปล่อยเต็มที่แล้วหลุดเป็นครั้งคราว (ดูเหตุผลเต็มในหัวไฟล์ frame-cap.js) */
+  const t0=performance.now();
+  if(window.FrameCap&&!FrameCap.due('tank',t0)){
+    requestAnimationFrame(()=>{ if(tankMode) drawTank(); else tankLoopOn=false; });
+    return;
+  }
   try{ drawTankFrame(); }
   catch(e){ if(!drawTank._warned){drawTank._warned=true;console.warn('[tank] วาดตู้ไม่ผ่าน ข้ามเฟรมนี้',e);} }
+  window.FrameCap?.noteWork(performance.now()-t0);
   requestAnimationFrame(()=>{ if(tankMode) drawTank(); else tankLoopOn=false; });
 }
 function drawTankFrame(){

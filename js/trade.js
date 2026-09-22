@@ -88,6 +88,9 @@ function releaseSlugOffers(slugs,reason){
   return hit.length;
 }
 function tryCustomerOffer(p,tank){
+  /* ลูกค้าใส่หมวก = นักสะสม มีวิธีเลือกของเป็นของตัวเอง (slug-collector.js)
+     เดินดูหลายตู้ก่อน แล้วค่อยเสนอซื้อทากที่ "ยีนสูงที่สุด" ด้วยเงื่อนไขแคบ = ราคาดี */
+  if(p.collector)return typeof tryCollectorOffer==='function'&&tryCollectorOffer(p,tank);
   if(!p.wantsBuy||p.tradeDone||p.tradeOffer||!tank||tank.type!=='tank')return false;
   p.preferences ||= makeBuyerPreferences();
   let best=null;

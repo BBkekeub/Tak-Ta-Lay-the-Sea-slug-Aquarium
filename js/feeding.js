@@ -14,6 +14,12 @@ let foodPick=false;   // โหมดเก็บอาหาร: คลิก�
 const foodClamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /* อิ่มเกินค่านี้ = ไม่เดินไปกิน (เดิมกินทุกชิ้นแม้อิ่มเต็ม ค่าอิ่มส่วนเกินถูกทิ้ง) */
 const FOOD_HUNGRY=90;
+/* ⚙️ 2026-09-22 ผู้เล่น: "ทากที่ความหิวต่ำกว่า 90 จะมากินอาหารตลอด จนกว่าจะเกิน 95"
+   = เริ่มหิวที่ FOOD_HUNGRY แต่พอเริ่มกินแล้วให้กินต่อจนเกิน FOOD_FULL ถึงจะเลิก
+   ถ้าใช้เส้นเดียว (90) ตัวที่กินคำแรกแล้วขึ้นไปแตะ 90 พอดีจะเลิกกินทันทีทั้งที่เพิ่งเริ่ม
+   ธง _feeding = "เริ่มมื้อไปแล้วและยังไม่เกิน 95" ตั้งตอนกินคำล่าสุด (ดู applyFood) */
+const FOOD_FULL=95;
+const foodWantsMore=s=>s.satiety < (s._feeding ? FOOD_FULL+1e-9 : FOOD_HUNGRY);
 /* อาหารที่ไม่มีใครกินจะเน่าหายไปเอง — กันเศษอาหารค้างจนพื้นตู้เต็ม 8 ชิ้นแล้ววางใหม่ไม่ได้ */
 const FOOD_SPOIL_MS=5*60*60*1000;
 function foodStats(s,now=Date.now()){
@@ -44,12 +50,22 @@ function applyFood(s,f,now=Date.now()){
  s.foodBuffs=s.foodBuffs.filter(b=>b.type!==f.type);
  s.foodBuffs.push({type:f.type,level:f.level,delta:d,until:now+spec.h*3600000});
  s.satiety=foodClamp(s.satiety+spec.sat,0,100);f.eaten.push(s.id);
+ /* ยังไม่เกิน FOOD_FULL = ยังนับว่า "กำลังกินมื้อนี้อยู่" เดี๋ยวจะกลับมากินต่อจนเกิน 95 */
+ s._feeding=s.satiety<=FOOD_FULL;
  s.state='rest';s.stt=4;s._meal=null;s._mealCooldown=now+8000;
  return true;
 }
+// Failed routes stay impossible while the start cell, body size, tank bounds,
+// food target and immutable collision mask are unchanged. Keep a bounded cache
+// per slug; successful paths remain fresh because foodStep consumes their array.
+const failedFoodRoutes=new WeakMap();
 // Grid BFS respects the same five body collision samples as normal walking.
 function foodPath(s,tx,ty,fw,fh,solid){
  const scale=s._breedScale||1,rad=slugCm(s.genes)/CM_PER_CELL*.35*scale,margin=slugCm(s.genes)/CM_PER_CELL*.55*scale+.2;
+ const state=[Math.floor(s.fx),Math.floor(s.fy),fw,fh,rad,margin,s._foodZoneLo||0,s._foodZoneHi||fw].join('|'),target=tx+','+ty;
+ let failed=failedFoodRoutes.get(s);
+ if(!failed||failed.state!==state||failed.solid!==solid){failed={state,solid,targets:new Set()};failedFoodRoutes.set(s,failed);}
+ if(failed.targets.has(target))return null;
  const clear=(x,y)=>x>=(s._foodZoneLo||0)+margin&&x<=(s._foodZoneHi||fw)-margin&&y>=margin&&y<=fh-margin&&![[x,y],[x+rad,y],[x-rad,y],[x,y+rad],[x,y-rad]].some(p=>solid.has(ptKey(...p)));
  const start=[Math.floor(s.fx),Math.floor(s.fy)],key=(x,y)=>x+','+y;
  const q=[start],prev=new Map([[key(...start),null]]);let found=null,best=Infinity;
@@ -58,7 +74,10 @@ function foodPath(s,tx,ty,fw,fh,solid){
   if(clear(x+0.5,y+0.5)&&d<best){best=d;found=[x,y];}if(d<0.6)break;
   for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,k=key(nx,ny);if(prev.has(k)||!clear(nx+0.5,ny+0.5))continue;prev.set(k,[x,y]);q.push([nx,ny]);}
  }
- if(!found||best>1.0)return null;
+ if(!found||best>1.0){
+  if(failed.targets.size>=128)failed.targets.delete(failed.targets.values().next().value);
+  failed.targets.add(target);return null;
+ }
  const path=[];for(let p=found;p&&prev.get(key(...p));p=prev.get(key(...p)))path.push({x:p[0]+0.5,y:p[1]+0.5});
  path.reverse();return {path,end:{x:found[0]+0.5,y:found[1]+0.5}};
 }
@@ -78,7 +97,7 @@ function foodPrepare(slugs,fw,fh,obstacles,sharedSolid,providedTank){
  for(const s of slugs){foodStats(s,now);if(s.wall&&s._meal){delete s._meal.food.reserved[s.id];s._meal=null;}}
  for(const f of tank.foods){
   for(const id of Object.keys(f.reserved))if(!slugs.some(s=>s.id===id&&s._meal&&s._meal.food===f&&s._meal.deadline>now))delete f.reserved[id];
-  const candidates=slugs.filter(s=>f.fx>=(s._foodZoneLo||0)&&f.fx<(s._foodZoneHi||fw)&&!s._meal&&!s.wall&&s.satiety<FOOD_HUNGRY&&(s._mealCooldown||0)<now&&s!==heldSlug&&!['climb','climbUp','climbDown','dash','dashCharge','flee','startle'].includes(s.state)).sort((a,b)=>Math.hypot(a.fx-f.fx,a.fy-f.fy)-Math.hypot(b.fx-f.fx,b.fy-f.fy));
+  const candidates=slugs.filter(s=>f.fx>=(s._foodZoneLo||0)&&f.fx<(s._foodZoneHi||fw)&&!s._meal&&!s.wall&&foodWantsMore(s)&&(s._mealCooldown||0)<now&&s!==heldSlug&&!['climb','climbUp','climbDown','dash','dashCharge','flee','startle'].includes(s.state)).sort((a,b)=>Math.hypot(a.fx-f.fx,a.fy-f.fy)-Math.hypot(b.fx-f.fx,b.fy-f.fy));
   for(const s of candidates){
    if(f.eaten.length+Object.keys(f.reserved).length>=f.spec.cap)break;
    let route=null,slot=-1;

@@ -22,8 +22,22 @@ function peopleInArea(x0,y0,x1,y1){
 
 /* ---------- ค่าปรับ ---------- */
 const PERSON_SPEED_CM = 82;      // ความเร็วเดินชมของ (ซม./วินาที) — ~0.88 ม./วิ เดินชิลล์ชมของ (ของเดิม 52 = 0.56 ม./วิ ช้าเป็นสโลว์โมชั่น)
-const WALK_STEP = 0.235;         // ความยาวก้าว เทียบส่วนสูง (~40 ซม. ที่ส่วนสูง 172) — 0.30 ก้าวยาวเกิน ขากางเป็นตัว A
-const WALK_LIFT = 0.027;         // ยกเท้าสูงสุดตอนเหวี่ยง เทียบส่วนสูง (~4.6 ซม.) — ยอดอยู่ช่วงต้น = ส้นตวัดหลัง ไม่ใช่ยกเข่าสวนสนาม
+/* ปรับหน้าตาท่าเดินได้จากสามตัวนี้ (ลองสดจากคอนโซลได้ ไม่ต้องรีโหลด — เป็น let ตั้งใจ)
+   GAIT_NARROW_* = ดึงข้อเท้าเข้าหาแนวกลางตัว 0 = ใช้ตำแหน่งดิบของโมเดล (ข้อเท้าห่างกัน 25.4 ซม. = ขาแบะ)
+   GAIT_LEAN_WALK = เอนตัวไปหน้าตอนเดิน เทียบส่วนสูง (0.021 ≈ 7° วัดจากช่วงสะโพก→อก)
+   ตัวเลขที่มาของค่าเริ่มต้นอยู่ในคอมเมนต์ตรงจุดที่ใช้จริง (ค้นคำว่า "ขาแบะ") */
+let GAIT_NARROW_STAND = 0.30, GAIT_NARROW_WALK = 0.30, GAIT_LEAN_WALK = 0.021;
+const WALK_STEP = 0.235;       // ความยาวก้าว เทียบส่วนสูง (~40 ซม. ที่ส่วนสูง 172) — 0.30 ก้าวยาวเกิน ขากางเป็นตัว A
+/* ⚠️ 2026-09-23 ผู้เล่น: "ก้าวโอเคแล้วแต่ยกขาเยอะไป" (ส่งรูปมา: เข่าหลังงอสูงเหมือนเดินสวนสนาม)
+   ความสูงของเข่ามาจากสองค่านี้ และมันคูณกัน:
+     GAIT_LIFT = ยกข้อเท้าขึ้นตรง ๆ ตอนเหวี่ยง
+     GAIT_TUCK = ดึงข้อเท้าเข้ามาใต้ตัวกลางช่วงเหวี่ยง → ระยะสะโพก–ข้อเท้าสั้นลง → IK บังคับให้เข่างอเพิ่ม
+   ตัวหลังนี่แหละที่ดัน "เข่า" ขึ้นมากกว่าตัวแรก เพราะมันย่นความยาวขาที่ IK ต้องแก้
+   คนเดินจริงยกเท้าพ้นพื้นแค่ 1–2 ซม. ตอนกลางช่วงเหวี่ยง (น้อยกว่าที่คนส่วนใหญ่คิดมาก)
+   ของเดิม 0.027 = 4.6 ซม. ที่คนสูง 172 คือราวสามเท่าของจริง
+   ยังเหลือไว้พอให้เห็นว่าเท้าพ้นพื้น — ถ้าศูนย์เป๊ะจะดูเหมือนไถลบนน้ำแข็ง */
+let GAIT_LIFT = 0.015;           // ยกเท้าสูงสุดตอนเหวี่ยง เทียบส่วนสูง (~2.6 ซม.) — ยอดอยู่ช่วงต้น = ส้นตวัดหลัง
+let GAIT_TUCK = 0.010;           // ดึงเท้าเข้าใต้ตัวกลางช่วงเหวี่ยง (ยิ่งมาก เข่ายิ่งงอสูง)
 const PERSON_R        = 2.5;     // รัศมีกันชนกับตู้/ของ (ช่องเล็ก ≈ 16 ซม.)
 const PERSON_EDGE     = 2.0;     // เว้นจากขอบพื้นร้าน (ช่องเล็ก)
 const LOOK_MIN = 5, LOOK_MAX = 5;    // ยืนดูตู้นานแค่ไหน (วินาที)
@@ -346,13 +360,48 @@ function visitorCapacity(){return Math.max(0,Math.floor(floorArea()/3));}
       ร้าน 48 ช่อง = ความจุ 12 → เหลือที่ให้ลูกค้าจริงแค่ 3 · ร้าน 24 ช่อง = เหลือ 0 (ลูกค้าเข้าไม่ได้เลย)
    ตอนนี้: ลูกค้าใช้ visitorCapacity() ของตัวเอง · ผู้ท้าแข่ง/พ่อค้ามีเพดานของตัวเอง ไม่แย่งที่กัน */
 const isChallenger=p=>!!(p&&(p.raceChallenger||p.tugChallenger||p.eatChallenger||p.throwChallenger||p.sumoChallenger));
-const isTrader=p=>!!(p&&(p.wantsSell||p.wholesaleBuyer));
+/* นักสะสม (ลูกค้าใส่หมวก) นับรวมโควตา "แขกพิเศษ" กับพ่อค้า ไม่กินที่ลูกค้าปกติ
+   ไม่งั้นช่วงแรกที่เพดานลูกค้าแค่ 2–3 คน เขาจะแทบไม่มีโอกาสเข้าร้านเลย */
+const isTrader=p=>!!(p&&(p.wantsSell||p.wholesaleBuyer||p.collector));
 const isCustomer=p=>!!p&&!isChallenger(p)&&!isTrader(p);
 function customerCount(){let n=0;for(const p of PEOPLE)if(isCustomer(p))n++;return n;}
 function challengerCount(){let n=0;for(const p of PEOPLE)if(isChallenger(p))n++;return n;}
 function traderCount(){let n=0;for(const p of PEOPLE)if(isTrader(p))n++;return n;}
 const CHALLENGER_MAX=10, TRADER_MAX=2;          // เพดานของแต่ละถัง (ไม่เกี่ยวกับความจุลูกค้า)
 const ENTRY_FEE=1;                              // ⚙️ ค่าเข้าร้าน ลูกค้าคนละกี่ทอง (ผู้เล่นกำหนด 2026-09-21)
+/* ตอนนี้เก็บค่าเข้าได้ไหม — คอมสลับแท็บยังนับ · มือถือสลับแอป/ดับจอไม่นับ (ผู้เล่นกำหนด 2026-09-22)
+   ประกาศเป็น function ไม่ใช่ const เพื่อให้เทสต์สลับเครื่องจำลองได้ (PHONE_SCREEN มาจาก shop-floor.js) */
+function onPhoneScreen(){
+  return typeof PHONE_SCREEN!=='undefined' ? PHONE_SCREEN
+    : matchMedia('(pointer: coarse)').matches && Math.min(screen.width,screen.height)<=600;
+}
+function entryFeeCounts(){ return !document.hidden || !onPhoneScreen(); }
+/* ---- ค่าเข้าย้อนหลังตอนไม่ได้เฝ้าร้าน (ผู้เล่นกำหนด 2026-09-22) ----
+   "ปิดอยู่ 8 ชั่วโมงได้ไม่เกิน 2000 · ไม่เข้ามาใน 8 ชั่วโมงก็ไม่มีทางเกิน 2000"
+   → จ่ายตามเวลาที่หายไปจริง AWAY_RATE ทอง/ชม. แต่ชนเพดาน AWAY_CAP ที่ 8 ชม. พอดี
+     หายไป 2 ชม. = 500 · 8 ชม. = 2,000 · 3 วัน = 2,000 เท่าเดิม (ทิ้งไว้นานกว่านั้นไม่ได้เพิ่ม)
+   นับเฉพาะตอน "เปิดร้านค้างไว้" — ปิดร้านอยู่ไม่มีลูกค้า จึงไม่มีค่าเข้าให้สะสม
+   ครอบคลุมทั้งปิดเกมไปเลย และมือถือพับแอป/ดับจอ (ซึ่งไม่ได้ค่าเข้าสด)
+   ส่วนคอมที่เปิดค้างไว้แล้วสลับแท็บยังได้ค่าเข้าสดอยู่ เวลาจึงไม่ถูกนับเป็น "ไม่อยู่" ซ้ำซ้อน */
+const AWAY_RATE=250, AWAY_CAP=2000, AWAY_MIN_SEC=60;
+function awayHours(sec){const h=sec/3600;return h>=1?h.toFixed(1)+' ชม.':Math.round(sec/60)+' นาที';}
+function awayMark(){ if(peopleOn&&entryFeeCounts())G.seenAt=Date.now(); }
+function awayIncomeTick(){
+  const now=Date.now();
+  if(!Number.isFinite(G.seenAt))G.seenAt=now;                 // เซฟเก่า/เกมใหม่ = เริ่มนับจากตอนนี้ ไม่แจกย้อนหลัง
+  if(!peopleOn){G.seenAt=now;return;}                          // ปิดร้าน = ไม่สะสมเวลา
+  if(!entryFeeCounts())return;                                 // มือถือพับแอปอยู่ = ปล่อยเวลาเดิน รอจ่ายตอนกลับมา
+  const away=(now-G.seenAt)/1000;
+  G.seenAt=now;
+  if(away<AWAY_MIN_SEC)return;                                 // แวบเดียวไม่ต้องเด้งข้อความ
+  const gold=Math.min(AWAY_CAP,Math.floor(away/3600*AWAY_RATE));
+  if(gold<=0)return;
+  addCoin(gold);
+  if(typeof toast==='function')toast('🏪 ค่าเข้าร้านตอนไม่อยู่ '+awayHours(away)+' · +'+gold.toLocaleString()+' ทอง'+(gold>=AWAY_CAP?' (เต็มเพดาน '+AWAY_CAP.toLocaleString()+')':''),'good');
+  if(typeof saveGame==='function')saveGame();
+}
+setInterval(awayIncomeTick,1000);
+document.addEventListener('visibilitychange',()=>{ if(document.hidden){awayMark();if(typeof saveGame==='function')saveGame();} });
 function challengerRoom(){return Math.max(0,CHALLENGER_MAX-challengerCount());}
 function traderRoom(){return Math.max(0,TRADER_MAX-traderCount());}
 function visitorAttraction(){const slug=G.objs.reduce((n,o)=>n+(o.type==='tank'&&Array.isArray(o.slugs)?o.slugs.length*(typeof tankAttractionFactor==='function'?tankAttractionFactor(o):1):0),0);const deco=G.objs.reduce((n,o)=>n+((o.type==='deco'&&o._key!=='counter'&&o.def&&Number.isFinite(o.def.attr))?o.def.attr:0),0);const tankDeco=G.objs.reduce((n,o)=>n+((o.type==='tank'&&Array.isArray(o.decor))?o.decor.length*0.5:0),0);return Math.round((slug+deco+tankDeco)*10)/10;}
@@ -461,6 +510,8 @@ function stepVisitorArrivals(){
   /* พ่อค้าเร่/คนรับเหมาถือตู้ทากมาขาย (slug-peddler.js) — คิวแยกจากลูกค้าปกติ
      gate: ยังไม่ถึงเควสพ่อค้าเร่ (บทที่ 2) ยังไม่ให้มา — sellerSystemUnlocked() มาจาก quests.js */
   if(typeof stepPeddlerArrival==='function' && (typeof sellerSystemUnlocked!=='function'||sellerSystemUnlocked()) && stepPeddlerArrival(capacity))return;
+  /* นักสะสมใส่หมวก (slug-collector.js) — มานาน ๆ ครั้ง เดินดูตู้แล้วเสนอราคาสูงกับทากยีนเด่น */
+  if(typeof stepCollectorArrival==='function' && stepCollectorArrival(capacity))return;
   if(score!==_arrivalScore){
     if(_arrivalScore===null||!isFinite(_spawnAt))_spawnAt=_peopleT+visitorInterval(score);
     else if(!_pendingParty){
@@ -511,7 +562,7 @@ function personEntered(p){return !(p._enterAt>_peopleT);}
 /* ชนิดกลุ่มที่สปอน → ประเภทสิทธิ์ผ่านประตู · ที่ไม่อยู่ในตารางนี้คือลูกค้าปกติ
    ⚠️ พ่อค้าส่งใช้ kind 'solo' เหมือนลูกค้าเดี่ยว แยกด้วยชื่อไม่ได้
       slug-wholesaler.js จึงส่ง accessKind='wholesale' เข้ามาตรง ๆ */
-const SPAWN_ACCESS={peddler:'peddler',race:'challenger',tug:'challenger',eat:'challenger',throw:'challenger',sumo:'challenger'};
+const SPAWN_ACCESS={peddler:'peddler',race:'challenger',tug:'challenger',eat:'challenger',throw:'challenger',sumo:'challenger',collector:'cust'};
 function spawnVisitors(capacity,requestedKind=null,requestedProfiles=null,accessKind=null){
   // คิวยังค้างเกิน 1 คน = ยังไม่รับกลุ่มใหม่ (ผู้เรียกทุกตัวลองใหม่รอบหน้าอยู่แล้ว) คิวจึงไม่ยาวสะสม
   if(_doorFreeAt>_peopleT+DOOR_GAP)return false;
@@ -533,6 +584,7 @@ function spawnVisitors(capacity,requestedKind=null,requestedProfiles=null,access
     }
     if(batch.length!==count)continue;
     if(kind==='peddler'&&typeof makePeddler==='function'&&!makePeddler(batch[0]))continue;
+    if(kind==='collector'&&typeof makeCollector==='function'&&!makeCollector(batch[0]))continue;   // ลูกค้าใส่หมวก (slug-collector.js)
     const first=Math.max(_peopleT,_doorFreeAt);
     batch.forEach((p,i)=>{p._enterAt=first+i*DOOR_GAP;});
     _doorFreeAt=first+batch.length*DOOR_GAP;
@@ -857,11 +909,25 @@ function stepPeopleSlice(dt){
     /* ค่าเข้าร้าน คนละ ENTRY_FEE ทอง จ่ายตอนเดินพ้นประตูเข้ามาจริง (ผู้เล่นกำหนด 2026-09-21)
        ธง _paidEntry กันจ่ายซ้ำ · คนหนึ่งคนจ่ายครั้งเดียวต่อการเข้าร้านหนึ่งรอบ
        นับเฉพาะ "ลูกค้า" — ผู้ท้าแข่งกับพ่อค้ามาทำธุระ ไม่ใช่คนมาเที่ยวร้าน จึงไม่เก็บ
-       (รายได้ก้อนนี้เข้าสถิติเองอยู่แล้ว เพราะ econ-stats.js อ่านส่วนต่างของ G.coin) */
+       (รายได้ก้อนนี้เข้าสถิติเองอยู่แล้ว เพราะ econ-stats.js อ่านส่วนต่างของ G.coin)
+       ⚠️ 2026-09-22 ผู้เล่น: "ตอนปิดเกมไม่เพิ่มนะ เป็นสิทธิเฉพาะคนที่เปิดเกมค้าไว้ ไม่งั้นโกงเกินไป"
+                        แล้วตามด้วย "เปิดอยู่ได้ เปลี่ยนแท็บในคอมนับ แต่ในโทรศัพท์ไม่นับ"
+       ลูกค้ายังเดินเข้าออกตามปกติทุกกรณี (กฎหมวด 6: ชีวิตในร้านห้ามหยุดเพราะไม่ได้มอง)
+       ต่างกันแค่ "ใครได้ค่าเข้า":
+         คอม  — เปิดเกมค้าไว้แล้วสลับแท็บ ยังนับ (ถือว่าเปิดร้านทิ้งไว้จริง)
+         มือถือ — สลับแอป/ดับจอ ไม่นับ (ไม่งั้นเปิดทิ้งไว้เฉย ๆ ก็ได้เงิน = โกงเกินไป)
+       ปิดเกมไปเลยไม่มีทางได้อยู่แล้ว เพราะไม่มีอะไรรัน และไม่มีการคำนวณย้อนหลังตอนเปิดใหม่
+       คนที่เดินเข้ามาช่วงไม่นับ = ติดธงไว้เลยว่าเข้าฟรี ไม่เก็บย้อนหลังตอนกลับมาดู */
     if(!p._paidEntry&&isCustomer(p)){
       p._paidEntry=true;
-      addCoin(ENTRY_FEE);
-      if(typeof CostPop!=='undefined')CostPop.at(p.x,p.y,ENTRY_FEE);
+      if(entryFeeCounts()){
+        addCoin(ENTRY_FEE);
+        /* ตัวเลขเด้ง "เหนือหัวคนที่เพิ่งเข้ามา" ไม่ใช่ที่พื้นตรงเท้า (ผู้เล่นขอ 2026-09-22)
+           z = ความสูงของคนคนนั้นจริง ๆ (hCm) บวกอีกนิดให้ลอยพ้นหัว */
+        /* ความสูงเดียวกับ "ขอบบนของกรอบคน" ใน personScreenBounds — ตัวเลขจึงลอยพ้นหัวพอดีทุกส่วนสูง
+           (ใช้ ZUNIT เฉย ๆ ไม่พอ วัดแล้วได้แค่ ~84% ของความสูงจริงบนจอ ตัวเลขไปทับหัว) */
+        if(typeof CostPop!=='undefined')CostPop.at(p.x,p.y,ENTRY_FEE,p.hCm/CM_PER_CELL*(ZUNIT+TH*.55));
+      }
     }
     p.t += dt; p.idle += dt;
     stepPersonLife(p,dt);
@@ -1052,10 +1118,83 @@ function drawPersonShadow(p){
 let _personBatch=null;
 const _carriedSlugs=[];   // ตู้ทากที่มีคนถืออยู่ในเฟรมนี้ (วาดตัวทากหลังเมชคนเสร็จ)
 
+/* ⚠️ 2026-09-22 ผู้เล่น: "เกมกระตุก แถมใช้พลังประมวลผลมากเกินไป" (วัดบนเครื่องผู้เล่น: เมนเธรดเต็ม 85–96%)
+   เดิมทุกเฟรม ต่อให้ไม่มีใครเปลี่ยนท่าเลย ก็ยังต้องทำงานเท่าเดิมทั้งหมด:
+     1) translatePoseFaces คัดลอกจุดยอดทุกจุดของทุกคนเพื่อบวกระยะเลื่อน (คนละ ~3,000 หน้า)
+     2) paintPersonMesh ไล่ตัดสามเหลี่ยมจากอาร์เรย์ซ้อนอาร์เรย์ใหม่หมด แล้ว bufferData ทั้งก้อน
+   วัดได้ (ลูกค้า 2 คน): translate 1.00 ms + paint 0.50 ms ต่อเฟรม → ลูกค้า 6 คนคือ ~4.5 ms/เฟรม
+   ที่แพงคือ "ทำซ้ำสิ่งที่ไม่ได้เปลี่ยน" ไม่ใช่ตัวการวาด
+   ตอนนี้: ท่าถูกแปลงเป็นบล็อกสามเหลี่ยม Float32 (x,y,z,r,g,b) "ครั้งเดียวตอนสร้างท่า"
+   แล้วอัปโหลดขึ้น GL buffer ของคนคนนั้นครั้งเดียว · ต่อเฟรมเหลือแค่ตั้ง uniform ระยะเลื่อน + drawArrays
+   จุดยอดในบัฟเฟอร์เป็นพิกัดโลกตอนสร้างท่า การเดินจึงชดเชยด้วย off=(p.x-pose.x, p.y-pose.y) ในเชดเดอร์
+   (ผลลัพธ์บนจอเท่าเดิมทุกพิกเซล — เชดเดอร์บวกค่าเดียวกับที่ translatePoseFaces เคยบวกให้ทุกจุด) */
+const PERSON_STRIDE=6;                       // x,y,z,r,g,b ต่อจุดยอด
+function faceTriCount(faces){let n=0;for(const f of faces)n+=(f.v||f).length-2;return n;}
+/* คลี่หน้าหลายเหลี่ยม → สามเหลี่ยมเรียงต่อกันในอาร์เรย์เดียว (สูตรเดียวกับ push() เดิมเป๊ะ)
+   rgb ว่าง = ใช้สีที่ส่งมา (หน้าบังของเฟอร์นิเจอร์ใช้ดำ · กระจกตู้ใช้ฟ้าจาง) */
+function flattenFaces(faces,out,at,fixedR,fixedG,fixedB){
+  for(const f of faces){
+    const vs=f.v||f;
+    let r=fixedR,g=fixedG,b=fixedB;
+    if(f.rgb){r=f.rgb[0]/255;g=f.rgb[1]/255;b=f.rgb[2]/255;}
+    for(let i=1;i<vs.length-1;i++){
+      const a=vs[0],c=vs[i],d=vs[i+1];
+      out[at++]=a[0];out[at++]=a[1];out[at++]=a[2];out[at++]=r;out[at++]=g;out[at++]=b;
+      out[at++]=c[0];out[at++]=c[1];out[at++]=c[2];out[at++]=r;out[at++]=g;out[at++]=b;
+      out[at++]=d[0];out[at++]=d[1];out[at++]=d[2];out[at++]=r;out[at++]=g;out[at++]=b;
+    }
+  }
+  return at;
+}
+function poseVertsOf(faces){
+  const tris=faceTriCount(faces),data=new Float32Array(tris*3*PERSON_STRIDE);
+  flattenFaces(faces,data,0,0,0,0);
+  return {verts:data,tris};
+}
+
+/* GL buffer ต่อคน — อัปโหลดเฉพาะตอนท่าเปลี่ยน (2–3 คน/เฟรม ตามโควตา) ไม่ใช่ทุกคนทุกเฟรม
+   อายุทรัพยากร (กฎข้อ 9): ประทับเลขเฟรมที่ใช้ล่าสุด ใครไม่ถูกใช้เกิน POSE_BUF_TTL เฟรม = ลบบัฟเฟอร์ทิ้ง
+   (คนออกจากร้าน/หลุดจอ/ปิดร้าน จะโดนเก็บกวาดเองโดยไม่ต้องไปแก้ทุกจุดที่ลบคนออกจาก PEOPLE) */
+const _poseBufs=new Map(); const POSE_BUF_TTL=240; let _poseFrame=0, _poseBuilds=0, _poseWorkers=[];
+function poseBufferFor(gl,p){
+  let e=_poseBufs.get(p);
+  if(!e){e={buf:gl.createBuffer(),cap:0,src:null};_poseBufs.set(p,e);}
+  e.used=_poseFrame;
+  const pose=p._drawPose;
+  if(e.src!==pose.verts){                    // ท่าใหม่ = อัปโหลดใหม่ครั้งเดียว
+    gl.bindBuffer(gl.ARRAY_BUFFER,e.buf);
+    if(e.cap<pose.verts.length){e.cap=pose.verts.length;gl.bufferData(gl.ARRAY_BUFFER,pose.verts,gl.DYNAMIC_DRAW);}
+    else gl.bufferSubData(gl.ARRAY_BUFFER,0,pose.verts);
+    e.src=pose.verts;
+  }
+  return e;
+}
+function prunePoseBuffers(gl){
+  for(const [p,e] of _poseBufs){
+    if(_poseFrame-e.used<=POSE_BUF_TTL)continue;
+    gl.deleteBuffer(e.buf);_poseBufs.delete(p);
+  }
+}
+
+/* เลขรุ่นเมชคน — ขยับเฉพาะตอน "ท่าเปลี่ยน" หรือ "คนขยับ" เท่านั้น
+   decor-glb.js ใช้ค่านี้ตัดสินว่าต้องเรนเดอร์ฉาก 3D ใหม่ไหม (คนยืนนิ่ง = ไม่ต้อง) */
+let _peopleMeshVersion=0,_peopleMeshKey='';
+function bumpPeopleMeshVersion(batch){
+  let key='';
+  for(const p of batch)key+=(p._drawPose?.t||0)+','+Math.round(p.x*64)+','+Math.round(p.y*64)+';';
+  if(key!==_peopleMeshKey){_peopleMeshKey=key;_peopleMeshVersion++;}
+  return _peopleMeshVersion;
+}
+
 function endPersonBatch(){
-  const faces=_personBatch;_personBatch=null;
-  if(faces?.length)window.DecorGLB?.queuePeople(faces);
-  if(faces&&faces.length)paintPersonMesh(faces,{x:0,y:0},Math.max(100,cellsW()+cellsH()));
+  const batch=_personBatch;_personBatch=null;
+  if(batch&&batch.length){
+    /* decor-glb ต้องรู้รูปทรงคนไว้บังโมเดล 3D — ส่งเป็นบล็อกสามเหลี่ยม + ระยะเลื่อน ไม่ต้องคัดลอกจุดยอดใหม่ */
+    window.DecorGLB?.queuePeople(
+      batch.map(p=>({verts:p._drawPose.verts,tris:p._drawPose.tris,dx:p.x-p._drawPose.x,dy:p.y-p._drawPose.y})),
+      bumpPeopleMeshVersion(batch));
+    drawPersonBatchGL(batch);
+  }
   drawCarriedSlugs();
   drawVisitorAnger();
 }
@@ -1123,25 +1262,95 @@ function personHitTest(p,sx,sy){
   const hit=depthAt(pose.faces,p.x-pose.x,p.y-pose.y);
   return Number.isFinite(hit)&&hit>=depthAt(personFurnitureFaces(true))-1e-6;
 }
-let _personBounds=null,_personVertexData=new Float32Array(65536);
+let _personBounds=null,_personVertexData=new Float32Array(65536),_poseBudget=3;
+const POSE_STALE=2.2;   /* ท่าค้างเกินกี่เท่าของคาบ = สร้างใหม่ทันที */
+/* คนยืนนิ่งขยับจาก 3 ตัวเท่านั้น: หายใจ (±0.0015 ของส่วนสูง) · เอนตัวและขยับข้างตอน state==='look' (±0.003 ทั้งคู่)
+   รวมแอมพลิจูดประมาณ 0.0045 เท่าของส่วนสูง แกว่งด้วยความถี่ ~1.6 rad/s
+   → ระยะที่ขยับต่อวินาทีบนจอ ≈ 1.6 × 0.0045 × ความสูงบนจอ(px)
+   ตั้งคาบให้ "หนึ่งรอบสร้างท่า = ขยับประมาณ POSE_PIXEL_STEP พิกเซล" แล้วหนีบไว้ไม่เกินของเดิม
+   ซูมเข้าใกล้มาก ๆ ก็ยังได้ 12 Hz เท่าเดิม · ซูมปกติ (คนสูง ~266 px) ได้ ~3.8 Hz = งานลดสามเท่า */
+const POSE_IDLE_AMP=.0045, POSE_PIXEL_STEP=.5, POSE_IDLE_MIN_HZ=1;
+function personIdleHz(p){
+  const bodyPx=p.hCm/CM_PER_CELL*ZUNIT*cam.zoom;
+  return Math.max(POSE_IDLE_MIN_HZ,Math.min(POSE_IDLE_HZ,1.6*POSE_IDLE_AMP*bodyPx/POSE_PIXEL_STEP));
+}
+/* ⚠️ 2026-09-22 ผู้เล่น: "คนท่าใหม่เยอะไปไหม ปรับให้ทำอะไรช้าลงกว่าเดิมหน่อยก็ได้"
+   ตอนนั้นป้ายขึ้น "ท่าใหม่ 64–76/วิ" ตอนลูกค้า 6 คนเดินพร้อมกัน (ยอด "คน" พุ่งจาก 2.8 → 7.4 ms/เฟรม)
+   วัดก่อนตัดสินใจ — คนเดินเต็มสปีด สูง 277 px บนจอ เทียบจุดยอดทุกจุดระหว่างสองท่าที่ห่างกัน 1 คาบ:
+      36 Hz → ขยับเฉลี่ย 0.88 px (สูงสุด 14.8 ที่ปลายเท้า)
+      22 Hz → 0.85 px (14.2)      ← เท่ากับ 36 Hz ทั้งที่ทำงานน้อยกว่าเกือบครึ่ง
+      15 Hz → 1.46 px (31.3)
+      10 Hz → 2.68 px (32.3)
+       6 Hz → 5.70 px (36.9)      ← เริ่มเห็นเป็นภาพกระตุกชัด
+   สรุป: เพดานเดิม 36 Hz จ่ายฟรีไปเปล่า ๆ (ไม่ได้ภาพดีกว่า 22 Hz เลย) จึงลดเพดานเหลือ 24
+   และลดงบรวมลงตามที่ผู้เล่นอนุญาต — ลูกค้า 6 คนจะได้คนละ ~16 Hz แทน 21.7 Hz
+   ท่าเดินจะ "หยาบขึ้นเล็กน้อย" จริงตามตัวเลขข้างบน (0.85 → ~1.4 px ต่อก้าวของการอัปเดต)
+   ตำแหน่งยังเลื่อนทุกเฟรมเหมือนเดิม คนจึงยังไถลไปข้างหน้าลื่น ๆ ไม่ใช่กระตุกทั้งตัว
+   ถ้ารู้สึกว่าขาแข็งไป ให้ดัน POSE_HZ_BUDGET กลับขึ้น ไม่ต้องแตะอย่างอื่น */
+/* ⚠️ 2026-09-23 ผู้เล่น: "ล็อกเฟรมแล้วดูดีขึ้น เพียงแต่มันทำให้ท่าเดินคนดูกระตุก"
+   ถูกต้อง — รอบก่อนผมหั่นงบเป็นเลขตายตัว (130 → 95) ซึ่งเป็นการเดาว่าเครื่องไหวแค่ไหน
+   พอ frame-cap.js ทำให้มีที่ว่างเหลือเฟือ (เกมวาด 1.9–10 ms จากช่องเวลา 16.7) งบที่หั่นไว้ก็กลายเป็นการรัดคอเปล่า ๆ
+   ตอนนี้งบขยับเองตาม "ที่ว่างจริงของเฟรม" แบบเดียวกับ animCap ของทาก:
+     ใช้เวลาวาดไม่ถึง 55% ของช่องเวลา → เพิ่มงบ (ท่าเดินลื่นขึ้น)
+     เกิน 75% → ลดงบ (ยอมให้ท่าหยาบลง ดีกว่าเฟรมตก)
+   เครื่องแรงจะไต่ไปจนสุดเพดาน · มือถือกากจะไหลลงไปเอง โดยไม่ต้องมีใครมานั่งเดาเลขให้ */
+let POSE_MOVE_HZ=24, POSE_HZ_BUDGET=150;
+const POSE_IDLE_HZ=12, POSE_MOVE_MAX_HZ=24, POSE_MOVE_MIN_HZ=12,
+      POSE_BUDGET_MIN=55, POSE_BUDGET_MAX=240;
+function tunePoseBudget(){
+  const cap=window.FrameCap;
+  if(!cap)return;
+  const slot=cap.intervalMs, work=cap.workMs;
+  if(work<slot*0.55)      POSE_HZ_BUDGET=Math.min(POSE_BUDGET_MAX,POSE_HZ_BUDGET*1.04);
+  else if(work>slot*0.75) POSE_HZ_BUDGET=Math.max(POSE_BUDGET_MIN,POSE_HZ_BUDGET*0.93);
+}   /* งบรวมทั้งร้าน: สร้างท่าใหม่ไม่เกินกี่ครั้ง/วินาที → หารกันตามจำนวนคนในจอ (คนเยอะ = แต่ละคนช้าลง แต่ไม่มีใครค้าง) */   /* อัตราเปลี่ยนท่า: กำลังเดิน/ทำท่า vs ยืนดูเฉย ๆ */   // ท่าค้างเกินกี่เท่าของคาบ = สร้างใหม่ทันที ไม่ต้องรอคิว (กันอาการ "ค้างท่าแล้วไถล")
 function beginPersonBatch(visitors){
   _personBatch=[];_personBounds=null;_carriedSlugs.length=0;
+  /* โควตา "สร้างท่าใหม่" ต่อเฟรม — กันเฟรมเดียวแบกงานสร้างเมชหลายคนพร้อมกัน (ต้นเหตุ p95 พุ่ง)
+     เครื่องช้า (งบอนิเมชันทากถูกหั่นแล้ว) เหลือ 2 คน/เฟรม · เครื่องปกติ 3 คน/เฟรม
+     ⚠️ ต้องมากพอให้คนที่เดินอยู่ได้ 30Hz ครบทุกคน ไม่งั้นท่าจะค้างแล้วเห็นเป็นไถล */
+  _poseBudget=(typeof animCap==='number'&&animCap<=4)?2:3;
+  tunePoseBudget();
+  POSE_MOVE_HZ=Math.max(POSE_MOVE_MIN_HZ,Math.min(POSE_MOVE_MAX_HZ,POSE_HZ_BUDGET/Math.max(1,(visitors&&visitors.length)||1)));
+  /* จัดคิวตาม "ใครค้างนานที่สุด" ไม่ใช่ตามลำดับการวาด — คนท้ายแถวจะได้ไม่โดนอดซ้ำ ๆ จนท่าแข็ง */
+  if(visitors&&visitors.length){
+    const due=[];
+    for(const p of visitors){
+      p._poseAllow=false;
+      if(!p._drawPose){p._poseAllow=true;continue;}              // ยังไม่เคยมีท่า = ต้องสร้างแน่นอน
+      /* คาบที่ drawPerson เลือกไว้จริงเมื่อเฟรมก่อน — ใช้จัดลำดับ "ใครค้างเกินคาบของตัวเองนานสุด"
+         (คำนวณคีย์ท่าใหม่ตรงนี้อีกรอบไม่คุ้ม ค่าคาบเปลี่ยนช้ากว่าเฟรมอยู่แล้ว) */
+      const rate=p._poseRate||((p.motion>.05||p.action!=='watch')?POSE_MOVE_HZ:POSE_IDLE_HZ);
+      const over=_peopleT-p._drawPose.t-(1+(p._poseJit||0))/rate;
+      if(over>0)due.push({p:p,over:over});
+    }
+    due.sort(function(a,b){return b.over-a.over;});
+    for(let i=0;i<due.length&&i<_poseBudget;i++)due[i].p._poseAllow=true;
+  }
   if(visitors?.length){const r={x0:CW,y0:CH,x1:0,y1:0};for(const p of visitors){const b=personScreenBounds(p);r.x0=Math.min(r.x0,b.x0);r.y0=Math.min(r.y0,b.y0);r.x1=Math.max(r.x1,b.x1);r.y1=Math.max(r.y1,b.y1);}_personBounds=r;}
 }
-function paintPersonMesh(faces,p,H,snapshot=false){
-  if(_personBatch){for(const f of faces)_personBatch.push(f);return;}
-  if(!faces.length)return;
+/* คอนเท็กซ์ WebGL ของเลเยอร์คน — สร้างครั้งเดียว ใช้ร่วมกันทั้งเส้นทางต่อเฟรมและเส้นทางอบภาพนิ่ง */
+function personGL(){
   if(!_personGL){
     const canvas=document.createElement('canvas'),gl=canvas.getContext('webgl',{alpha:true,antialias:true,premultipliedAlpha:true});
     if(!gl)throw Error('WebGL is required for character depth rendering');
     const shader=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;};
     const program=gl.createProgram();
-    gl.attachShader(program,shader(gl.VERTEX_SHADER,'attribute vec3 pos;attribute vec3 color;uniform vec4 clipX;uniform vec4 clipY;uniform vec4 clipZ;varying vec3 tint;void main(){vec4 v=vec4(pos,1.0);gl_Position=vec4(dot(v,clipX),dot(v,clipY),dot(v,clipZ),1.0);tint=color;}'));
+    /* off = ระยะที่คนเดินไปหลังจากสร้างท่า (หน่วยช่อง) — บวกให้ที่นี่แทนการคัดลอกจุดยอดทั้งตัวใน JS
+       ต้องบวก "ก่อน" คิด clip ทั้งสามแกน เพราะแกน Z (ความลึก) ก็คิดจาก x+y เหมือนกัน
+       ผลจึงเท่ากับ translatePoseFaces เดิมทุกประการ ทั้งภาพและลำดับการบัง */
+    gl.attachShader(program,shader(gl.VERTEX_SHADER,'attribute vec3 pos;attribute vec3 color;uniform vec4 clipX;uniform vec4 clipY;uniform vec4 clipZ;uniform vec2 off;varying vec3 tint;void main(){vec4 v=vec4(pos.x+off.x,pos.y+off.y,pos.z,1.0);gl_Position=vec4(dot(v,clipX),dot(v,clipY),dot(v,clipZ),1.0);tint=color;}'));
     gl.attachShader(program,shader(gl.FRAGMENT_SHADER,'precision mediump float;uniform float opacity;varying vec3 tint;void main(){gl_FragColor=vec4(tint*opacity,opacity);}'));
     gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
-    _personGL={canvas,gl,program,buffer:gl.createBuffer(),pos:gl.getAttribLocation(program,'pos'),color:gl.getAttribLocation(program,'color'),clipX:gl.getUniformLocation(program,'clipX'),clipY:gl.getUniformLocation(program,'clipY'),clipZ:gl.getUniformLocation(program,'clipZ'),opacity:gl.getUniformLocation(program,'opacity')};
+    _personGL={canvas,gl,program,buffer:gl.createBuffer(),pos:gl.getAttribLocation(program,'pos'),color:gl.getAttribLocation(program,'color'),clipX:gl.getUniformLocation(program,'clipX'),clipY:gl.getUniformLocation(program,'clipY'),clipZ:gl.getUniformLocation(program,'clipZ'),opacity:gl.getUniformLocation(program,'opacity'),off:gl.getUniformLocation(program,'off')};
   }
-  const {canvas,gl,program,buffer,pos,color,clipX,clipY,clipZ,opacity}=_personGL,origin=snapshot?{x:0,y:0}:P(0,0,0),z=snapshot?1:cam.zoom;
+  return _personGL;
+}
+/* เส้นทาง "วาดจากลิสต์หน้า" — ตอนนี้เหลือผู้ใช้เดียวคือ cat-seller.js ที่อบภาพแมวแคชเชียร์
+   (ครั้งเดียวต่อการเปลี่ยนผังร้าน ไม่ใช่งานต่อเฟรม) · ลูกค้าใช้ drawPersonBatchGL แทนแล้ว */
+function paintPersonMesh(faces,p,H,snapshot=false){
+  if(!faces.length)return;
+  const {canvas,gl,program,buffer,pos,color,clipX,clipY,clipZ,opacity,off}=personGL(),origin=snapshot?{x:0,y:0}:P(0,0,0),z=snapshot?1:cam.zoom;
   let bounds=_personBounds;
   if(!bounds){bounds={x0:Infinity,y0:Infinity,x1:-Infinity,y1:-Infinity};for(const f of faces)for(const v of f.v){const x=origin.x+(v[0]-v[1])*TW*z,y=origin.y+(v[0]+v[1])*TH*z-v[2]*ZUNIT*z;bounds.x0=Math.min(bounds.x0,x);bounds.x1=Math.max(bounds.x1,x);bounds.y0=Math.min(bounds.y0,y);bounds.y1=Math.max(bounds.y1,y);}}
   const x0=snapshot?Math.floor(bounds.x0)-2:Math.max(0,Math.floor(bounds.x0)-2),y0=snapshot?Math.floor(bounds.y0)-2:Math.max(0,Math.floor(bounds.y0)-2),x1=snapshot?Math.ceil(bounds.x1)+2:Math.min(CW,Math.ceil(bounds.x1)+2),y1=snapshot?Math.ceil(bounds.y1)+2:Math.min(CH,Math.ceil(bounds.y1)+2),w=x1-x0,h=y1-y0;
@@ -1173,7 +1382,7 @@ function paintPersonMesh(faces,p,H,snapshot=false){
   for(const f of faces)push(f.v,f.rgb[0]/255,f.rgb[1]/255,f.rgb[2]/255);const opaqueEnd=at/6;
   for(const vs of glass)push(vs,.48,.66,.71);
   gl.viewport(0,canvas.height-height,width,height);gl.disable(gl.BLEND);gl.depthMask(true);gl.colorMask(true,true,true,true);gl.clearColor(0,0,0,0);gl.clearDepth(1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-  gl.useProgram(program);gl.uniform1f(opacity,1);gl.uniform4f(clipX,TW*z*2/w,-TW*z*2/w,0,(origin.x-x0)*2/w-1);gl.uniform4f(clipY,-TH*z*2/h,-TH*z*2/h,ZUNIT*z*2/h,1-(origin.y-y0)*2/h);gl.uniform4f(clipZ,-.025/H,-.025/H,-.025/H,(p.x+p.y)*.025/H);
+  gl.useProgram(program);gl.uniform1f(opacity,1);gl.uniform2f(off,0,0);gl.uniform4f(clipX,TW*z*2/w,-TW*z*2/w,0,(origin.x-x0)*2/w-1);gl.uniform4f(clipY,-TH*z*2/h,-TH*z*2/h,ZUNIT*z*2/h,1-(origin.y-y0)*2/h);gl.uniform4f(clipZ,-.025/H,-.025/H,-.025/H,(p.x+p.y)*.025/H);
   gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,data.subarray(0,at),gl.STREAM_DRAW);
   gl.enableVertexAttribArray(pos);gl.vertexAttribPointer(pos,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(color);gl.vertexAttribPointer(color,3,gl.FLOAT,false,24,12);
   gl.colorMask(false,false,false,false);gl.drawArrays(gl.TRIANGLES,0,maskCount);gl.colorMask(true,true,true,true);gl.drawArrays(gl.TRIANGLES,maskCount,opaqueEnd-maskCount);
@@ -1186,10 +1395,115 @@ function paintPersonMesh(faces,p,H,snapshot=false){
   ctx.drawImage(canvas,0,0,width,height,x0,y0,w,h);
 }
 
+/* ---------- เลเยอร์ลูกค้าต่อเฟรม ----------
+   งานที่เหลือต่อเฟรมมีแค่: ยัดหน้าบัง (เฟอร์นิเจอร์+กระจกตู้ ~150 สามเหลี่ยม) ลงบัฟเฟอร์เล็กหนึ่งใบ
+   แล้ววนคน → ตั้ง uniform ระยะเลื่อน → drawArrays จากบัฟเฟอร์ของคนคนนั้น (อัปโหลดไว้แล้วตอนสร้างท่า)
+   ลำดับสามพาสต้องเหมือนเดิมเป๊ะ ไม่งั้นการบังเพี้ยน:
+     1) หน้าบังทึบ เขียนเฉพาะความลึก (colorMask ปิด)
+     2) ตัวคน ทึบ
+     3) กระจกตู้ ผสมสีทับ (depthMask ปิด)
+   ⚠️ บัฟเฟอร์หน้าบังยังสร้างใหม่ทุกเฟรม "โดยตั้งใจ" — โต๊ะเล่น/โต๊ะวิจัยมีของบนโต๊ะเปลี่ยนตลอด
+      ของชุดนี้เล็กมากเทียบกับคน (คนเดียว ~3,000 สามเหลี่ยม) จึงยังไม่คุ้มที่จะไปแคชแยก */
+/* จัดคนเป็น "กลุ่มที่กรอบบนจอซ้อนกัน" — คนที่กรอบไม่ซ้อนกันบังกันไม่ได้อยู่แล้ว จึงวาดแยกกรอบได้
+   ⚠️ 2026-09-22 เดิมใช้กรอบรวมของลูกค้าทุกคน: ลูกค้ายืนคนละมุมร้าน = เลเยอร์คนกลายเป็นเกือบเต็มจอ
+      (วัดได้ 766×430 px จากลูกค้าแค่ 2 คน · ของผู้เล่นมี 6 คนกระจายทั่วจอ)
+      ต้นทุนจึงผูกกับ "ระยะห่างระหว่างลูกค้า" ไม่ใช่พื้นที่ที่คนกินจริง ทั้งฝั่งเรนเดอร์และฝั่ง composite
+   รวมกรอบแบบทรานซิทีฟจนไม่มีคู่ไหนซ้อนกัน → กรอบที่ได้ไม่ทับกัน วาดทับลงแคนวาส 2D ได้ตรง ๆ */
+function personClusters(batch){
+  const boxes=[];
+  for(const p of batch){
+    const b=personScreenBounds(p);
+    const r={x0:Math.max(0,Math.floor(b.x0)-2),y0:Math.max(0,Math.floor(b.y0)-2),
+             x1:Math.min(CW,Math.ceil(b.x1)+2),y1:Math.min(CH,Math.ceil(b.y1)+2),people:[p]};
+    if(r.x1<=r.x0||r.y1<=r.y0)continue;
+    boxes.push(r);
+  }
+  for(let merged=true;merged;){
+    merged=false;
+    for(let i=0;i<boxes.length&&!merged;i++)for(let j=i+1;j<boxes.length;j++){
+      const a=boxes[i],b=boxes[j];
+      if(a.x0>=b.x1||b.x0>=a.x1||a.y0>=b.y1||b.y0>=a.y1)continue;
+      a.x0=Math.min(a.x0,b.x0);a.y0=Math.min(a.y0,b.y0);
+      a.x1=Math.max(a.x1,b.x1);a.y1=Math.max(a.y1,b.y1);
+      for(const p of b.people)a.people.push(p);
+      boxes.splice(j,1);merged=true;break;
+    }
+  }
+  return boxes;
+}
+let _occVerts=new Float32Array(16384);
+function drawPersonBatchGL(batch){
+  const {canvas,gl,program,buffer,pos,color,clipX,clipY,clipZ,opacity,off}=personGL();
+  const origin=P(0,0,0),z=cam.zoom,H=Math.max(100,cellsW()+cellsH());
+  const clusters=personClusters(batch);
+  if(!clusters.length)return;
+  const scale=Math.min(2,window.devicePixelRatio||1);
+  let maxW=0,maxH=0;
+  for(const c of clusters){maxW=Math.max(maxW,Math.ceil((c.x1-c.x0)*scale));maxH=Math.max(maxH,Math.ceil((c.y1-c.y0)*scale));}
+  if(canvas.width<maxW)canvas.width=Math.ceil(maxW/128)*128;
+  if(canvas.height<maxH)canvas.height=Math.ceil(maxH/128)*128;
+
+  const blockers=personFurnitureFaces(true),glass=[];
+  for(const o of G.objs){if(o===moving||!onScreen(o))continue;
+    if(o.def.playTable){glass.push(...playTableDepthFaces(o).glass);continue;}
+    if(o.def.researchTable){glass.push(...researchTableDepthFaces(o).glass);continue;}
+    if(o.type!=='tank')continue;
+    const q=objGeometry(o).glass;                     // แคชไว้แล้ว (ดู objGeometry) ไม่สร้างใหม่ทุกเฟรม
+    if(q)for(const v of q)glass.push(v);
+  }
+  const need=(faceTriCount(blockers)+faceTriCount(glass))*3*PERSON_STRIDE;
+  if(_occVerts.length<need)_occVerts=new Float32Array(2**Math.ceil(Math.log2(need)));
+  let at=flattenFaces(blockers,_occVerts,0,0,0,0);
+  const maskCount=at/PERSON_STRIDE;
+  at=flattenFaces(glass,_occVerts,at,.48,.66,.71);
+  const glassCount=at/PERSON_STRIDE-maskCount;
+
+  gl.useProgram(program);
+  gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);
+  gl.enableVertexAttribArray(pos);gl.enableVertexAttribArray(color);
+  gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,_occVerts.subarray(0,at),gl.STREAM_DRAW);
+  const bind=b=>{gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.vertexAttribPointer(pos,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(color,3,gl.FLOAT,false,24,12);};
+  _poseFrame++;
+
+  for(const c of clusters){
+    const x0=c.x0,y0=c.y0,w=c.x1-c.x0,h=c.y1-c.y0;
+    const width=Math.ceil(w*scale),height=Math.ceil(h*scale);
+    gl.viewport(0,canvas.height-height,width,height);
+    gl.disable(gl.BLEND);gl.depthMask(true);gl.colorMask(true,true,true,true);
+    gl.clearColor(0,0,0,0);gl.clearDepth(1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+    gl.uniform1f(opacity,1);
+    gl.uniform4f(clipX,TW*z*2/w,-TW*z*2/w,0,(origin.x-x0)*2/w-1);
+    gl.uniform4f(clipY,-TH*z*2/h,-TH*z*2/h,ZUNIT*z*2/h,1-(origin.y-y0)*2/h);
+    gl.uniform4f(clipZ,-.025/H,-.025/H,-.025/H,0);    // ชุดเดียวกับที่ endPersonBatch เคยส่ง p={x:0,y:0}
+
+    /* หน้าบังของเฟอร์นิเจอร์ต้องวาดซ้ำในทุกกรอบ — แต่ละกรอบมี depth buffer ของตัวเอง
+       ของชุดนี้เล็ก (หลักร้อยสามเหลี่ยม) เทียบกับคนคนเดียว ~3,000 จึงถูกกว่าการวาดเต็มจอมาก */
+    bind(buffer);gl.uniform2f(off,0,0);
+    gl.colorMask(false,false,false,false);gl.drawArrays(gl.TRIANGLES,0,maskCount);gl.colorMask(true,true,true,true);
+
+    for(const p of c.people){
+      const pose=p._drawPose;if(!pose||!pose.tris)continue;
+      const e=poseBufferFor(gl,p);
+      bind(e.buf);
+      gl.uniform2f(off,p.x-pose.x,p.y-pose.y);
+      gl.drawArrays(gl.TRIANGLES,0,pose.tris*3);
+    }
+    if(glassCount){
+      bind(buffer);gl.uniform2f(off,0,0);
+      gl.depthMask(false);gl.enable(gl.BLEND);gl.uniform1f(opacity,.38);
+      gl.blendFuncSeparate(gl.DST_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ZERO,gl.ONE);
+      gl.drawArrays(gl.TRIANGLES,maskCount,glassCount);
+      gl.depthMask(true);gl.disable(gl.BLEND);
+    }
+    ctx.drawImage(canvas,0,0,width,height,x0,y0,w,h);
+  }
+  prunePoseBuffers(gl);
+}
+
 // Fixed upper-arm and forearm lengths; gestures move the joints, never stretch them.
 function solvePersonArm(shoulder,wantedHand,preferredElbow,maxReach=.215,upper=maxReach/2,lower=maxReach/2){
   const delta=wantedHand.map((x,i)=>x-shoulder[i]);
-  const raw=Math.hypot(...delta),distance=Math.max(.035,Math.min(maxReach,raw));
+  const raw=Math.hypot(...delta),distance=Math.max(.035,Math.abs(upper-lower)+1e-6,Math.min(maxReach,raw));
   const direction=raw>1e-8?delta.map(x=>x/raw):[0,0,-1];
   const hand=shoulder.map((x,i)=>x+direction[i]*distance);
   let bend=preferredElbow.map((x,i)=>x-shoulder[i]);
@@ -1208,6 +1522,64 @@ function solvePersonArm(shoulder,wantedHand,preferredElbow,maxReach=.215,upper=m
 }
 
 // Reuse each existing hand mesh's upper surface when placing it under a tank.
+// The bake assigns whole triangles to bones, leaving duplicated seam vertices.
+// Match their bind positions once; join only shirt seams when a pose is rebuilt.
+// Fit once per head/hair variant; all coordinates are relative to the head joint.
+const personHatFits=new WeakMap();
+function fittedPersonHat(model,hair){
+  const key=hair||model.parts.head;
+  if(personHatFits.has(key))return personHatFits.get(key);
+  const base=.085,parts=[model.parts.head,hair].filter(Boolean);
+  let rx=.05,ry=.06,top=base;
+  for(const part of parts)for(let i=0;i<part.v.length;i+=3){
+    if(part.v[i+2]<base-.008)continue;
+    rx=Math.max(rx,Math.abs(part.v[i]));ry=Math.max(ry,Math.abs(part.v[i+1]));top=Math.max(top,part.v[i+2]);
+  }
+  let scale=1;
+  for(const part of parts)for(let i=0;i<part.v.length;i+=3){
+    if(part.v[i+2]<base-.008)continue;
+    scale=Math.max(scale,Math.hypot(part.v[i]/rx,part.v[i+1]/ry));
+  }
+  // Circumscribe the head with a ten-sided ellipse, leaving clearance at each face.
+  const fit={base,rx:rx*scale/Math.cos(Math.PI/10)+.006,ry:ry*scale/Math.cos(Math.PI/10)+.006,top:top+.014};
+  personHatFits.set(key,fit);return fit;
+}
+const personShirtSeams=new WeakMap();
+function shirtSeams(model){
+  if(personShirtSeams.has(model))return personShirtSeams.get(model);
+  const buckets=new Map(),groups=[],byPart=new Map(),eps=.00016;
+  for(const name of ['torso','armL','armR','foreL','foreR']){
+    const part=model.parts[name];if(!part)continue;
+    const used=new Set();
+    for(const [slot,start,count] of part.s)if(slot==='shirt')
+      for(let k=start*3;k<(start+count)*3;k++)used.add(part.t[k]);
+    for(const i of used){
+      const pos=[0,1,2].map(a=>part.v[i*3+a]+part.o[a]);
+      const cell=pos.map(x=>Math.floor(x/eps));let group;
+      for(let x=-1;x<=1&&!group;x++)for(let y=-1;y<=1&&!group;y++)for(let z=-1;z<=1&&!group;z++){
+        const near=buckets.get([cell[0]+x,cell[1]+y,cell[2]+z].join(','));
+        group=near?.find(g=>Math.hypot(...pos.map((v,a)=>v-g.pos[a]))<eps);
+      }
+      if(!group){group={pos,members:[]};groups.push(group);const key=cell.join(',');
+        if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(group);}
+      group.members.push({part,i});
+    }
+  }
+  const seams=groups.filter(g=>new Set(g.members.map(m=>m.part)).size>1);
+  seams.forEach((g,id)=>{for(const {part,i} of g.members){
+    if(!byPart.has(part))byPart.set(part,new Map());byPart.get(part).set(i,id);
+  }});
+  for(const [part,vertices] of byPart){
+    const triangles=new Uint8Array(part.t.length/3);
+    for(let k=0;k<triangles.length;k++)triangles[k]=vertices.has(part.t[k*3])||vertices.has(part.t[k*3+1])||vertices.has(part.t[k*3+2]);
+    byPart.set(part,{vertices,triangles});
+  }
+  const result={byPart,count:seams.length,points:Array.from({length:seams.length},()=>[]),facePool:[]};personShirtSeams.set(model,result);return result;
+}
+// Shared bind-space accessories are fitted offline by tools/build-people-bags.mjs.
+// Pose them with the exact torso transform: width, sway, lean, twist and crouch.
+const personBagModels=new WeakMap(Object.keys(PEOPLE_MODEL).map(name=>[PEOPLE_MODEL[name],PEOPLE_BAG_MODEL[name]]));
+function fittedPersonBags(model){return personBagModels.get(model);}
 const carryPalmTops=new WeakMap();
 function carryPalmTop(part){
   if(!carryPalmTops.has(part)){
@@ -1221,25 +1593,28 @@ function carryPalmTop(part){
    เดิมเลื่อนด้วย faces.map(...v.map(...)) = สร้างอาร์เรย์ใหม่ต่อ "ทุกจุดยอดของทุกหน้า ทุกเฟรม"
    คนเดินหนึ่งคนมีหลายพันจุด → ขยะ GC กองใหญ่ทุกเฟรม ซึ่งบนมือถือคือตัวกระตุกตัวจริง
    ตอนนี้จองบัฟเฟอร์ปลายทางไว้ต่อคน แล้วเขียนทับค่าเดิม — จองใหม่เฉพาะตอนเปลี่ยนท่าเท่านั้น */
-function translatePoseFaces(p,src,dx,dy){
-  let out=p._poseBuf;
-  if(!out||out._src!==src){
-    out=src.map(f=>({rgb:f.rgb,v:f.v.map(v=>[v[0],v[1],v[2]])}));
-    out._src=src;p._poseBuf=out;
-  }
-  for(let i=0;i<src.length;i++){
-    const sv=src[i].v,dv=out[i].v;
-    for(let j=0;j<sv.length;j++){const s=sv[j],d=dv[j];d[0]=s[0]+dx;d[1]=s[1]+dy;d[2]=s[2];}
-  }
-  return out;
-}
+/* ⚠️ translatePoseFaces ถูกถอดออก 2026-09-22 — เดิมคัดลอกจุดยอดทุกจุดของทุกคนทุกเฟรมเพื่อบวกระยะเลื่อน
+   (วัดได้ 1.00 ms ต่อคนต่อเฟรม) ตอนนี้ระยะเลื่อนถูกส่งเป็น uniform `off` ให้เชดเดอร์บวกเอง
+   ผลเท่าเดิมทุกจุด แต่ฝั่ง JS เหลือศูนย์ · ถ้าต้องการจุดยอดที่เลื่อนแล้วใน JS ให้บวก dx/dy ตอนอ่าน */
 function drawPerson(p){
   if(!personOnScreen(p))return;
   // Camera movement does not change a person's world-space geometry.
   // Reuse idle poses at 12 Hz and moving/gesturing poses at 30 Hz;
   // position is translated every frame so walking remains smooth.
-  const poseRate=(p.motion>.05||p.action!=='watch')?30:12;
-  const poseKey=[Math.floor(p.idle*poseRate),p.action==='watch'?0:Math.round((p.actionT||0)*30),Math.round((p.catchupBoost||1)*10),Math.round(p.phase*20),Math.round((p.motion||0)*20),Math.round(p.fdx*100),Math.round(p.fdy*100),Math.round((p.headYaw||0)*100),p.action,p.state,p._squeezeUntil>_peopleT?1:0,p.focus?.id,['point','crouch'].includes(p.action)?Math.round(p.x*20):0,['point','crouch'].includes(p.action)?Math.round(p.y*20):0,p.hCm,p.outfit,p.hairCut,p.shirt,p.pants,p.skin,p.hair,p.bagged,p.accessory,p.modelHair,p.facial,p.body,p.carryTank?1:0,p.carryTank?p.carryColor:0,p.carryTank?p.carryAccent:0].join('|');
+  /* ⚠️ 2026-09-22 ผู้เล่น: "เกมกระตุก แถมใช้พลังประมวลผลมากเกินไป"
+     คนยืนดูตู้เฉย ๆ เคยสร้างเมชใหม่ทั้งตัว (3,042 สามเหลี่ยม) 12 ครั้ง/วินาที ตามนาฬิกา POSE_IDLE_HZ
+     วัดจริงว่าได้อะไรกลับมา (คนสูง 266 px บนจอ ยืนนิ่ง เทียบจุดยอดทุกจุด):
+        ห่างกัน 1 คาบ (1/12 วิ) → จุดยอดขยับ "สูงสุด 0.053 px" เฉลี่ย 0.005 px
+        ห่างกันเต็ม 1 วินาที    → สูงสุด 0.41 px
+     คือจ่ายเต็มราคาเพื่อภาพที่ต่างกันไม่ถึงพิกเซล · ท่ายืนขยับจากสามตัวเท่านั้น
+     (หายใจ 0.0015 · เอนตัวตอน state==='look' 0.003 · ขยับข้าง 0.003 — ทั้งหมดเทียบกับส่วนสูง)
+     ตอนนี้จึงแยกคีย์เป็นสองส่วน:
+       shapeKey = ทุกอย่างที่ "เห็นได้" (ท่า ทิศ หันหัว เดิน ของที่ถือ เสื้อผ้า) → เปลี่ยนเมื่อไรรีเฟรชไว
+       ส่วนลมหายใจ = ผูกกับ "ระยะที่ขยับจริงบนจอ" ไม่ใช่นาฬิกา (personIdleHz)
+     ผลคือคนที่หันหัว/ขยับ ยังลื่นเท่าเดิม แต่คนที่นิ่งจริงหยุดเผาเมชทิ้ง */
+  const idleHz=personIdleHz(p);
+  const moving=p.motion>.05||p.action!=='watch';
+  const shapeKey=[p.action==='watch'?0:Math.round((p.actionT||0)*30),Math.round((p.catchupBoost||1)*10),Math.round(p.phase*20),Math.round((p.motion||0)*20),Math.round(p.fdx*100),Math.round(p.fdy*100),Math.round((p.headYaw||0)*100),p.action,p.state,p._squeezeUntil>_peopleT?1:0,p.focus?.id,['point','crouch'].includes(p.action)?Math.round(p.x*20):0,['point','crouch'].includes(p.action)?Math.round(p.y*20):0,p.hCm,p.outfit,p.hairCut,p.shirt,p.pants,p.skin,p.hair,p.bagged,p.accessory,p.modelHair,p.facial,p.body,p.carryTank?1:0,p.carryTank?p.carryColor:0,p.carryTank?p.carryAccent:0].join('|');
   /* ⚠️ 2026-09-21 ผู้เล่น: "มือถือแลค" — คอมเมนต์ข้างบนตั้งใจให้ใช้ท่าซ้ำที่ 12/30Hz
      แต่ของจริงแทบไม่เคยได้ใช้ซ้ำเลย เพราะคีย์มีค่าที่ "ไม่มีวันนิ่ง" ปนอยู่:
      headYaw กับ fdx/fdy เป็นค่าที่ไล่เข้าเป้าแบบ exponential (บรรทัด 336) จึงขยับทีละนิดตลอดกาล
@@ -1248,12 +1623,34 @@ function drawPerson(p){
      ลูกค้า 5 คนบนมือถือจึงกินเวลาเกินงบเฟรมไปหลายเท่า
      แก้ด้วยการคุม "อัตราเปลี่ยนท่า" ตามเวลาจริงตามที่ตั้งใจไว้แต่แรก: คีย์เปลี่ยนก็รอให้ถึงรอบก่อน
      (ท่าที่ได้เหมือนเดิมทุกประการ แค่อัปเดตที่ 12/30Hz แทน 60Hz · ตำแหน่งยังเลื่อนทุกเฟรม เดินจึงลื่นเท่าเดิม) */
-  if(p._drawPose&&(p._drawPose.key===poseKey||_peopleT-p._drawPose.t<1/poseRate)){
+  /* ⚠️ 2026-09-22 ผู้เล่น: "รู้สึกกระตุก" · ปิดอนิเมชันทากแล้ว p95 ยังเท่าเดิม → ตัวการอยู่ฝั่งคน
+     วัดได้ (ลูกค้า 4 คนในจอ): เฟรมที่ไม่มีใครสร้างท่าใหม่ 3.8 ms · เฟรมที่สร้างพร้อมกัน 4 คน 10.7 ms
+     และเฟรมแบบหลังเกิด 7% = ตรงกับ p95 ที่ผู้เล่นเห็นเป๊ะ
+     สาเหตุ: ทุกคนใช้คาบเดียวกัน (12/30Hz) และเข้าร้านไล่ ๆ กัน จังหวะรีเฟรชท่าเลย "ตรงกันหมด"
+     (ปัญหาเดียวกับสไปรต์ทากที่แก้ไปแล้วด้วย s._tsOff — ที่นี่ยังไม่มีตัวกระจาย)
+     แก้สองชั้น: สุ่มคาบให้เหลื่อมกันทุกครั้งที่สร้างท่า + จำกัดจำนวนคนที่สร้างท่าใหม่ได้ต่อเฟรม
+     คนที่ไม่ได้คิวจะใช้ท่าเดิมไปอีกเฟรม (ตำแหน่งยังเลื่อนตามปกติ เดินไม่สะดุด) */
+  /* ⚠️ 2026-09-22 รอบสอง ผู้เล่น: "ท่าเดินเวลามีตัวขวางค้างท่านั้นแล้วไถลไปตามทาง · ท่าเดินแข็งกว่าเดิมมาก"
+     รอบแรกผมคุมด้วย "โควตาต่อเฟรม" แบบใครมาก่อนได้ก่อน (ลำดับการวาด) คนท้ายแถวจึงโดนอดคิวซ้ำ ๆ
+     ท่าค้างแต่ตำแหน่งยังเลื่อน = เห็นเป็นไถล และคนที่โดนอดบ่อยก็ดูแข็ง
+     ตอนนี้: จัดคิวตาม "ใครค้างนานสุด" (คิดใน beginPersonBatch) + ใครค้างเกิน POSE_STALE เท่าของคาบ
+     ให้สร้างท่าใหม่ได้ทันทีไม่สนโควตา = ไม่มีใครค้างยาวจนเห็นเป็นไถลอีก */
+  /* เลือกคาบจากสิ่งที่เปลี่ยนจริง ไม่ใช่จากสถานะอย่างเดียว:
+       กำลังเดิน/ทำท่า          → POSE_MOVE_HZ (ลื่นเท่าเดิมทุกประการ)
+       ยืนอยู่แต่รูปร่างเปลี่ยน (หันหัว มองตู้อื่น เปลี่ยนของที่ถือ) → POSE_IDLE_HZ เหมือนเดิม
+       ยืนนิ่งจริง เหลือแค่ลมหายใจ → idleHz ซึ่งคิดจากระยะขยับบนจอ (ปกติ 1–4 Hz แทน 12 Hz) */
+  const shapeChanged=!p._drawPose||p._drawPose.shape!==shapeKey;
+  const poseRate=moving?POSE_MOVE_HZ:(shapeChanged?POSE_IDLE_HZ:idleHz);
+  p._poseRate=poseRate;                                   // beginPersonBatch ใช้จัดคิว "ใครค้างนานสุด"
+  const poseKey=shapeKey+'|'+Math.floor(p.idle*idleHz);
+  const interval=(1+(p._poseJit||0))/poseRate, age=p._drawPose?_peopleT-p._drawPose.t:Infinity;
+  const due=!p._drawPose||(p._drawPose.key!==poseKey&&age>=interval);
+  const mustRefresh=age>=interval*POSE_STALE;                  // ค้างนานเกินไปแล้ว ห้ามอดอีก
+  if(p._drawPose&&(!due||(!p._poseAllow&&!mustRefresh&&_poseBudget<=0))){
     const cached=p._drawPose,dx=p.x-cached.x,dy=p.y-cached.y;
-    const faces=dx||dy?translatePoseFaces(p,cached.faces,dx,dy):cached.faces;
     if(cached.carryQuad)_carriedSlugs.push({p,cm:cached.carryCm,
       quad:dx||dy?cached.carryQuad.map(v=>[v[0]+dx,v[1]+dy,v[2]]):cached.carryQuad});
-    paintPersonMesh(faces,p,p.hCm/CM_PER_CELL);return;
+    _personBatch?.push(p);return;                     // ใช้บล็อกจุดยอดเดิมที่อยู่บน GPU แล้ว ไม่แตะจุดยอดเลย
   }
   let carryQuad=null,carryCm=0;
   const H=p.hCm/CM_PER_CELL, b=P(p.x,p.y,0), px=H*ZUNIT*cam.zoom;
@@ -1282,7 +1679,8 @@ function drawPerson(p){
   const actionProgress=Math.min(1,(p.actionT||0)/(p.actionDuration||1));
   const jump=action==='jump'&&p.kid?Math.max(0,Math.sin(actionProgress*Math.PI*4))*.07:0;
   const crouch=!p.carryTank&&action==='crouch'?Math.min(gesture,Math.max(0,(clearance/H-.14)/.5)):0;
-  let posedArms=false;
+  // Raised arms can cross neck height; they must never inherit head transforms.
+  let posedArms=false,armGeometry=false;
   function inspectPose(v){
     v=v.slice();if(!crouch)return v;
     if(v[2]>=HIPZ){
@@ -1298,16 +1696,23 @@ function drawPerson(p){
   const _yaw=-(p.headYaw||0), _yawC=Math.cos(_yaw), _yawS=Math.sin(_yaw);
   const _nodZ=(action==='nod')?Math.sin((p.actionT||0)*6)*.004*gesture:0;
   const runLean=Math.max(0,(p.catchupBoost||1)-1)*.012*motion;
-  const lean=runLean+(p.state==='look'?0.012+Math.sin(p.idle*.65)*.003:0.019*motion)+(action==='lean'?gesture*.026:0);
+  /* ⚠️ 2026-09-23 ผู้เล่น: "ไม่มีใครเดินหลังตรงขนาดนั้น"
+     ของเดิมเขียนเป็น "ถ้า state==='look' ใช้ 0.012 ไม่งั้นใช้ 0.019*motion" = เลือกอย่างใดอย่างหนึ่ง
+     ลูกค้าที่กำลังเดินไปดูตู้อยู่ใน state 'look' อยู่แล้ว จึงได้แค่ 0.012 (4.1°) และ "ไม่โตตามความเร็ว"
+     คือยิ่งเดิน ยิ่งไม่เอนเพิ่ม → ตัวตั้งตรงเป๊ะเหมือนยืนตรงเคลื่อนที่
+     ตอนนี้แยกเป็นสองส่วนแล้วบวกกัน: ท่าทางพื้นฐาน (ยืนดูตู้) + เอนตามความเร็วจริง
+     เพดาน 0.026 ของส่วนสูง = ราว 8.8° วัดจากช่วงสะโพก→อก 0.168 — อยู่ในช่วงเดินปกติของคนจริง (2–10°) */
+  const postureLean=p.state==='look'?0.012+Math.sin(p.idle*.65)*.003:0;
+  const lean=runLean+Math.min(0.026,postureLean+GAIT_LEAN_WALK*motion)+(action==='lean'?gesture*.026:0);
   const shift=p.state==='look'?Math.sin(p.idle*.65)*.003:0;
   function world(v){
     v=[v[0]+shift*Math.min(1,v[2]/.5),v[1]+(action==='lean'?gesture*.026*Math.max(0,v[2]-.5):0),v[2]];
-    if(v[2]>HEADCUT){
+    if(!armGeometry&&v[2]>HEADCUT){
       const x=v[0],y=v[1]-(lean+.009);
       v[0]=x*_yawC-y*_yawS;v[1]=lean+.009+x*_yawS+y*_yawC;
       v[2]+=_nodZ;
     }
-    if(!posedArms&&crouch&&v[2]>HEADCUT){const y=v[1]-lean,z=v[2]-HEADCUT,a=-.65*crouch;v[1]=lean+y*Math.cos(a)+z*Math.sin(a);v[2]=HEADCUT+z*Math.cos(a)-y*Math.sin(a);}
+    if(!armGeometry&&!posedArms&&crouch&&v[2]>HEADCUT){const y=v[1]-lean,z=v[2]-HEADCUT,a=-.65*crouch;v[1]=lean+y*Math.cos(a)+z*Math.sin(a);v[2]=HEADCUT+z*Math.cos(a)-y*Math.sin(a);}
     if(!posedArms)v=inspectPose(v);
     /* ---- สัดส่วนเด็ก (ไม่ต้องมีโมเดลแยก) ----
        ผู้ใหญ่ในโมเดลสูงราว 5.6 หัว · เด็กวัยประถมจริงราว 4.5-5 หัว
@@ -1316,7 +1721,7 @@ function drawPerson(p){
     let vx=v[0],vy=v[1],z=v[2];
     if(p.kid){
       if(z<HIPZ) z*=KID_LEG; else z-=HIPZ*(1-KID_LEG);
-      if(v[2]>HEADCUT){
+      if(!armGeometry&&v[2]>HEADCUT){
         const nz=NECKZ-HIPZ*(1-KID_LEG), py=lean+.009;
         z=nz+(z-nz)*KID_HEAD; vx*=KID_HEAD; vy=py+(vy-py)*KID_HEAD;
       }
@@ -1358,7 +1763,7 @@ function drawPerson(p){
      ที่นี่แค่หาตำแหน่งข้อต่อตามท่าทาง แล้วหมุนชิ้นส่วนไปวางตามข้อต่อนั้น
      ท่าเดิน/ชี้/ก้ม/หันหัว ยังใช้ระบบเดิมทั้งหมด แค่เปลี่ยนสิ่งที่ถูกวาดจาก "ทรงกระบอก" เป็น "เมช" */
   const MDL=PEOPLE_MODEL[(p.body&&PEOPLE_MODEL[p.body])?p.body:(p.gender==='female'?'female':'male')], JT=MDL.joints;
-  const SLOTC={skin:p.skin,shirt:p.shirt,pants:p.pants,shoe:p.shoe,hair:p.hair,dark:'#2b2622',white:'#efeadd'};
+  const SLOTC={skin:p.skin,shirt:p.shirt,pants:p.pants,shoe:p.shoe,hair:p.hair,dark:'#2b2622',white:'#efeadd',bag:'#655844',strap:'#51463a'};
   const bw=build;                                   // อ้วน/ผอม = ขยายด้านข้าง (ความสูงคุมด้วย hCm)
   const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
   const norm=v=>{const l=Math.hypot(v[0],v[1],v[2])||1;return [v[0]/l,v[1]/l,v[2]/l];};
@@ -1388,12 +1793,17 @@ function drawPerson(p){
      ไม่เรียก face() ทีละสามเหลี่ยมเพราะจะเรียก world() ซ้ำ 3 เท่า (เวอร์เท็กซ์หนึ่งตัวใช้ร่วมกันหลายหน้า)
      แปลงทีละเวอร์เท็กซ์ครั้งเดียวแล้วค่อยประกอบหน้า เร็วกว่า ~3 เท่า */
   const _W=[];
-  function emit(part,at,rot,stretch,shear,twist){
+  const seamMap=shirtSeams(MDL),seamPoints=seamMap.points,seamFaces=seamMap.facePool;
+  let seamFaceCount=0;
+  function emit(part,at,rot,stretch,shear,twist,radius=1){
     if(!part) return;
     const v=part.v,t=part.t,n=v.length/3,ax=part.axis,st=(stretch&&stretch!==1&&ax)?stretch-1:0;
-    const sh=shear||0, span=TWZ-HIPZ, tw=twist||null;
+    const sh=shear||0, span=TWZ-HIPZ, tw=twist||null,joins=seamMap.byPart.get(part);
     for(let i=0;i<n;i++){
       let x=v[i*3],y=v[i*3+1],z=v[i*3+2];
+      // Child limbs need a smaller cross section as well as shorter bones.
+      // Scale around the bone axis so elbow/wrist attachment positions stay fixed.
+      if(radius!==1&&ax){const d=x*ax[0]+y*ax[1]+z*ax[2],r=1-radius;x=x*radius+ax[0]*d*r;y=y*radius+ax[1]*d*r;z=z*radius+ax[2]*d*r;}
       if(st){const d=(x*ax[0]+y*ax[1]+z*ax[2])*st;x+=ax[0]*d;y+=ax[1]*d;z+=ax[2]*d;}
       if(rot){const nx=rot[0]*x+rot[1]*y+rot[2]*z,ny=rot[3]*x+rot[4]*y+rot[5]*z,nz=rot[6]*x+rot[7]*y+rot[8]*z;x=nx;y=ny;z=nz;}
       const wz=at[2]+z;
@@ -1409,10 +1819,16 @@ function drawPerson(p){
       }
       _W[i]=world([vx, vy, wz]);
     }
+    if(joins)for(const [i,id] of joins.vertices)seamPoints[id].push(_W[i]);
     for(const run of part.s){
       const rgb0=hexToRgb(SLOTC[run[0]]||p.shirt);
       for(let k=run[1],e=run[1]+run[2];k<e;k++){
         const A=_W[t[k*3]],B=_W[t[k*3+1]],C=_W[t[k*3+2]];
+        if(joins?.triangles[k]){
+          const f={v:[A,B,C],rgb:null,depth:0};faces.push(f);
+          const entry=seamFaces[seamFaceCount]||(seamFaces[seamFaceCount]={face:null,rgb:null});
+          entry.face=f;entry.rgb=rgb0;seamFaceCount++;continue;
+        }
         const ux=B[0]-A[0],uy=B[1]-A[1],uz=B[2]-A[2],wx=C[0]-A[0],wy=C[1]-A[1],wz=C[2]-A[2];
         let nx=uy*wz-uz*wy,ny=uz*wx-ux*wz,nz=ux*wy-uy*wx;
         const L=Math.hypot(nx,ny,nz)||1;nx/=L;ny/=L;nz/=L;
@@ -1467,8 +1883,8 @@ function drawPerson(p){
     let fy,fz,pitch;
     if(th<Math.PI){                                 // ช่วงเหวี่ยงขาไปข้างหน้า
       const u=th/Math.PI, e=u*u*(3-2*u);            // smoothstep: ออกตัวนุ่ม ลงนุ่ม
-      fy=-STEPA+2*STEPA*e-0.018*motion*Math.sin(Math.PI*u);   // ดึงเท้าเข้าใต้ตัวตอนผ่าน = เข่างอเพิ่ม
-      fz=WALK_LIFT*motion*Math.sin(Math.PI*Math.pow(u,0.70)); // ยอดอยู่ราว 30% ของช่วง = ส้นตวัดไปหลัง
+      fy=-STEPA+2*STEPA*e-GAIT_TUCK*motion*Math.sin(Math.PI*u);   // ดึงเท้าเข้าใต้ตัวตอนผ่าน = เข่างอเพิ่ม
+      fz=GAIT_LIFT*motion*Math.sin(Math.PI*Math.pow(u,0.70)); // ยอดอยู่ราว 30% ของช่วง = ส้นตวัดไปหลัง
       pitch=(u<0.32? -TOEOFF*(1-u/0.32)                       // เพิ่งถีบเสร็จ ปลายเท้ายังชี้ลง
                    : HEELDOWN*Math.pow((u-0.32)/0.68,2))*motion;   // แล้วค่อยเชิดขึ้นรอลงส้น
     }else{                                          // ช่วงเท้าอยู่กับพื้น
@@ -1485,7 +1901,17 @@ function drawPerson(p){
        · ข้างที่ยกขาเชิงกรานตกลงเล็กน้อย (pelvic drop จริงราว 4°) — เท้าไม่ส่ายตาม เพราะเหยียบพื้นอยู่ */
     const hj=rotZ(J('hip'),pelvisA), drop=(th<Math.PI?-1:1)*0.0045*gaitAmp;
     const hip=[hj[0]+sway,hj[1],hj[2]+bob+drop];
-    const ankle=[J('ankle')[0],J('ankle')[1]+fy,J('ankle')[2]+fz];
+    /* ⚠️ 2026-09-23 ผู้เล่น: "ดูก้าวเท้าไปข้างหน้าเยอะเกินจนดูเหมือนเดินขาแบะ"
+       ไล่ดูตัวเลขโมเดลจริง: ข้อเท้าซ้าย-ขวาห่างกัน 0.1474 เท่าของส่วนสูง = 25.4 ซม. ที่คนสูง 172
+       แต่ข้อสะโพกห่างกันแค่ 0.0852 = 14.7 ซม. → ขากางออกเป็นรูป ∧ ตั้งแต่ท่ายืนเฉย ๆ
+       (ความยาวก้าวไม่ได้ผิด: WALK_STEP 0.235 = 40 ซม. ซึ่งสั้นกว่าคนจริงด้วยซ้ำ
+        สิ่งที่ผิดคือ "ความกว้างของฐานเท้า" ไม่ใช่ความยาวก้าว — ตาอ่านรวมกันเป็น "ขาแบะ")
+       คนจริงเดินเท้าเกือบเรียงเส้นเดียว ฐานกว้างราว 8–12 ซม. และแคบลงอีกตอนเดินเร็ว
+       จึงดึงข้อเท้าเข้าหาแนวกลางตัว: ยืน 30% (เหลือ ~17.8 ซม.) · เดินเต็มสปีด 60% (เหลือ ~10.2 ซม.)
+       เข่ากับต้นขาเอียงตามเองผ่าน IK = การหุบขาเข้าจริง ๆ ไม่ใช่แค่ขยับเท้า */
+    const narrow=GAIT_NARROW_STAND+GAIT_NARROW_WALK*motion;
+    const ax=J('ankle')[0]*(1-narrow);
+    const ankle=[ax,J('ankle')[1]+fy,J('ankle')[2]+fz];
     const knee=legIK(hip,ankle,LEGL1,LEGL2);
     const rl=MDL.parts['thigh'+S],cl=MDL.parts['calf'+S],fl=MDL.parts['foot'+S];
     emit(rl,hip,axisRot(rl.axis,norm(sub(knee,hip))),1);
@@ -1504,7 +1930,7 @@ function drawPerson(p){
   if(p.facial&&facialSet[p.facial]) emit(facialSet[p.facial],headAt,null,1);
   /* ---- แขน: ใช้ IK เดิม แต่ความยาวท่อนมาจากโมเดลจริง ---- */
   for(const side of [-1,1]){
-    posedArms=false;
+    posedArms=false;armGeometry=true;
     const S=side<0?'L':'R', J=k=>JT[k+S];
     const KARM=p.kid?0.93:1;                       // ย่อขาแล้วต้องย่อแขนตาม ไม่งั้นมือห้อยเลยเข่า
     const L1=dist(J('shoulder'),J('elbow'))*KARM, L2=dist(J('elbow'),J('wrist'))*KARM, REACH=(L1+L2)*.985;
@@ -1558,12 +1984,34 @@ function drawPerson(p){
     hand=pose.hand.slice();elbow=pose.elbow.slice();
     if(!crouch&&!p.carryTank)constrainVisitorArm(p,[elbow],world,H,right,fx,fy);
     const axU=norm(sub(elbow,shoulder)),axF=norm(sub(hand,elbow));
-    emit(ua,shoulder,axisRot(ua.axis,axU),dist(shoulder,elbow)/ua.len);
-    emit(fa,elbow,axisRot(fa.axis,axF),dist(elbow,hand)/fa.len);
+    const armRadius=p.kid?.80:1,handScale=p.kid?.84:1;
+    emit(ua,shoulder,axisRot(ua.axis,axU),dist(shoulder,elbow)/ua.len,0,null,armRadius);
+    emit(fa,elbow,axisRot(fa.axis,axF),dist(elbow,hand)/fa.len,0,null,armRadius);
     // Orient the palms independently of the forearms: fingers forward, thumbs inward.
-    emit(hd,hand,p.carryTank?[0,-side,0, side,0,0, 0,0,1]:axisRot(hd.axis,axF),1);
+    emit(hd,hand,p.carryTank?[0,-side,0, side,0,0, 0,0,1]:axisRot(hd.axis,axF),handScale,0,null,handScale);
   }
-  posedArms=false;
+  posedArms=false;armGeometry=false;
+
+  // Faces share these arrays, so welding preserves the original triangle count.
+  for(const points of seamPoints){
+    if(points.length<2)continue;
+    let x=0,y=0,z=0;for(const v of points){x+=v[0];y+=v[1];z+=v[2];}
+    const inv=1/points.length;x*=inv;y*=inv;z*=inv;
+    for(const v of points){v[0]=x;v[1]=y;v[2]=z;}
+  }
+  seamFaces.length=seamFaceCount;
+  for(const {face:f,rgb} of seamFaces){
+    const [a,b,c]=f.v,ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
+    let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
+    const length=Math.hypot(nx,ny,nz)||1,sign=nx+ny+nz<0?-1:1;
+    nx*=sign/length;ny*=sign/length;nz*=sign/length;
+    if(sign<0)f.v=[a,c,b];
+    f.rgb=shadeRgb(rgb,(nx*-.28+ny*.36+nz*.75)*16-5);
+    f.depth=(a[0]+a[1]+a[2]+b[0]+b[1]+b[2]+c[0]+c[1]+c[2])/3;
+  }
+  // Reuse scratch containers without retaining obsolete poses or colors.
+  for(const points of seamPoints)points.length=0;
+  for(const entry of seamFaces){entry.face=null;entry.rgb=null;}
 
   /* ---- ตู้ทากใบเล็กในมือพ่อค้าเร่ ----
      เปิดด้านหน้า (ไม่วาดกระจกหน้า) เพื่อให้เห็นตัวทากข้างใน — เมชนี้เป็นสีทึบล้วน
@@ -1597,22 +2045,27 @@ function drawPerson(p){
   }
 
   if(p.bagged){
-    // Strap lies against the front and back of the body instead of floating over it.
-    for(const sign of [-1,1])for(let i=0;i<14;i++){
-      const strap=t=>[-.065+t*.137,lean+sign*(.065-Math.max(0,t-.4)*.018),.783+bob-t*.218];
-      const a=strap(i/14),b=strap((i+1)/14);
-      let vv=[[a[0]-.004,a[1],a[2]],[a[0]+.004,a[1],a[2]],[b[0]+.004,b[1],b[2]],[b[0]-.004,b[1],b[2]]];
-      if(sign<0)vv.reverse();face(vv,'#51463a');
-    }
-    rings([[.093*build,0,.476+bob,.030,.035],[.093*build,0,.551+bob,.032,.037],[.093*build,0,.563+bob,.025,.030]],'#655844',8);
+    emit(fittedPersonBags(MDL).bag,[JT.hips[0]+sway,JT.hips[1],JT.hips[2]+bob],null,1,lean,[pelvisA,thoraxA]);
+  }
+  /* หมวกนักสะสม — ปีกกว้างแบน ๆ + ทรงกระบอกเตี้ย วางตามตำแหน่งหัวจริง (headAt) จึงขยับตามหัวทุกท่า
+     ใช้ rings() ชุดเดียวกับเป้สะพาย ไม่ได้เพิ่มโมเดลใหม่ (ทากทาเลไม่มีชิ้นส่วนหมวกในไฟล์โมเดล) */
+  if(p.accessory==='hat'){
+    const fit=fittedPersonHat(MDL,hairSet[hairKey]),hx=headAt[0]*bw,hy=headAt[1],hz=headAt[2];
+    const rx=fit.rx*bw,ry=fit.ry,bz=hz+fit.base,tz=hz+fit.top;
+    rings([[hx,hy,bz,rx,ry],[hx,hy,bz+.004,rx+.027,ry+.024],[hx,hy,bz+.011,rx+.027,ry+.024],
+           [hx,hy,bz+.014,rx,ry],[hx,hy,tz-.006,rx,ry],[hx,hy,tz,rx*.96,ry*.96]],p.hatColor||'#3d3350',10);
   }
   if(p.accessory==='backpack'){
-    rings([[0,lean-.073,.565+bob,.055,.023],[0,lean-.081,.62+bob,.063,.031],[0,lean-.078,.727+bob,.055,.030],[0,lean-.068,.754+bob,.035,.020]],p.pants,12);
-    for(const side of [-1,1])limb([side*.06,lean-.046,.77+bob],[side*.061,lean+.059,.694+bob],.007,.007,p.pants);
+    emit(fittedPersonBags(MDL).backpack,[JT.hips[0]+sway,JT.hips[1],JT.hips[2]+bob],null,1,lean,[pelvisA,thoraxA]);
   }
-  p._drawPose={key:poseKey,x:p.x,y:p.y,faces,carryQuad,carryCm,t:_peopleT};
+  _poseBudget--;p._poseAllow=false;                 // ใช้โควตา "สร้างท่าใหม่" ของเฟรมนี้ไปหนึ่ง
+  p._poseJit=(Math.random()-0.5)*0.3;                     // คาบถัดไปเหลื่อมจากคนอื่นเล็กน้อย ไม่ให้กลับมาตรงกันอีก
+  /* คลี่เป็นบล็อกสามเหลี่ยม Float32 ตรงนี้ครั้งเดียว — เฟรมถัด ๆ ไปใช้บล็อกนี้ซ้ำจนกว่าท่าจะเปลี่ยน
+     faces ยังเก็บไว้เพราะ hit test (ตอนคลิก) ใช้ตรวจว่าคลิกโดนตัวคนจริงไหม ไม่มีต้นทุนต่อเฟรม */
+  const flat=poseVertsOf(faces);_poseBuilds++;
+  p._drawPose={key:poseKey,shape:shapeKey,x:p.x,y:p.y,faces,verts:flat.verts,tris:flat.tris,carryQuad,carryCm,t:_peopleT};
   if(carryQuad)_carriedSlugs.push({p,quad:carryQuad,cm:carryCm});
-  paintPersonMesh(faces,p,H);
+  _personBatch?.push(p);
 }
 
 /* ---------- ปุ่มเปิด/ปิดลูกค้า ---------- */
@@ -1871,6 +2324,9 @@ function drawVisitorAnger(){
 window.PeoplePerf={
   get geoBuilds(){return _geoBuilds;},
   get geoCached(){return _geoCache.size;},
+  get poseBuilds(){return _poseBuilds;},      // จำนวนครั้งที่สร้างท่าใหม่ (ตัวเลขที่ป้าย FPS โชว์เป็น "ท่าใหม่ /วิ")
+  get poseBuffers(){return _poseBufs.size;},  // บัฟเฟอร์จุดยอดที่ยังถือไว้ ควรเท่ากับจำนวนคนที่เพิ่งอยู่ในจอ
+  get workers(){return _poseWorkers.length;}, // เธรดช่วยสร้างท่า (0 = ทำบนเมนเธรดอย่างเดียว)
   counts(){return {ทั้งหมด:PEOPLE.length,ลูกค้า:customerCount(),นักแข่ง:challengerCount(),พ่อค้า:traderCount(),
                    ในจอ:PEOPLE.filter(p=>personEntered(p)&&personOnScreen(p)).length};}
 };

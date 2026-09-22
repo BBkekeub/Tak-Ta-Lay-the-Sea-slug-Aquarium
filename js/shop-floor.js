@@ -136,6 +136,9 @@ let hoverObj  = null;      // ตู้/ของที่เมาส์ชี�
 let appMode = 'view';     // 'view' = ดู/เล่น (คลิกตู้=เข้าไปดู) · 'build' = ก่อสร้าง
 let shopAnim = true;      // เปิด/ปิดการเคลื่อนไหวทากในหน้าร้าน
 let floorLastT = 0;
+/* หนี้เวลาของ simulation ทากในตู้ที่เห็นบนจอ — เก็บไว้เดินเป็นก้าวย่อย ไม่ทิ้ง (ดู drawFloor)
+   เพดาน 0.5 วิ เท่ากับ PEOPLE_DEBT_MAX ของลูกค้า: กลับจากแท็บที่ซ่อนแล้วไม่ไล่เก็บจนค้าง */
+let _floorSimDebt = 0; const FLOOR_DEBT_MAX = 0.5;
 
 /* ============================================================
    วาดพื้นร้าน
@@ -349,6 +352,26 @@ function drawRoom(){
 
 const ANIM_MIN_PX = 30;    // ทากบนจอสูง ≥ เท่านี้ (px) = ซูมใกล้พอ → อนิเมชันเต็ม (ไม่งั้นสไปรต์นิ่ง)
 let   animBudget  = 0;     // งบตัวที่อนิเมชันได้ต่อเฟรม (กันกระตุกถ้าซูมใกล้แล้วเห็นเยอะ)
+/* ⚠️ 2026-09-22 ผู้เล่น: "รู้สึกกระตุก" (โหมด 2D · p95 = 33 ms = ตกรอบจอเฟรมเว้นเฟรม)
+   วัดฉากจริง (ทาก 36 ตัว · ลูกค้า 4 คน · 1024×716): เฟรมรวม 21.5 ms เกินงบ 16.7 ms อยู่นิดเดียว
+   ก้อนใหญ่สุดคือ drawObject 10.6 ms ซึ่งเกือบทั้งหมดคือ "เรนเดอร์ตัวทากสดทุกเฟรม" ตามงบ ANIM_MAX ตัว
+   งบเดิมตายตัวที่ 14 → เครื่องช้าก็ยังดัน 14 ตัวเท่าเดิมจนเฟรมตก
+   ตอนนี้ปรับงบตามเวลาเฟรมจริงแบบเดียวกับ tuneSpriteBudget() ของโหมดในตู้:
+     วาดเร็วกว่าครึ่งหนึ่งของช่องเวลา → เพิ่มงบทีละตัว (สูงสุด ANIM_MAX)
+     วาดกินเกิน 80% ของช่องเวลา → ลดงบทีละตัว (ต่ำสุด ANIM_MIN · ที่เหลือใช้สไปรต์นิ่งซึ่งถูกมาก)
+   ภาพที่เสียไปคือทากบางตัว "นิ่ง" ตอนเครื่องหน่วง ดีกว่าทั้งจอกระตุก
+   ⚠️ 2026-09-22 รอบสอง: รับ "เวลาที่ใช้วาดจริง" แทน "ระยะห่างระหว่างเฟรม" และเทียบกับช่องเวลาจริง
+      เดิมตรึงเกณฑ์ไว้ที่ 15/19 ms ซึ่งผูกกับสมมติฐานว่าเล่นที่ 60 fps เสมอ
+      พอมี frame-cap.js ล็อก 30 fps ระยะห่างจะเป็น 33 ms ตลอด = เข้าใจผิดว่าเครื่องช้าแล้วหั่นงบทิ้งทันที
+      ทั้งที่ช่องเวลาจริงกว้างขึ้นเป็นเท่าตัว (ทากควรได้อนิเมทมากขึ้นด้วยซ้ำ ไม่ใช่น้อยลง) */
+const ANIM_MAX = 14, ANIM_MIN = 2;
+let   animCap = ANIM_MAX, _floorEMA = 8;
+function tuneAnimBudget(workMs){
+  _floorEMA += (Math.min(workMs,120) - _floorEMA)*0.12;
+  const slot=window.FrameCap?FrameCap.intervalMs:16.7;
+  if(_floorEMA < slot*0.5) animCap = Math.min(ANIM_MAX, animCap+1);
+  else if(_floorEMA > slot*0.8) animCap = Math.max(ANIM_MIN, animCap-1);
+}
 
 /* กรอบวัตถุบนจอ (ก้น z=0 ถึงยอด) → คัดเฉพาะที่เห็นในจอมาวาด/ขยับ (กันกระตุกตอนของเยอะ) */
 function objTopZ(o){ if(o.def.playTable)return 20*ZUNIT; if(o.def.researchTable)return 22*ZUNIT; if(o._key==='counter')return 30*ZUNIT;return o.type==='tank' ? tankStandH(o.def)+tankGlassH(o.def) : (o.type==='deco'? decoH(o) : 0); }
@@ -391,15 +414,28 @@ function drawRoomFloorLayer(){
 
 function drawFloor(){
   if(document.hidden)return;
+  /* แคนวาสกว้าง/สูง 0 = หน้ายังไม่ได้ layout (เปิดมาในแท็บพื้นหลัง · หน้าต่างย่อ · กำลังหมุนจอ)
+     วาดต่อไปจะโยน InvalidStateError ตอน blit ชั้นที่แคชไว้ ทุกเฟรม = คอนโซลท่วมและเฟรมตก */
+  if(!(CW>0&&CH>0))return;
   window.DecorGLB?.beginShop();
   window.Slug3D?.beginFrame();
   // อนิเมชันหน้าร้าน (เปิด/ปิดได้) — เปิด = ทากเดินในตู้
   if(engineReady){
     SlugEngine.ANIM = shopAnim;
     if(shopAnim){
-      const now=performance.now(); let dt=(now-(floorLastT||now))/1000; floorLastT=now; if(dt>0.05) dt=0.05;
-      G.objs.forEach(o=>{ if(o.type==='tank' && o.slugs.length && onScreen(o)) stepTankSlugs(o.slugs, o.def.w, o.def.h, dt, o.slugs.length<=25, o.decor, o.def); });
-    } else floorLastT=0;
+      /* ⚠️ 2026-09-22 เดิมตัด dt ทิ้งที่ 0.05 วิ ("if(dt>0.05) dt=0.05") ซึ่งคือการ "ทิ้งเวลา" ไปเฉย ๆ
+         ที่ 60 fps ไม่เคยแตะเพดานเลยไม่มีใครเห็นปัญหา แต่พอ frame-cap.js ลดเองเหลือ 15 fps
+         (มือถือกาก) เฟรมจะห่าง 0.067 วิ = ทากเดินช้ากว่าที่ควร 25% ผิดกฎ "ห้าม clamp dt แล้วทิ้งเวลา"
+         ตอนนี้เก็บเป็นหนี้เวลาแล้วเดินเป็นก้าวย่อยเหมือนที่ stepPeople ทำอยู่ — เวลารวมตรงเสมอ
+         เพดานหนี้กันเคส "กลับมาจากแท็บที่ถูกซ่อน" ไม่ให้ไล่เก็บทีเดียวจนค้าง */
+      const now=performance.now();
+      _floorSimDebt=Math.min(_floorSimDebt+(now-(floorLastT||now))/1000,FLOOR_DEBT_MAX);
+      floorLastT=now;
+      for(let steps=0;steps<8&&_floorSimDebt>1e-8;steps++){
+        const dt=Math.min(.05,_floorSimDebt); _floorSimDebt-=dt;
+        G.objs.forEach(o=>{ if(o.type==='tank' && o.slugs.length && onScreen(o)) stepTankSlugs(o.slugs, o.def.w, o.def.h, dt, o.slugs.length<=25, o.decor, o.def); });
+      }
+    } else { floorLastT=0; _floorSimDebt=0; }
   }
   if(typeof stepPeople==='function') stepPeople();     // ลูกค้าเดินดูตู้ (มีตัวจับเวลาของตัวเอง)
   if(typeof PlayTable!=='undefined'&&PlayTable.isOpen()){window.DecorGLB?.hide();return;}
@@ -435,7 +471,7 @@ function drawFloor(){
   }
 
   // วัตถุ (จัดลำดับความลึก)
-  animBudget = 14;    // รีเซ็ตงบอนิเมชันต่อเฟรม (คุมไม่ให้กระตุกแม้ซูมใกล้เห็นเยอะ · ที่เหลือใช้สไปรต์นิ่ง)
+  animBudget = animCap;   // งบอนิเมชันต่อเฟรม ปรับเองตามความเร็วเครื่อง (tuneAnimBudget) · ที่เหลือใช้สไปรต์นิ่ง
   const list = isoSortedObjects();
 
   let ghost=null;
@@ -1200,8 +1236,23 @@ document.getElementById('expH').onclick=()=>expand('h');
 function loop(){
   /* แผงเลือกของยุบ/กางตามสถานะ "ถืออยู่ไหม" (tank-decor-ui.js) — คืนทันทีถ้าไม่เปลี่ยน */
   if(typeof syncFloorBuildDock==='function')syncFloorBuildDock();
-  if(!window.BOOTING && !document.hidden && !(typeof tankMode!=='undefined' && tankMode) && !window.SlugRace?.isOpen()) drawFloor();
-  else if(document.hidden||window.SlugRace?.isOpen())window.DecorGLB?.hide();
+  const _now=performance.now();
+  const draw=!window.BOOTING && !document.hidden && !(typeof tankMode!=='undefined' && tankMode) && !window.SlugRace?.isOpen();
+  if(draw){
+    /* ตัวคุมจังหวะเฟรม (frame-cap.js) — รอบจอที่ยังไม่ถึงคิวก็ข้ามไปเลย ไม่ต้องวาด
+       ต้องถาม "หลัง" เช็กว่าจะวาดไหมแล้ว ไม่งั้นรอบที่อยู่ในตู้/หน้าแข่งจะไปกินคิวของหน้าร้านทิ้ง */
+    if(window.FrameCap && !FrameCap.due('shop',_now)){ requestAnimationFrame(loop); return; }
+    drawFloor();
+    /* ⚠️ ต้องวัด "เวลาที่ใช้วาดจริง" ไม่ใช่ระยะห่างระหว่างเฟรม — พอมีตัวล็อกเฟรมแล้ว
+       ระยะห่างจะเท่ากับคาบเป้าหมายเสมอ (33.3 ms ที่ 30 fps) ถ้าเอามาตัดสินว่าเครื่องช้า
+       งบอนิเมชันทากจะถูกหั่นทิ้งทั้งที่เครื่องยังว่างสบาย */
+    const _work=performance.now()-_now;
+    tuneAnimBudget(_work);
+    window.FrameCap?.noteWork(_work);
+  }else{
+    if(document.hidden||window.SlugRace?.isOpen())window.DecorGLB?.hide();
+    window.FrameCap?.reset('shop');
+  }
   requestAnimationFrame(loop);
 }
 

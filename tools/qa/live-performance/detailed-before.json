@@ -1,0 +1,433 @@
+{
+  "elapsedMs": 20042.5,
+  "frames": 527,
+  "fps": 26.294124984408132,
+  "p50": 33.400000000001455,
+  "p95": 51,
+  "p99": 83.29999999999927,
+  "viewport": [
+    1116,
+    750
+  ],
+  "people": 5,
+  "stats": [
+    {
+      "name": "drawPerson",
+      "calls": 2599,
+      "selfPerFrame": 5.5499051220050575,
+      "totalPerFrame": 8.123339656747495,
+      "max": 17.900000035762787
+    },
+    {
+      "name": "drawObject",
+      "calls": 2640,
+      "selfPerFrame": 5.054459203352738,
+      "totalPerFrame": 6.457495256325325,
+      "max": 35.80000001192093
+    },
+    {
+      "name": "DecorGLB.endShop",
+      "calls": 528,
+      "selfPerFrame": 2.798481975266784,
+      "totalPerFrame": 2.798481975266784,
+      "max": 13.900000035762787
+    },
+    {
+      "name": "flattenFaces",
+      "calls": 2169,
+      "selfPerFrame": 2.05502845903954,
+      "totalPerFrame": 2.05502845903954,
+      "max": 8.699999988079071
+    },
+    {
+      "name": "decorSolidSet",
+      "calls": 4226,
+      "selfPerFrame": 1.6229601503549536,
+      "totalPerFrame": 1.6229601503549536,
+      "max": 9.5
+    },
+    {
+      "name": "foodPath",
+      "calls": 9514,
+      "selfPerFrame": 1.4626185952825383,
+      "totalPerFrame": 1.4626185952825383,
+      "max": 13.5
+    },
+    {
+      "name": "drawFloor",
+      "calls": 528,
+      "selfPerFrame": 1.2861480090830766,
+      "totalPerFrame": 25.735294117760162,
+      "max": 104.70000004768372
+    },
+    {
+      "name": "drawPersonBatchGL",
+      "calls": 528,
+      "selfPerFrame": 1.143263757907462,
+      "totalPerFrame": 1.198671726732598,
+      "max": 48.30000001192093
+    },
+    {
+      "name": "decorCellSet",
+      "calls": 26400,
+      "selfPerFrame": 0.9863377595762148,
+      "totalPerFrame": 0.9863377595762148,
+      "max": 5.900000035762787
+    },
+    {
+      "name": "stepTankSlugs",
+      "calls": 2112,
+      "selfPerFrame": 0.9119544593613785,
+      "totalPerFrame": 4.553510435844508,
+      "max": 42.30000001192093
+    },
+    {
+      "name": "stepPeopleSlice",
+      "calls": 588,
+      "selfPerFrame": 0.7891840588661932,
+      "totalPerFrame": 0.8373814022744629,
+      "max": 36.90000003576279
+    },
+    {
+      "name": "poseVertsOf",
+      "calls": 1113,
+      "selfPerFrame": 0.5362428866708527,
+      "totalPerFrame": 2.5734345347424386,
+      "max": 9
+    },
+    {
+      "name": "slugPartsOf",
+      "calls": 27457,
+      "selfPerFrame": 0.3305502853990732,
+      "totalPerFrame": 0.3305502853990732,
+      "max": 20.5
+    },
+    {
+      "name": "drawPersonShadow",
+      "calls": 2599,
+      "selfPerFrame": 0.2335863369013372,
+      "totalPerFrame": 0.2335863369013372,
+      "max": 1
+    },
+    {
+      "name": "foodPrepare",
+      "calls": 2272,
+      "selfPerFrame": 0.1677419362303428,
+      "totalPerFrame": 1.6316888047350426,
+      "max": 41.799999952316284
+    },
+    {
+      "name": "slugFaceAndCreep",
+      "calls": 13200,
+      "selfPerFrame": 0.12182163106422497,
+      "totalPerFrame": 0.12182163106422497,
+      "max": 0.5999999642372131
+    },
+    {
+      "name": "foodDecay",
+      "calls": 4224,
+      "selfPerFrame": 0.09032258001179125,
+      "totalPerFrame": 0.09032258001179125,
+      "max": 0.5999999642372131
+    },
+    {
+      "name": "foodStep",
+      "calls": 12672,
+      "selfPerFrame": 0.08406072266866406,
+      "totalPerFrame": 0.08406072266866406,
+      "max": 0.699999988079071
+    },
+    {
+      "name": "endPersonBatch",
+      "calls": 528,
+      "selfPerFrame": 0.08102466813527204,
+      "totalPerFrame": 1.3130929801450508,
+      "max": 48.30000001192093
+    },
+    {
+      "name": "drawCatSeller",
+      "calls": 528,
+      "selfPerFrame": 0.07438330168515953,
+      "totalPerFrame": 0.07438330168515953,
+      "max": 0.7999999523162842
+    },
+    {
+      "name": "beginPersonBatch",
+      "calls": 528,
+      "selfPerFrame": 0.07343453496864218,
+      "totalPerFrame": 0.07343453496864218,
+      "max": 1
+    },
+    {
+      "name": "slugPoseTimers",
+      "calls": 12128,
+      "selfPerFrame": 0.07096774222954853,
+      "totalPerFrame": 0.07096774222954853,
+      "max": 0.5999999642372131
+    },
+    {
+      "name": "slugSprite",
+      "calls": 13201,
+      "selfPerFrame": 0.0411764711311239,
+      "totalPerFrame": 0.1683111946315874,
+      "max": 25.399999976158142
+    },
+    {
+      "name": "Slug3D.draw",
+      "calls": 25872,
+      "selfPerFrame": 0.04003795025697017,
+      "totalPerFrame": 0.04003795025697017,
+      "max": 0.6000000238418579
+    },
+    {
+      "name": "DecorGLB.beginShop",
+      "calls": 528,
+      "selfPerFrame": 0.03833017086847005,
+      "totalPerFrame": 0.03833017086847005,
+      "max": 0.30000001192092896
+    },
+    {
+      "name": "drawCarriedSlugs",
+      "calls": 528,
+      "selfPerFrame": 0.027514232516967368,
+      "totalPerFrame": 0.027514232516967368,
+      "max": 0.20000004768371582
+    },
+    {
+      "name": "personFurnitureFaces",
+      "calls": 528,
+      "selfPerFrame": 0.0216318791912448,
+      "totalPerFrame": 0.0216318791912448,
+      "max": 0.40000003576278687
+    },
+    {
+      "name": "personClusters",
+      "calls": 528,
+      "selfPerFrame": 0.015939278665937102,
+      "totalPerFrame": 0.015939278665937102,
+      "max": 0.40000003576278687
+    },
+    {
+      "name": "stepPeople",
+      "calls": 528,
+      "selfPerFrame": 0.014990512967335884,
+      "totalPerFrame": 0.8523719152417988,
+      "max": 37.09999996423721
+    },
+    {
+      "name": "SlugEngine.drawSlug",
+      "calls": 1,
+      "selfPerFrame": 0.006641366223908918,
+      "totalPerFrame": 0.006641366223908918,
+      "max": 3.5
+    },
+    {
+      "name": "DecorGLB.queuePeople",
+      "calls": 528,
+      "selfPerFrame": 0.0058823527602136026,
+      "totalPerFrame": 0.0058823527602136026,
+      "max": 0.10000002384185791
+    },
+    {
+      "name": "Slug3D.beginFrame",
+      "calls": 528,
+      "selfPerFrame": 0.005502846367671323,
+      "totalPerFrame": 0.005502846367671323,
+      "max": 0.19999998807907104
+    },
+    {
+      "name": "freeSpotNear",
+      "calls": 13,
+      "selfPerFrame": 0.001707780067110876,
+      "totalPerFrame": 0.001707780067110876,
+      "max": 0.19999998807907104
+    },
+    {
+      "name": "drawTankSlug",
+      "calls": 0,
+      "selfPerFrame": 0,
+      "totalPerFrame": 0,
+      "max": 0
+    },
+    {
+      "name": "drawCaustics",
+      "calls": 0,
+      "selfPerFrame": 0,
+      "totalPerFrame": 0,
+      "max": 0
+    },
+    {
+      "name": "drawTankHygiene",
+      "calls": 0,
+      "selfPerFrame": 0,
+      "totalPerFrame": 0,
+      "max": 0
+    },
+    {
+      "name": "drawWallSlug",
+      "calls": 0,
+      "selfPerFrame": 0,
+      "totalPerFrame": 0,
+      "max": 0
+    },
+    {
+      "name": "saveGame",
+      "calls": 0,
+      "selfPerFrame": 0,
+      "totalPerFrame": 0,
+      "max": 0
+    }
+  ],
+  "longFrames": [
+    {
+      "duration": 60,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 92.80000001192093,
+      "blockingDuration": 41.8,
+      "scripts": []
+    },
+    {
+      "duration": 60,
+      "blockingDuration": 6.6,
+      "scripts": []
+    },
+    {
+      "duration": 51.80000001192093,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 53.10000002384186,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 77.69999998807907,
+      "blockingDuration": 6.9,
+      "scripts": []
+    },
+    {
+      "duration": 106.60000002384186,
+      "blockingDuration": 56.3,
+      "scripts": []
+    },
+    {
+      "duration": 59.19999998807907,
+      "blockingDuration": 8.9,
+      "scripts": []
+    },
+    {
+      "duration": 115,
+      "blockingDuration": 57.3,
+      "scripts": []
+    },
+    {
+      "duration": 53.19999998807907,
+      "blockingDuration": 2,
+      "scripts": []
+    },
+    {
+      "duration": 52.60000002384186,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 58.39999997615814,
+      "blockingDuration": 8.1,
+      "scripts": []
+    },
+    {
+      "duration": 50.19999998807907,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 60.30000001192093,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 73.5,
+      "blockingDuration": 8.8,
+      "scripts": []
+    },
+    {
+      "duration": 60.19999998807907,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 65.19999998807907,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 61.30000001192093,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 55.10000002384186,
+      "blockingDuration": 4.4,
+      "scripts": []
+    },
+    {
+      "duration": 51.60000002384186,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 56.10000002384186,
+      "blockingDuration": 5.9,
+      "scripts": []
+    },
+    {
+      "duration": 54.19999998807907,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 71.80000001192093,
+      "blockingDuration": 21.6,
+      "scripts": []
+    },
+    {
+      "duration": 50.69999998807907,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 73.89999997615814,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 63.90000003576279,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 72.30000001192093,
+      "blockingDuration": 11.8,
+      "scripts": []
+    },
+    {
+      "duration": 54.5,
+      "blockingDuration": 0,
+      "scripts": []
+    },
+    {
+      "duration": 82.90000003576279,
+      "blockingDuration": 17.3,
+      "scripts": []
+    },
+    {
+      "duration": 61.80000001192093,
+      "blockingDuration": 0,
+      "scripts": []
+    }
+  ]
+}

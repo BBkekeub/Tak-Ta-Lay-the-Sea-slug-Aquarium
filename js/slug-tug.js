@@ -410,7 +410,8 @@
    const actions=element('div',null,d);actions.className='tug-actions';
    const no=element('button','ไม่แข่ง',actions);no.className='tbtn tug-quiet';no.onclick=dismiss;
    const later=element('button','ไปเตรียมทากก่อน',actions);later.className='tbtn';later.onclick=close;
-   const start=element('button','จ่าย '+entry.toLocaleString()+' เริ่มแข่ง',actions);start.className='tbtn tug-primary';
+   /* ป้ายปุ่มต้องไม่โกหก — ไม่ได้จ่ายตอนกดแล้ว เสียเฉพาะตอนแพ้ (ดู settle) */
+   const start=element('button','เริ่มแข่ง · แพ้เสีย '+entry.toLocaleString(),actions);start.className='tbtn tug-primary';
 
    /* บอกตรง ๆ ว่าคู่นี้ต้องกดกี่ครั้ง/วิ ถึงจะเสมอ — ทากยิ่งเก่งยิ่งต้องกดน้อยลง
       ถ้าตัวเลขสูงเกินจะกดไหว ให้ปฏิเสธคำท้าแล้วไปปรับปรุงทากมาใหม่ นั่นคือทางชนะจริง */
@@ -445,8 +446,9 @@
    }
    start.onclick=()=>{
      const n=mode,team=picked.map(id=>t.slugs.find(x=>x.id===id)).filter(Boolean);
+     /* ยังต้องมีทองพอจ่ายค่าสมัครถึงจะกดเริ่มได้ (กันแพ้แล้วทองติดลบ) แต่ "ยังไม่หักตอนนี้"
+        หักจริงตอนรู้ผลเท่านั้น ดู settle() — ระหว่างแข่งเป็นหน้าต่างทับ ใช้เงินที่อื่นไม่ได้อยู่แล้ว */
      if(team.length!==n||!G.objs.includes(t)||G.coin<entry){refresh();return;}
-     addCoin(-entry);
      const mine=team.map(s=>({id:s.id,genes:{...geneOf(s)}})),foes=rivalTeam(n).map(g=>({genes:{...g}}));
      state.active={tankId:t.id,rope:0,countdown:3,freezeUntil:0,freezeSide:null,settled:false,won:null,
        camX:(HOME+AWAY)/2,view:layoutAt(0),elapsed:0,size:n,entry,prizePot:PRIZE*n,
@@ -599,7 +601,16 @@
  function settle(won){
    const a=state.active;if(!a||a.settled)return;
    a.rope=clamp(a.rope,-WIN,WIN);a.settled=true;a.won=won;
-   a.prize=a.tour?0:won?(a.prizePot??PRIZE):0;addCoin(a.prize);   // ทัวร์นาเมนต์จ่ายรางวัลตามอันดับตอนจบทั้งสาย
+   /* ⚠️ 2026-09-23 ผู้เล่น: "การแข่งต้องปรับเป็น ถ้ายังไม่แพ้จะยังไม่เสียเงิน"
+      เดิมชักเย่อหักค่าสมัครทิ้งตั้งแต่กดเริ่ม (addCoin(-entry)) ซึ่งเป็นตู้เดียวที่ทำแบบนั้น
+      อีกสี่ตู้ (วิ่ง · กินจุ · ปาหิน · ดันวง) ไม่แตะเงินเลยจนกว่าจะรู้ผล แล้วค่อยหักเฉพาะตอนแพ้
+      ตอนนี้ชักเย่อทำแบบเดียวกัน: ชนะ = ได้รางวัลเต็ม · แพ้ = เสียค่าสมัคร · ระหว่างแข่งเงินไม่ขยับ
+      (ผู้เล่นเลือกให้เหมือนอีกสี่ตู้ ไม่ใช่คงสุทธิเดิม — เงินรางวัลชักเย่อจึงสูงขึ้นจาก +200 เป็น +500 ต่อตัว)
+      ทัวร์นาเมนต์ยังเก็บค่าสมัครล่วงหน้าเหมือนเดิม (a.tour) — ผู้เล่นสั่งไว้ก่อน */
+   const entry=a.entry??ENTRY;
+   a.prize=a.tour||a.practice?0:won?(a.prizePot??PRIZE):0;
+   a.fee  =a.tour||a.practice?0:won?0:entry;                      // ใบเสร็จอ่านค่านี้ ไม่ต้องคิดซ้ำ
+   addCoin(a.prize-a.fee);
    saveGame();syncHUD();
    if(!a.me.bot){
      if(typeof playNotificationSound==='function')playNotificationSound(won?'tugWin':'tugLose');
@@ -705,8 +716,10 @@
      element('strong','ไม่มีค่าสมัคร ไม่มีรางวัล',receipt);
      element('small','ซ้อมได้ไม่จำกัด · คำท้าจริงถึงจะมีเงินรางวัล',receipt);
    }else{
-     element('span','ค่าสมัคร −'+(a.entry??ENTRY).toLocaleString()+' ทอง',receipt);
-     element('strong',a.prize>0?'รางวัล +'+a.prize.toLocaleString()+' ทอง':'ไม่ได้รางวัล',receipt);
+     /* ชนะ = ไม่มีบรรทัดค่าสมัครเลย (ไม่ได้จ่าย) · แพ้ = เสียค่าสมัคร ไม่มีรางวัล */
+     element('span',a.won?'ชนะ — ไม่เสียค่าสมัคร':'แพ้ — เสียค่าสมัคร',receipt);
+     element('strong',a.won?'รางวัล +'+a.prize.toLocaleString()+' ทอง'
+                           :'−'+(a.fee??(a.entry??ENTRY)).toLocaleString()+' ทอง',receipt);
      element('small','ทองคงเหลือ '+G.coin.toLocaleString(),receipt);
    }
    element('p',a.won?'คู่แข่ง: แขนหลุดแล้ว! ไว้เจอกันใหม่':'คู่แข่ง: ยังอ่อนซ้อมนะเพื่อน',d).className='race-taunt';

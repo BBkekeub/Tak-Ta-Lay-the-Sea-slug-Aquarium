@@ -1,0 +1,90 @@
+{
+  "fit": [
+    {
+      "body": "male",
+      "kind": "bag",
+      "inside": 0,
+      "maxDepth": 0,
+      "examples": [],
+      "triangles": 70,
+      "coldMs": 0,
+      "cacheReused": true
+    },
+    {
+      "body": "male",
+      "kind": "backpack",
+      "inside": 0,
+      "maxDepth": 0,
+      "examples": [],
+      "triangles": 168,
+      "coldMs": 0,
+      "cacheReused": true
+    },
+    {
+      "body": "female",
+      "kind": "bag",
+      "inside": 0,
+      "maxDepth": 0,
+      "examples": [],
+      "triangles": 70,
+      "coldMs": 0,
+      "cacheReused": true
+    },
+    {
+      "body": "female",
+      "kind": "backpack",
+      "inside": 0,
+      "maxDepth": 0,
+      "examples": [],
+      "triangles": 168,
+      "coldMs": 0,
+      "cacheReused": true
+    },
+    {
+      "body": "male2",
+      "kind": "bag",
+      "inside": 0,
+      "maxDepth": 0,
+      "examples": [],
+      "triangles": 70,
+      "coldMs": 0,
+      "cacheReused": true
+    },
+    {
+      "body": "male2",
+      "kind": "backpack",
+      "inside": 0,
+      "maxDepth": 0,
+      "examples": [],
+      "triangles": 168,
+      "coldMs": 0,
+      "cacheReused": true
+    },
+    {
+      "body": "female2",
+      "kind": "bag",
+      "inside": 0,
+      "maxDepth": 0,
+      "examples": [],
+      "triangles": 70,
+      "coldMs": 0,
+      "cacheReused": true
+    },
+    {
+      "body": "female2",
+      "kind": "backpack",
+      "inside": 0,
+      "maxDepth": 0,
+      "examples": [],
+      "triangles": 168,
+      "coldMs": 0,
+      "cacheReused": true
+    }
+  ],
+  "cache": {
+    "reused": true,
+    "offscreen": true,
+    "fitReused": true
+  },
+  "passed": true
+}

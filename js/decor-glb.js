@@ -12,7 +12,7 @@ const keys=Object.keys(TANK_DECOR).filter(k=>TANK_DECOR[k].model);
 const enabled=k=>keys.includes(k)&&(RELEASE_ALL||k==='tidal_41');
 const assetCache=new Map(),materialCache=new Map(),textureCache=new Map(),objects=new Map(),batches=new Map();
 const ghostMaterials=new Map(),imageFingerprints=new WeakMap();
-let slugCrowd=null,lastSlugRender=0,personFaces=[],furnitureKey='';
+let slugCrowd=null,lastSlugRender=0,personFaces=[],furnitureKey='',peopleVersion=0,peopleFilled=-1,peopleRendered=-1,lastShopRender=0;
 const loader=new GLTFLoader(),scene=new THREE.Scene(),content=new THREE.Group(),occluders=new THREE.Group();scene.add(content,occluders);
 const camera=new THREE.OrthographicCamera(),thumbCamera=new THREE.PerspectiveCamera(32,1,.001,20);
 let renderer,canvas,bgCanvas,bgContext,mode='',signature='',assetRevision=0,lastSize='',currentTank=null,nowFrame=0;
@@ -305,11 +305,35 @@ function fillDepth(mesh,faces){
  let i=0;for(const face of faces)for(let k=1;k<face.length-1;k++)for(const j of [0,k,k+1]){const p=face[j];a.array[i++]=p[0]*cellM;a.array[i++]=p[2]*cellM;a.array[i++]=p[1]*cellM;}
  mesh.geometry.setDrawRange(0,i/3);a.needsUpdate=true;mesh.visible=i>0;
 }
-api.queuePeople=faces=>{personFaces=faces.map(f=>f.v);};
+/* ⚠️ 2026-09-22 ผู้เล่น: "เกมกระตุก แถมใช้พลังประมวลผลมากเกินไป"
+   วัดได้: endShop กิน 13.6 ms/เฟรม เพราะเงื่อนไขข้ามเดิมนับ "มีคนอยู่ในจอ" เป็น "มีของอนิเมท"
+   คนยืนนิ่งดูตู้เฉย ๆ จึงบังคับให้เรนเดอร์ฉาก Three.js ใหม่ทั้งฉากทุก 33 ms ตลอดเวลา
+   (A/B ในฉากเดียวกัน: ปิดของที่อนิเมทแล้ว renders/reuses = 44/44 → 1/113 · drawFloor 9.08 → 3.83 ms)
+   ตอนนี้ people.js ส่ง "เลขรุ่นเมชคน" มาด้วย — ขยับเฉพาะตอนท่าหรือตำแหน่งคนเปลี่ยนจริง
+   เลขรุ่นอยู่ในลายเซ็นฉาก คนนิ่ง = ลายเซ็นไม่ขยับ = ข้ามได้จริง (ทาก 3D ยังคุมด้วยนาฬิกา 30Hz เหมือนเดิม) */
+api.queuePeople=(groups,version)=>{personFaces=groups||[];peopleVersion=version|0;};
+/* หน้าคนมาเป็นบล็อกสามเหลี่ยมสำเร็จรูปจาก people.js แล้ว (x,y,z,r,g,b ต่อจุด) พร้อมระยะเลื่อนของคนคนนั้น
+   คัดลอกเฉพาะพิกัด ข้ามสี · ไม่ต้องไล่ตัดสามเหลี่ยมจากอาร์เรย์ซ้อนอาร์เรย์อีกรอบเหมือนเดิม */
+function fillDepthGroups(mesh,groups){
+ let needed=0;for(const g of groups)needed+=g.tris*9;
+ let a=mesh.geometry.attributes.position;
+ if(!a||a.array.length<needed){
+  mesh.geometry.dispose();mesh.geometry=new THREE.BufferGeometry();
+  const capacity=3*2**Math.ceil(Math.log2(Math.max(32,Math.ceil(needed/3))));
+  a=new THREE.BufferAttribute(new Float32Array(capacity),3);a.setUsage(THREE.DynamicDrawUsage);mesh.geometry.setAttribute('position',a);
+ }
+ let i=0;const out=a.array;
+ for(const g of groups){
+  const v=g.verts,n=g.tris*3,dx=g.dx||0,dy=g.dy||0;
+  for(let k=0,at=0;k<n;k++,at+=6){out[i++]=(v[at]+dx)*cellM;out[i++]=v[at+2]*cellM;out[i++]=(v[at+1]+dy)*cellM;}
+ }
+ mesh.geometry.setDrawRange(0,i/3);a.needsUpdate=true;mesh.visible=i>0;
+}
 function shopLayoutKey(){return G.objs.map(o=>[o.id,o===moving,o.cx,o.cy,o.rot,oW(o),oH(o),o.type==='tank'?tankStandH(o.def):decoH(o),!!o.def.playTable,!!o.def.researchTable]).flat().join('|');}
 function updateShopOcclusion(key){
  if(key!==furnitureKey){furnitureKey=key;fillDepth(furnitureDepth,personFurnitureFaces());}
- fillDepth(peopleDepth,personFaces);
+ /* เมชบังของคนเปลี่ยนเฉพาะตอนเลขรุ่นขยับ — รอบเรนเดอร์ที่เกิดจากทาก 3D ไม่ต้องยัดหน้าคนใหม่ทั้งชุด */
+ if(peopleFilled!==peopleVersion){peopleFilled=peopleVersion;fillDepthGroups(peopleDepth,personFaces);}
 }
 function shopCamera(){
  // In world metres (x, y-up, z): floor P gives (x-z)*TW, (x+z)*TH-y*ZUNIT.
@@ -329,7 +353,13 @@ api.endShop=()=>{
   e.root.visible=e.ready;e.root.updateMatrixWorld(true);if(e.ready){e.root.visible=frustum.intersectsBox(e.asset.bounds.clone().applyMatrix4(e.root.matrixWorld));if(!e.root.visible)api.stats.culled++;}}
  /* สถานะ 3D + จำนวนงานต้องอยู่ในคีย์ด้วย — เหตุผลเดียวกับใน endTank() ด้านบน */
  prune();sizeCanvas();const layout=shopLayoutKey(),sig=[mode,r.x,r.y,r.w,r.h,cam.x,cam.y,cam.zoom,assetRevision,layout,(window.Slug3D?.enabled?1:0),slugJobs.length,personFaces.length,...[...objects.values()].flatMap(e=>[e.key,...e.root.position.toArray(),e.root.rotation.y,e.root.visible])].join('|');
- if(sig===signature&&((!personFaces.length&&!slugJobs.length)||performance.now()-lastSlugRender<33)){api.stats.reuses++;return;}signature=sig;const start=performance.now();updateBatches();updateSlugCrowd();updateShopOcclusion(layout);renderer.info.reset();clear();occluders.visible=true;setViewport(r);renderer.render(scene,camera);stats(start);
+ /* แยกสองระดับให้ชัด (แก้ 2026-09-22 · ก่อนหน้านี้ใช้ "มีคนอยู่ในจอ" เป็นตัวตัดสิน = เรนเดอร์ใหม่ตลอด)
+      hard = กล้อง/ผัง/ชุดโมเดลเปลี่ยน → ต้องเรนเดอร์เดี๋ยวนี้ ไม่งั้นภาพเลื่อนไม่ตรงกับแคนวาส 2D
+      soft = แค่คนขยับหรือทาก 3D เดิน → เรนเดอร์ได้ แต่ไม่เกิน 30Hz (ตาเห็นเท่าเดิม ประหยัดครึ่งหนึ่ง)
+      ไม่มีทั้งสองอย่าง = ข้ามจริง ๆ (ร้านนิ่ง = ศูนย์งาน ตามกฎ AGENTS.md ข้อ "ของนิ่งห้ามวาดซ้ำ") */
+ const hard=sig!==signature, soft=peopleVersion!==peopleRendered||slugJobs.length>0;
+ if(!hard&&(!soft||performance.now()-lastShopRender<33)){api.stats.reuses++;return;}
+ signature=sig;lastShopRender=performance.now();peopleRendered=peopleVersion;const start=performance.now();updateBatches();updateSlugCrowd();updateShopOcclusion(layout);renderer.info.reset();clear();occluders.visible=true;setViewport(r);renderer.render(scene,camera);stats(start);
 };
 
 // One renderer draws visible catalog viewports directly into the WebGL canvas.
