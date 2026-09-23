@@ -9,6 +9,7 @@ import * as THREE from 'three';
      6 → +ต้นกลาง 8 · 8 → +คู่หลัง 1,3 · 9 → +ต้นหน้าเล็กสุด 7
    ⚠️ ยีน gillN = 50 (ค่าเริ่มต้น) ให้ 2 พุ่ม ไม่ใช่ 9 — ตรงกับ 2D แต่ต่างจากของเดิมที่โชว์ครบเสมอ */
 const CROWN_ORDER=[4,5,6,0,2,8,1,3,7];
+export const throwCrownTips=new WeakMap();
 const HIDDEN=new THREE.Vector3(0,0,0);
 const TINT=new THREE.Color();            // ตัวแปรพักสีตอนผสมกระจก — สร้างครั้งเดียว ไม่ใช่ทุกอินสแตนซ์ทุกเฟรม
 // GPU instancing: one draw per mesh part, with independent skeleton matrices and colors.
@@ -122,6 +123,7 @@ export class SlugCrowd {
    /* girth (d.size) ต้องขยายทั้ง 3 แกนเหมือน 2D (bw=stretch*size, bh=size) ไม่ใช่แค่ X
       floorLift วัดมาจากโพสท่าที่ยังไม่ scale — คูณ size เข้าไปด้วยกันจุดสัมผัสพื้นถึงจะไม่ลอย/จม */
    this.shape.makeScale(d.stretch*d.size,d.size,d.size);this.shape.setPosition(0,floorLift*d.size,0);
+   let crown=null;
    for(const part of this.parts){const src=parts.get(part.name);
     this.appendage.identity();
     /* ⚠️ ห้ามกลับไปใช้ startsWith('Gill') — หงอนใน GLB ตั้งชื่อสองชุด
@@ -144,11 +146,17 @@ export class SlugCrowd {
     /* หงอนที่เกินจำนวนของยีนตัวนี้ → ย่อเป็นศูนย์ ไม่มีพิกเซลออกมา
        (อินสแตนซ์ทุกตัวใช้ mesh.count เดียวกัน ซ่อนรายตัวได้แค่ทางนี้ · ไม่มีต้นทุนเพิ่ม) */
     if(part.rank>=d.nGill)this.transform.scale(HIDDEN);
+    if(job.s.throwLean!==undefined&&/gill/i.test(part.name)&&!(part.rank>=d.nGill)){
+     if(src.userData.throwTip===undefined){const p=src.geometry.attributes.position;let k=0;for(let n=1;n<p.count;n++)if(p.getY(n)>p.getY(k))k=n;src.userData.throwTip=k;}
+     src.getVertexPosition(src.userData.throwTip,this.anchor);this.anchor.applyMatrix4(this.transform);
+     if(!crown||this.anchor.y>crown.y){if(!crown)crown=throwCrownTips.get(job.s)||new THREE.Vector3();crown.copy(this.anchor);}
+    }
     if(part.strain&&!v.strain)this.transform.scale(HIDDEN);   // ตา ＞＜ (slug-skin.js) โผล่เฉพาะตอนออกแรงชักเย่อ
     part.traits.setXYZW(i,d.aura,d.nSpot,d.shape==='sq'?1:d.shape==='tri'?2:0,part.name==='Body'?d.deep:d.gdeep);part.mesh.setMatrixAt(i,this.transform);part.pose.setX(i,i);part.metal.setX(i,part.name==='Body'?v.bodyMetal:v.gillMetal);
      /* สีจากยีนเขียนตรง ๆ — สีกระจกไปย้อมทีหลังใน shader ผ่าน uniform crowdGlass (ดูคอมเมนต์ตอนสร้าง material) */
      for(const [k,attr] of Object.entries(part.colors)){const c=v.palette[k];attr.setXYZ(i,c.r,c.g,c.b);}
      if(src.morphTargetInfluences?.length)part.mesh.setMorphAt(i,src);}
+   if(crown)throwCrownTips.set(job.s,crown);else throwCrownTips.delete(job.s);
   });
   this.texture.needsUpdate=true;
   for(const p of this.parts){p.mesh.instanceMatrix.needsUpdate=true;p.pose.needsUpdate=true;p.metal.needsUpdate=true;p.traits.needsUpdate=true;for(const a of Object.values(p.colors))a.needsUpdate=true;if(p.mesh.morphTexture)p.mesh.morphTexture.needsUpdate=true;}

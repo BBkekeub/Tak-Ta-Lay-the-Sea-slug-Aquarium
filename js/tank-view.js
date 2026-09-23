@@ -135,7 +135,7 @@ function tankSlugSprite(s, P, sa, walking, lifted){
   const now = performance.now();
   if(s._tsOff===undefined) s._tsOff = Math.random()*1000/TSPR_FPS;   // กระจายจังหวะ ไม่ให้รีเฟรชพร้อมกันทั้งฝูง
   const zb = now < _zoomBusyT;                                       // ซูมอยู่ → ใช้ของเดิมยืดเอา ไม่เรนเดอร์ใหม่
-  const poseKey=s.state+'|'+Math.round((s.wake||0)*12)+'|'+Math.round((s.startle||0)*10)+'|'+(lifted?1:0)+'|'+(s._bakeEyes?1:0)+'|'+Math.round((s.tugLean||0)*8);   // tugLean: หงอนสะบัดตอนชักเย่อ ต้องรีเฟรชสไปรต์ตามจังหวะกด
+  const poseKey=s.state+'|'+Math.round((s.wake||0)*12)+'|'+Math.round((s.startle||0)*10)+'|'+(lifted?1:0)+'|'+(s._bakeEyes?1:0)+'|'+Math.round((s.tugLean||0)*8)+'|'+Math.round((s.throwLean||0)*24);   // tugLean: หงอนสะบัดตอนชักเย่อ ต้องรีเฟรชสไปรต์ตามจังหวะกด
   const due = !s._ts || (!zb && ((now - s._tsT) > (1000/TSPR_FPS) || s._tsWalk!==walking || s._tsPose!==poseKey));
   const sized = s._ts && (zb || Math.abs(s._tsSa - sa) < sa*0.06);   // ขนาดเพี้ยนไม่เกิน 6% ใช้ของเดิมยืดเอา
   if(due && _tsprBudget>0 || !s._ts || !sized && _tsprBudget>0){
@@ -1963,6 +1963,7 @@ function drawTankFrame(){
   else if(throwing)SlugThrow.stepNormal(slugs,dt);
   else if(sumo)SlugSumo.stepNormal(slugs,dt);
   else stepTankSlugs(heldSlug? slugs.filter(s=>s!==heldSlug) : slugs, fw, fh, dt, true, curTank.decor, curTank.def);
+  if(typeof stepBreederLarvae==='function')stepBreederLarvae(curTank,dt);
 
   // --- วาดทาก + ของตกแต่ง รวมกัน เรียงลึก (fy มาก=ไกล วาดก่อน) · clip กล่องแก้วแบบเปิดฝา ---
   tctx.save(); clipOpen();

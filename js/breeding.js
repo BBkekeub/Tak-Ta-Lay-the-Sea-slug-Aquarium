@@ -44,6 +44,18 @@ function hatchBreedingEgg(o,index){
  if(b.eggs.every(e=>e.open)){b.phase='idle';b.eggs=[];b.parentGenes=null;}
  saveGame();syncHUD();renderBreederUI();return true;
 }
+// The open tank owns larval motion at frame cadence; growth stays on the breeder timer.
+function breederLarvaeInView(o){
+ return typeof tankMode!=='undefined'&&tankMode&&typeof curTank!=='undefined'&&curTank===o&&!document.hidden&&!window.SlugRace?.isOpen();
+}
+function stepBreederLarvae(o,dt){
+ if(!isBreeder(o)||!breederLarvaeInView(o))return;
+ const b=breederState(o);
+ for(const larva of b.larvae){
+  const s=larva.slug;s._foodZoneLo=25;s._foodZoneHi=30;s._zoneTank=o;s._breedScale=.5;
+  walkBreedingZone(s,dt);
+ }
+}
 function tickBreeder(o,dt,rnd=Math.random){
  const b=breederState(o);b.clean=tankCleanliness(o);
  const feedingSlugs=prepareBreederFoodSlugs(o);foodPrepare(feedingSlugs,o.def.w,o.def.h,o.decor||[],null,o);
@@ -59,7 +71,7 @@ function tickBreeder(o,dt,rnd=Math.random){
   }else if(b.left===0&&b.phase==='eggs')b.phase='hatching';
  }
  let grownTank=0,grownInv=0,died=0;   // นับไว้สรุปลงบันทึกร้านทีเดียวท้ายรอบ (ดูท้ายฟังก์ชัน)
- for(let i=b.larvae.length-1;i>=0;i--){const larva=b.larvae[i];walkBreedingZone(larva.slug,dt);larva.left=Math.max(0,larva.left-dt);
+ for(let i=b.larvae.length-1;i>=0;i--){const larva=b.larvae[i];if(!breederLarvaeInView(o))walkBreedingZone(larva.slug,dt);larva.left=Math.max(0,larva.left-dt);
   if(larva.left>0)continue;
   if(!larva.ready&&larva.growthRoll!==undefined)larva.survives=larva.growthRoll<.7*breedingSatietyFactor(larva.slug.satiety)*breedingCleanFactor(o);
   if(!larva.survives){if(typeof onBreedLarvaDeath==='function')onBreedLarvaDeath(o,larva);b.larvae.splice(i,1);died++;continue;}

@@ -1,0 +1,13 @@
+{
+  "checks": {
+    "accepted": true,
+    "repeat": false,
+    "velocityIncreased": true,
+    "cacheReused": true,
+    "bitmapPixels": 32768,
+    "drawMsP50": 0.015000000596046448,
+    "drawMsP95": 0.0550000011920929
+  },
+  "passed": true,
+  "errors": []
+}

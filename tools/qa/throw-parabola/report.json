@@ -1,0 +1,19 @@
+{
+  "threeClicks": true,
+  "ascent": {
+    "phase": "boost",
+    "height": 13.199512017009399,
+    "clock": 3.9999999999999885
+  },
+  "apex": {
+    "phase": "waves",
+    "height": 13.51902520941125,
+    "clock": 0
+  },
+  "descent": {
+    "phase": "waves",
+    "height": 7.5754703438941
+  },
+  "passed": true,
+  "errors": []
+}

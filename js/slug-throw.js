@@ -4,9 +4,9 @@
  *   ลูกค้ามาท้า → โมดอลเลือกทาก+เดิมพัน → เข้าตู้เต็มจอ → ผลแพ้ชนะ (ใช้หน้าตาโมดอลชุดเดียวกัน)
  *
  * ปาหนึ่งไม้มี 4 ช่วง (รอบสองของดีไซน์ — รอบแรก "กดสุดไว้ก่อนก็ชนะ" ผู้เล่นบอกว่าไม่สนุก)
- *   1. แถบแรง   — หมุดวิ่งไป-กลับ กด Space หยุด · เกิน FOUL_AT = เหวี่ยงพลาด เหลือครึ่ง (ดันแรงสุด = เสี่ยง)
- *   2. แถบองศา  — ยิ่งล็อกแรงไว้สูง หมุดยิ่งวิ่งเร็ว (โลภแล้วจับจังหวะยากขึ้น) · 45° ไกลสุด
- *   3. เร่งแรง 5 วิ — กล้องซูมตามหิน กด F / K สลับกันรัว ๆ ทุกครั้งที่กดหินเร่งขึ้นจริง ไม่มีเพดาน (หยุดกด = ความเร็วตก)
+ *   1. ลูกศรองศา — คลิกเริ่มเล็ง แล้วคลิกล็อกมุม · 45° ไกลสุด
+ *   2. ความยาวลูกศร — คลิกเลือกแรงแล้วปา · เกิน FOUL_AT = เหวี่ยงพลาด เหลือครึ่ง
+ *   3. เร่งแรง 5 วิ — กล้องซูมตามหิน กด F / K สลับกันรัว ๆ F/K เพิ่มแรงจากการเล็ง · ถึงยอดพาราโบล่าที่ 5 วิเสมอ
  *   4. ช่วงหินตก — คลื่นซัดเข้ามาเป็นระลอก กด Space ให้ทันทุกลูก · พลาดลูกไหน หินเสียแรง ตกใกล้ลง
  *   บนลานมีวงเป้าสุ่มตำแหน่งทุกไม้ ลงเป้าได้โบนัส → ไม่ใช่ปาให้ไกลสุดอย่างเดียว
  *   คะแนน = ผลรวมระยะ 3 ไม้ + โบนัสเป้า (ทุกไม้มีความหมาย ไม่ใช่เอาไม้ที่ดีที่สุด)
@@ -20,30 +20,25 @@
  /* ⚠️ 2026-09-19 ผู้เล่น: "ให้ลานอยู่ด้านหน้าสุดของตู้จะได้ไม่โดนวางของบัง"
     เดิมเลนอยู่กลางตู้ (LANE_Y=5 จากลึก 10) แล้วไม่มีกฎห้ามวางของเลย = วางหินคร่อมเลนบังหินที่ปาได้
     ตอนนี้ย้ายเลนมาชิดขอบหน้า และกันแถบ LANE_H ไว้ให้โล่งทั้งของตกแต่งและอาหาร (แบบตู้วิ่ง/ชักเย่อ/กินจุ) */
- const LANE_Y=2.6, LANE_H=5.2;
- const ANGLE_LO=15, ANGLE_HI=75, BEST_ANGLE=45;
+ const LANE_H=20/CM_PER_CELL, LANE_Y=LANE_H/2;
+ const ANGLE_LO=0, ANGLE_HI=90, BEST_ANGLE=45;
  const SWEEP_POWER=1.15;
- const ANGLE_SPEED_BASE=.7, ANGLE_SPEED_GREED=1.0;   // ความเร็วแถบองศา = BASE + GREED × แรงที่ล็อกไว้
+ const ANGLE_SPEED_BASE=.7;   // เลือกองศาก่อนความแรง
  const FOUL_AT=.9, FOUL_MUL=.5;                // ⚙️ โซนแดงท้ายแถบแรง
- /* ⚙️ ช่วงเร่งแรง — ⚠️ 2026-09-18 ผู้เล่น: "กดย้ำต้องดันหินไปเรื่อย ๆ ไม่ใช่แค่เก็บเกจแล้วตัน"
-    หินมี "ความเร็ว" จริง (ซม./วิ) · กด F/K สลับกันหนึ่งครั้ง = อัดความเร็วเพิ่ม PRESS_GAIN (คูณพลังหงอน)
-    ปล่อยมือเมื่อไหร่ความเร็วตกตามแรงต้าน DRAG · ระยะ = ระยะทางสะสมจริง ไม่มีเพดาน กดเร็ว/นานกว่า = ไปไกลกว่าเสมอ */
+ /* F/K เพิ่มความเร็วสมมูลจากแรงแรกระหว่างไต่ขึ้น 5 วิ แล้วล็อกแรงตอนถึงยอด
+    อินทิเกรตแรงโน้มถ่วง/แรงต้านทุก substep; ยืดเวลาขึ้นเป็น 5 วิ ลงตามแรงที่กระทำ
+    เป็นฟิสิกส์ผสมกติกาเกม: คลื่นเปลี่ยนแรงต้าน และขอบตู้จำกัดระยะคะแนน */
  const BOOST_T=5;                              // ⚙️ ช่วงที่ยังเร่งได้ (วิ) หลังจากนี้เข้าช่วงหินตก
- const V0_BASE=6, V0_GAIN=10;                  // ความเร็วตั้งต้นจากการเล็ง (ซม./วิ)
  /* ⚠️ แรงต้านช่วงหินตกต้องต่ำกว่าช่วงเร่ง ไม่งั้นพอถึงช่วงคลื่นหินแทบหยุดแล้ว
     การพลาดคลื่นเลยไม่มีผล (เทสต์: พลาดครบ 4 ลูกเสียระยะแค่ 1 ซม.) · ตอนนี้ช่วงคลื่นกินระยะราว 40% ของไม้ */
- const PRESS_GAIN=1.15, DRAG=.45, DRAG_FALL=.12;   // อัดต่อครั้ง · แรงต้านช่วงเร่ง · แรงต้านช่วงหินตก
+ const DRAG=.45, DRAG_FALL=.12;   // DRAG/ASCENT ใช้ต่อไม้เก่าที่เซฟไว้เท่านั้น
  /* ช่วงเร่งหินยังพุ่งขึ้นอยู่ ระยะราบจึงเดินแค่ ASCENT ของความเร็ว · ระยะจริงส่วนใหญ่มาตอนหินตก
     (ถ้าให้ช่วงเร่งกินระยะเยอะ การพลาดคลื่นจะแทบไม่มีผล — เทสต์แล้วเสียแค่ 8 ซม.) */
  const ASCENT=.35;
- const WAVES=4, WAVE_GAP=.85, WAVE_LEAD=1;   // ⚙️ คลื่น
- /* ---- ช่วงหินตก = เกมทรงหัวหิน (ผู้เล่นออกแบบ 2026-09-19) ----
-    หินเป็นก้อนรียาว มี "มุมหัว" (pitch) · 0° = เพรียวลม แหวกไปไม่เสียความเร็ว
-      · คลื่นซัดตอนหัวราบ/หัวจม  → ตบหัวกดลง (pitch ลบ) = ท้องหินปะทะลม แรงต้านพุ่ง
-      · กด Space = งัดหัวขึ้น (pitch บวก) · กดพอดีก่อนคลื่นถึง = หักล้างกันพอดี หัวกลับมาราบ = ไม่เสียความเร็ว
-      · กดเร็วไป/กดรัว หัวเชิดค้างเกิน PITCH_CATCH → คลื่นมุดเข้าใต้ท้อง เชิดขึ้นไปอีก = แย่ที่สุด
-    เดิมช่วงนี้เป็น "กดให้ตรงหน้าต่างเวลา" ซึ่งกดรัวทั้งช่วงก็ได้ครบทุกลูก (เทสต์แล้วกดมั่วชนะที่ 1)
-    แบบใหม่การกดรัวคือทางที่แย่ที่สุด เพราะหัวเชิดค้างตลอดเวลา */
+ const WAVES=4, WAVE_GAP=.85, WAVE_LEAD=1, WAVE_WINDOW=1.8/8;   // ⚙️ คลื่น
+ /* Space counters a crest from first nose contact through the midpoint (0.225 s).
+    Each wave stores its attempt/result in shot.waves, so resume preserves timing.
+    Pitch remains a visual/drag consequence of failure, not the success condition. */
  const PITCH_PRESS=24;      // งัดหัวขึ้นต่อการกด 1 ครั้ง (องศา)
  const PITCH_WAVE=26;       // แรงคลื่น (องศา)
  const PITCH_CATCH=28;      // หัวเชิดเกินนี้ตอนคลื่นถึง = คลื่นมุดใต้ท้อง เชิดต่อ
@@ -62,14 +57,13 @@
  const gillPower=g=>.6*g01(g,'gillLen')+.4*gillCnt01(g);
  const armMul=g=>.45+.55*gillPower(g);
  /* ความเร็วตั้งต้นจากการเล็ง (ฟาวล์ = หลุดมือ ออกตัวช้ากว่าครึ่ง) */
- const startSpeed=(g,power,angle)=>V0_BASE+V0_GAIN*armMul(g)*clamp(power,0,1)*(power>FOUL_AT?FOUL_MUL:1)*Math.sin(2*angle*Math.PI/180);
+ // cm, seconds: ballistic range/height; presentation time is remapped to 5 s ascent.
+ const GRAVITY=981, FALL_T=5, THROW_BASE=175, THROW_GAIN=160, THROW_PRESS=2.4;
+ const startSpeed=(g,power,angle)=>THROW_BASE+THROW_GAIN*armMul(g)*clamp(power,0,1)*(power>FOUL_AT?FOUL_MUL:1);
  /* ระยะอ้างอิง "ถ้าเล่นดี": เล็ง 90% องศา 45° แล้วกด 8 ครั้ง/วิ ตลอดช่วงเร่ง ไม่พลาดคลื่น */
  function maxDist(g){
-   let v=V0_BASE+V0_GAIN*armMul(g)*FOUL_AT,d=0;
-   const dt=.05,gain=PRESS_GAIN*armMul(g);
-   for(let t=0;t<BOOST_T;t+=dt){v+=gain*8*dt;v-=v*DRAG*dt;d+=v*dt*ASCENT;}
-   for(let t=0;t<WAVE_LEAD+WAVES*WAVE_GAP;t+=dt){v-=v*DRAG_FALL*dt;d+=v*dt;}
-   return Math.min(MAX_CM,d);
+   const v=startSpeed(g,FOUL_AT,BEST_ANGLE)+THROW_PRESS*armMul(g)*8*BOOST_T;
+   return Math.min(MAX_CM,v*v/GRAVITY);
  }
  const scoreOf=e=>e.shots.reduce((n,s)=>n+s.score,0);
 
@@ -92,7 +86,70 @@
    return true;
  }
  const flying=a=>a&&(a.phase==='boost'||a.phase==='waves');
+ const stoneHeight=a=>{
+   if(a.shot?.physics>=2)return SAND_CELLS+(a.shot.height||0)/CM_PER_CELL;
+   const total=BOOST_T+WAVE_LEAD+WAVES*WAVE_GAP;
+   const progress=(a.phase==='boost'?a.clock:BOOST_T+a.clock)/total;
+   return SAND_CELLS+(1.2+2.6*Math.sin(a.shot.angle*Math.PI/180))*Math.sin(Math.PI*clamp(progress,0,1));
+ };
+ let boostFlashUntil=0,waveSprite=null,stoneSprite=null;
+ // One small reusable bitmap. Camera movement only scales/blits it.
+ function waveImage(){
+   if(waveSprite)return waveSprite;
+   const c=document.createElement('canvas');c.width=128;c.height=256;const g=c.getContext('2d');
+   const fill=g.createLinearGradient(0,0,128,0);
+   fill.addColorStop(0,'#e7ffff');fill.addColorStop(.06,'#7ce7ee');
+   fill.addColorStop(.25,'#24a7caaa');fill.addColorStop(1,'#147ba000');
+   g.fillStyle=fill;g.fillRect(0,0,128,256);
+   g.fillStyle='#edffff';g.fillRect(0,0,2,256);
+   // Soft water ribs and foam are baked once; only translation changes per frame.
+   for(let i=0;i<24;i++){
+     const y=i*11;g.strokeStyle=i%3?'#b9f7fa30':'#efffff70';g.lineWidth=i%3?1:2;
+     g.beginPath();g.moveTo(3,y);g.bezierCurveTo(12,y+14,22,y-11,45,y+5);g.stroke();
+     g.fillStyle='#edffff66';g.beginPath();g.arc(5+i%4*3,y+4,1+i%2,0,Math.PI*2);g.fill();
+   };
+   waveSprite=c;return c;
+ }
 
+ // One deterministic, shaded pebble bitmap shared by the loaded and flying stone.
+ function stoneImage(){
+   if(stoneSprite)return stoneSprite;
+   const c=document.createElement('canvas');c.width=256;c.height=160;const g=c.getContext('2d');
+   g.beginPath();g.moveTo(10,85);g.bezierCurveTo(6,52,43,21,77,18);g.bezierCurveTo(117,5,162,17,187,30);
+   g.bezierCurveTo(221,34,247,61,246,86);g.bezierCurveTo(251,115,210,141,174,143);
+   g.bezierCurveTo(124,155,73,145,41,127);g.bezierCurveTo(20,119,7,104,10,85);g.closePath();g.clip();
+   const base=g.createLinearGradient(55,18,170,153);base.addColorStop(0,'#b5b2a9');base.addColorStop(.38,'#898c87');base.addColorStop(.74,'#545e60');base.addColorStop(1,'#283238');g.fillStyle=base;g.fillRect(0,0,256,160);
+   let seed=871;const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+   for(let i=0;i<1700;i++){const x=rnd()*256,y=rnd()*160,r=.25+rnd()*1.5;g.fillStyle=rnd()>.48?'rgba(229,223,204,.17)':'rgba(20,32,37,.16)';g.beginPath();g.ellipse(x,y,r*1.5,r,0,0,Math.PI*2);g.fill();}
+   g.lineCap='round';g.strokeStyle='#d5d4c13b';g.lineWidth=2;
+   for(let i=0;i<5;i++){g.beginPath();g.moveTo(20,48+i*16);g.bezierCurveTo(75,35+i*20,160,84+i*12,240,64+i*14);g.stroke();}
+   const shine=g.createRadialGradient(81,40,2,96,51,107);shine.addColorStop(0,'#f2ecda45');shine.addColorStop(.5,'#dde8de10');shine.addColorStop(1,'#ffffff00');g.fillStyle=shine;g.fillRect(0,0,256,160);
+   stoneSprite=c;return c;
+ }
+ function drawStone(p,r,angle=0){
+   tctx.save();tctx.translate(p.x,p.y);tctx.rotate(angle);
+   tctx.drawImage(stoneImage(),-r*1.8,-r*.95,r*3.6,r*1.9);tctx.restore();
+ }
+ function loadedStone(a){
+   const s=sprites[a.turn],tip=s&&window.DecorGLB?.throwCrown?.(s);
+   if(tip)return {x:tip.x,y:tip.y,z:tip.z+6*.8/ZH};
+   const screen=s&&window.Slug3D?.throwCrownScreen?.(s);
+   if(screen){const base=S(START_CM/CM_PER_CELL,LANE_Y,SAND_CELLS);return {x:START_CM/CM_PER_CELL+(screen.x-base.x)/(CELLW*tankCam.zoom),y:LANE_Y,z:SAND_CELLS+(base.y-screen.y+6*.8*tankCam.zoom)/(ZH*tankCam.zoom)};}
+   if(s&&typeof slugPartsOf==='function'){
+     const P=slugPartsOf(s),len=TANK_SLUG_VIEW_SCALE*slugCm(s.genes)*depthPxPerCm();
+     if(P){const scale=len/(P.bw*P.s),k=P.s*scale,base=S(START_CM/CM_PER_CELL,LANE_Y,SAND_CELLS);
+       const cx=base.x-((P.L+P.R)/2-P.bw/2)*k,cy=base.y-P.h*scale*.44;
+       let top=null;for(const st of P.stalks){const rot=st.rot0+(s.throwLean??0),h=st.ay*.94;
+         const px=st.px+Math.sin(rot)*h,py=st.py-Math.cos(rot)*h;
+         const q={x:cx+(s.flip?-1:1)*(px-(P.L+P.R)/2)*k,y:cy+(py-(P.T+P.B)/2)*k};
+         if(!top||q.y<top.y)top=q;
+       }
+       if(top)return {x:START_CM/CM_PER_CELL+(top.x-base.x)/(CELLW*tankCam.zoom),y:LANE_Y,z:SAND_CELLS+(base.y-top.y+6*.72*tankCam.zoom)/(ZH*tankCam.zoom)};
+     }
+   }
+   const lean=(.15+aimAngle(a)/90*.8),g=cur()?.genes||{};
+   return {x:START_CM/CM_PER_CELL-Math.sin(lean)*.65,y:LANE_Y,z:SAND_CELLS+1.1+g01(g,'gillLen')*.5};
+ }
  /* ---------- ลูกค้ามาท้า ---------- */
  function purchased(){if(!state.purchased){state.purchased=true;state.nextAt=Date.now()+5*MINUTE;saveGame();}}
  const gap=()=>ShopEvents.gap();                // 20–45 นาที ใช้ค่าเดียวกันทั้ง 4 ตู้ (config.js)
@@ -133,7 +190,8 @@
  }
  function dismiss(){state.offer=null;leave();close();reschedule();saveGame();}
  function tick(){
-   if(owned())purchased();
+   if(state.active&&!state.active.settled&&['intro','angle','power'].includes(state.active.phase)&&state.active.aimStyle!=='arrow1'){state.active.phase='intro';state.active.clock=0;state.active.lockPower=null;state.active.lockAngle=null;state.active.aimStyle='arrow1';}
+ if(owned())purchased();
    practiceSync();
    if(state.active){if(resumeReady&&!modal&&!ui&&!window.BOOTING)openMatch();return;}
    if(!tank()){if(state.offer){state.offer=null;leave();if(modal)close();saveGame();}return;}
@@ -191,8 +249,8 @@
    const row=element('div',null,d,'eat-rivals');
    for(const r of rivals){const cell=element('div',null,row,'eat-rival');const c=element('canvas',null,cell);c.width=150;c.height=90;c.setAttribute('aria-hidden','true');
      try{drawSlugPortrait(c,{genes:r.genes});}catch(_){}element('b',r.name,cell);element('small','สุดแรง '+maxDist(r.genes).toFixed(0)+' ซม.',cell);}
-   element('p','1) กด Space หยุดแถบแรง — เกิน 90% เหวี่ยงพลาด เหลือครึ่ง  2) หยุดแถบองศา 45° ไกลสุด (ล็อกแรงสูง = แถบวิ่งเร็วขึ้น)',d,'eat-rule');
-   element('p','3) กล้องซูมตามหิน กด F / K สลับกันรัว ๆ 5 วิ ทุกครั้งที่กดหินเร่งขึ้นจริง ไม่มีเพดาน หยุดกดความเร็วตก  4) ช่วงหินตกมีคลื่นซัดเข้ามา '+WAVES+' ลูก กด Space ให้ทันทุกลูก พลาดแล้วหินเสียแรงตกใกล้',d,'eat-rule');
+   element('p','คลิกบนสนามเริ่มเล็ง → คลิกล็อกองศาลูกศร → คลิกเลือกแรงแล้วปา · ลูกศรยิ่งยาวยิ่งแรง เกิน 90% เหวี่ยงพลาด · ใช้ Space แทนคลิกได้',d,'eat-rule');
+   element('p','3) กด F / K สลับกันเพิ่มแรงจากค่าที่เล็ง หินไต่ขึ้นถึงยอดใน 5 วิเสมอ  4) ช่วงหินตกมีคลื่นซัดเข้ามา '+WAVES+' ลูก กด Space ตอนขอบคลื่นแตะปลายหน้าหินจนถึงกึ่งกลาง กดได้ครั้งเดียวต่อลูก กดเร็วหรือช้าไปจะเสียแรง',d,'eat-rule');
    element('p','บนลานมีวงเป้าสุ่มตำแหน่งทุกไม้ · ลงเป้าได้โบนัส +'+RING_BONUS+' แต้ม',d,'eat-rule');
    element('p','เลือกทากในตู้ปาหิน',d);
    let picked=t.slugs[0]?.id||null;
@@ -256,7 +314,7 @@
  function openMatch(){
    const a=state.active,t=tankOf();if(!a||modal||ui)return;
    if(!t||!t.slugs.some(s=>s.id===a.entrants[0].id)){state.active=null;state.offer=null;leave();saveGame();return;}
-   sprites=a.entrants.map((e,i)=>i===0?t.slugs.find(s=>s.id===e.id):{id:'throw-bot-'+i,genes:e.genes,state:'rest',ph:i*1.3,noBob:true,creepT:0});
+   sprites=a.entrants.map((e,i)=>i===0?{...t.slugs.find(s=>s.id===e.id)}:{id:'throw-bot-'+i,genes:e.genes,state:'rest',ph:i*1.3,noBob:true,creepT:0});
    pops=[];camX=camZoom=null;
    ui=element('div');ui.id='throwTankHUD';document.body.classList.add('throw-in-tank');
    enterTank(t);ov.querySelector('.ov-body').append(ui);
@@ -272,25 +330,24 @@
    hud.board=element('ol',null,ui,'eat-board');
    hud.rows=a.entrants.map((e,i)=>{const li=element('li',null,hud.board,i===0?'is-me':'');li.style.setProperty('--c',COLORS[i]);
      element('i',null,li);element('span',i===0?'คุณ':e.name,li);const b=element('b','0',li);return {li,b};});
-   /* ---- ช่วงเล็ง: แถบแรง + แถบองศา ---- */
-   const meters=element('div',null,ui,'throw-meters');hud.meters=meters;
-   const mk=(label,cls)=>{const box=element('div',null,meters,'throw-meter '+cls);
-     const head=element('div',null,box,'throw-meter-head');element('span',label,head);const val=element('b','',head);
-     const bar=element('div',null,box,'throw-bar');const zone=element('i',null,bar,'throw-zone');const mark=element('i',null,bar,'throw-mark');
-     return {box,val,zone,mark};};
-   hud.power=mk('แรง','is-power');
-   hud.angle=mk('องศา','is-angle');
-   hud.power.zone.classList.add('is-foul');      // โซนแดง = ฟาวล์
-   hud.power.zone.style.left=(FOUL_AT*100)+'%';hud.power.zone.style.width=((1-FOUL_AT)*100)+'%';
+   /* One arrow beside the thrower: angle first, then length = power. */
+   hud.meters=element('div',null,ui,'throw-meters throw-aim-summary');
+   hud.aimStep=element('strong','คลิกบนสนามเพื่อเริ่มเล็ง',hud.meters);
+   hud.aimValue=element('span','องศา → ความแรง → ปา',hud.meters);
+   hud.aimWarning=element('small','แรงเกิน 90% = เหวี่ยงพลาด',hud.meters);
+   ui.addEventListener('pointerdown',e=>{
+     if(e.button!==0||e.target.closest('button')||cur()?.bot)return;
+     if(['intro','angle','power'].includes(state.active?.phase)){e.preventDefault();tap();}
+   });
    /* ---- ช่วงบิน: แถบเร่งแรง + แถบคลื่น ---- */
    const fly=element('div',null,ui,'throw-fly');hud.fly=fly;fly.hidden=true;
    const boost=element('div',null,fly,'throw-boost');
-   const bh=element('div',null,boost,'throw-meter-head');element('span','เร่งแรง — กด F / K สลับกัน',bh);hud.boostVal=element('b','0 ซม./วิ',bh);
+   const bh=element('div',null,boost,'throw-meter-head');hud.boostTitle=element('span','เร่งแรง — กด F / K สลับกัน',bh);hud.boostVal=element('b','0 ซม./วิ',bh);
    const bbar=element('div',null,boost,'throw-bar');hud.boostFill=element('i',null,bbar,'throw-fill');
    hud.boostTime=element('div','',boost,'throw-clock');
    hud.liveDist=element('div','0 ซม.',boost,'throw-live');
    const wave=element('div',null,fly,'throw-wavebox');
-   const wh=element('div',null,wave,'throw-meter-head');element('span','คลื่น — กด Space งัดหัวหินรับให้พอดี',wh);hud.waveVal=element('b','',wh);
+   const wh=element('div',null,wave,'throw-meter-head');element('span','Space เมื่อคลื่นแตะครึ่งหน้าหิน',wh);hud.waveVal=element('b','',wh);
    hud.waveTrack=element('div',null,wave,'throw-wave-track');
    element('i',null,hud.waveTrack,'throw-wave-goal');
    /* มาตรวัดมุมหัวหิน — กลาง = ราบ/เพรียวลม · ซ้าย = หัวจม · ขวา = หัวเชิด */
@@ -302,9 +359,9 @@
    const controls=element('div',null,ui,'throw-controls');
    hud.keyF=element('button',null,controls,'throw-btn throw-side');hud.keyF.type='button';element('b','F',hud.keyF);
    hud.go=element('button',null,controls,'throw-btn');hud.go.type='button';
-   hud.goLabel=element('b','ปา',hud.go);hud.goKey=element('small','Space',hud.go,'throw-key');
+   hud.goLabel=element('b','ปา',hud.go);hud.goKey=element('small','คลิก / Space',hud.go,'throw-key');
    hud.keyK=element('button',null,controls,'throw-btn throw-side');hud.keyK.type='button';element('b','K',hud.keyK);
-   hud.go.onpointerdown=e=>{e.preventDefault();tap();};
+   hud.go.onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();e.stopPropagation();tap();};
    hud.keyF.onpointerdown=e=>{e.preventDefault();boostKey('f');};
    hud.keyK.onpointerdown=e=>{e.preventDefault();boostKey('k');};
    hud.skip=element('button','⏭ ข้ามตาบอท',ui,'throw-skip');hud.skip.type='button';hud.skip.hidden=true;
@@ -313,14 +370,60 @@
 
  /* ---------- จังหวะการเล่น ---------- */
  const sweep=(clock,speed)=>{const x=(clock*speed)%1;return x<.5?x*2:2-x*2;};
- const angleSpeed=a=>ANGLE_SPEED_BASE+ANGLE_SPEED_GREED*(a.lockPower??.5);
+ const angleSpeed=()=>ANGLE_SPEED_BASE;
+ const aimAngle=a=>a.lockAngle??(ANGLE_LO+(ANGLE_HI-ANGLE_LO)*sweep(a.clock,angleSpeed(a)));
+ const aimPower=a=>a.lockPower??(a.phase==='power'||a.phase==='bot'?sweep(a.clock,SWEEP_POWER):.55);
+ function projectedDirection(dx,dz){
+   const p=S(0,LANE_Y,SAND_CELLS),q=S(dx,LANE_Y,SAND_CELLS+dz);
+   return Math.atan2(q.y-p.y,q.x-p.x);
+ }
+ const aimGuide={key:'',points:new Float64Array(202),count:0,shot:{},state:{}};
+ function previewTrajectory(angle,v,height=1.1*CM_PER_CELL){
+   const key=angle.toFixed(2)+'|'+v.toFixed(2)+'|'+height.toFixed(2);
+   if(aimGuide.key===key)return aimGuide;
+   aimGuide.key=key;
+   const r=angle*Math.PI/180,s=aimGuide.shot,a=aimGuide.state;
+   Object.assign(s,{height,dist:0,angle,v,vx:v*Math.cos(r),vz:v*Math.sin(r),pitch:0});
+   a.shot=s;a.clock=0;
+   aimGuide.count=1;aimGuide.points[0]=0;aimGuide.points[1]=s.height;
+   for(let i=1;i<=100;i++){
+     const falling=i>40;
+     if(i===41){a.clock=0;s.vz=0;s.timeScale=Math.sqrt(2*s.height/GRAVITY)/FALL_T;}
+     a.clock+=.125;stepDynamicStone(a,.125,falling);
+     aimGuide.points[i*2]=s.dist;aimGuide.points[i*2+1]=s.height;aimGuide.count++;
+     if(falling&&s.height<=0)break;
+   }
+   return aimGuide;
+ }
+ function drawAimArrow(a){
+   const loaded=loadedStone(a),origin=S(loaded.x,loaded.y,loaded.z);
+   const angle=aimAngle(a),power=aimPower(a),scale=clamp(tankCam.zoom,.8,1.05);
+   const radians=angle*Math.PI/180;
+   const length=(a.phase==='angle'?108:50+145*power)*scale,wide=12*scale;
+   const danger=a.phase==='power'&&power>FOUL_AT;
+   // Same force integrator as the stone; preview excludes future F/K and waves.
+   const guide=previewTrajectory(angle,startSpeed(cur().genes,power,angle),(loaded.z-SAND_CELLS)*CM_PER_CELL);
+   tctx.save();tctx.strokeStyle='rgba(220,255,244,.8)';tctx.lineWidth=2;
+   tctx.setLineDash([4,6]);tctx.beginPath();
+   for(let i=0;i<guide.count;i++){
+     const p=S(loaded.x+guide.points[i*2]/CM_PER_CELL,loaded.y,SAND_CELLS+guide.points[i*2+1]/CM_PER_CELL);
+     if(i)tctx.lineTo(p.x,p.y);else tctx.moveTo(p.x,p.y);
+   }
+   tctx.stroke();tctx.restore();
+   tctx.save();tctx.translate(origin.x,origin.y);tctx.rotate(projectedDirection(Math.cos(radians),Math.sin(radians)));
+   tctx.fillStyle=danger?'#ef725a':'#e7ac42';tctx.strokeStyle=danger?'#ffd5ca':'#a9f4e8';tctx.lineWidth=3;
+   tctx.beginPath();tctx.moveTo(0,-wide*.45);tctx.lineTo(length-25*scale,-wide*.45);tctx.lineTo(length-30*scale,-wide);
+   tctx.lineTo(length,0);tctx.lineTo(length-30*scale,wide);tctx.lineTo(length-25*scale,wide*.45);tctx.lineTo(0,wide*.45);tctx.closePath();tctx.fill();tctx.stroke();
+   tctx.strokeStyle='#fff1be';tctx.lineWidth=1.5;tctx.beginPath();tctx.moveTo(6,0);tctx.lineTo(length-20*scale,0);tctx.stroke();
+   tctx.restore();
+ }
  function tap(){
    const a=state.active;if(!a||a.settled)return false;
    const e=cur();
-   if(a.phase==='intro'){startTurn();return true;}
+   if(a.phase==='intro'){if(e?.bot)return false;startTurn();saveGame();return true;}
    if(e?.bot)return false;
-   if(a.phase==='power'){a.lockPower=sweep(a.clock,SWEEP_POWER);a.phase='angle';a.clock=0;return true;}
-   if(a.phase==='angle'){a.lockAngle=ANGLE_LO+(ANGLE_HI-ANGLE_LO)*sweep(a.clock,angleSpeed(a));launch();return true;}
+   if(a.phase==='power'){a.lockPower=sweep(a.clock,SWEEP_POWER);launch();saveGame();return true;}
+   if(a.phase==='angle'){a.lockAngle=ANGLE_LO+(ANGLE_HI-ANGLE_LO)*sweep(a.clock,angleSpeed(a));a.phase='power';a.clock=0;saveGame();return true;}
    if(a.phase==='waves'){return pitchUp(a);}
    return false;
  }
@@ -330,7 +433,8 @@
    const a=state.active;if(!a||a.settled||a.phase!=='boost'||cur()?.bot)return false;
    if(lastBoostKey===k)return false;
    if(!boostCap())return false;
-   lastBoostKey=k;a.shot.presses++;a.shot.v+=a.shot.gain;     // ทุกครั้งที่กด = อัดความเร็วเพิ่มจริง ไม่มีเพดาน
+   lastBoostKey=k;boostImpulse(a.shot);
+   boostFlashUntil=a.clock+.16;
    hud[k==='f'?'keyF':'keyK']?.animate([{transform:'translateY(4px) scale(.94)',filter:'brightness(1.5)'},{transform:'none',filter:'none'}],{duration:130});
    return true;
  }
@@ -338,7 +442,7 @@
    const a=state.active,e=cur();
    a.lockPower=a.lockAngle=null;a.shot=null;a.clock=0;lastBoostKey=null;
    newRing(e);
-   a.phase=e.bot?'bot':'power';
+   a.aimStyle='arrow1';a.phase=e.bot?'bot':'angle';
    if(e.bot){const miss=1-e.aim;a.botPower=clamp(FOUL_AT-Math.random()*miss*.3,.25,FOUL_AT);a.botAngle=clamp(BEST_ANGLE+(Math.random()*2-1)*miss*20,ANGLE_LO,ANGLE_HI);}
  }
  function nextTurn(){
@@ -346,49 +450,123 @@
    a.turn++;
    if(a.turn>=a.entrants.length){a.turn=0;a.round++;}
    if(a.round>=THROWS){settle();return;}
-   startTurn();
+   if(cur()?.bot)startTurn();
+   else{a.phase='intro';a.clock=0;a.shot=null;a.lockAngle=null;a.lockPower=null;}
  }
  function launch(){
-   const a=state.active,e=cur();
-   a.shot={v:startSpeed(e.genes,a.lockPower,a.lockAngle),gain:PRESS_GAIN*armMul(e.genes),
+   const a=state.active,e=cur(),loaded=loadedStone(a);
+   a.shot={physics:3,originX:loaded.x*CM_PER_CELL,originY:loaded.y,height:(loaded.z-SAND_CELLS)*CM_PER_CELL,v:startSpeed(e.genes,a.lockPower,a.lockAngle),gain:THROW_PRESS*armMul(e.genes),
      angle:a.lockAngle,foul:a.lockPower>FOUL_AT,presses:0,waves:[],by:a.turn,dist:0,pitch:0};
    for(let i=0;i<WAVES;i++)a.shot.waves.push({at:WAVE_LEAD+i*WAVE_GAP,hit:null});
-   a.phase='boost';a.clock=0;lastBoostKey=null;
+   const r=a.shot.angle*Math.PI/180;
+   a.shot.vx=a.shot.v*Math.cos(r);a.shot.vz=a.shot.v*Math.sin(r);
+   a.shot.timeScale=Math.max(.01,a.shot.vz/(GRAVITY*BOOST_T));
+   a.phase='boost';a.clock=0;lastBoostKey=null;boostFlashUntil=0;
    if(a.shot.foul)pops.push({x:START_CM/CM_PER_CELL+1,y:LANE_Y,text:'เหวี่ยงพลาด!',color:'#ff8a7a',t:0});
  }
  /* เดินฟิสิกส์หินหนึ่งเฟรม: ความเร็วตกตามแรงต้าน แล้วบวกระยะที่วิ่งได้จริง */
  /* แรงต้านจากมุมหัว: ราบ (|มุม| ≤ PITCH_FLAT) = 1 เท่า · เชิด/จมสุด = 1+PITCH_DRAG เท่า */
  const pitchDrag=s=>1+PITCH_DRAG*clamp((Math.abs(s.pitch||0)-PITCH_FLAT)/(PITCH_MAX-PITCH_FLAT),0,1);
+ // 2 g stone, 3 cm² cross-section, air density 1.225 kg/m³.
+ // a_drag = rho * Cd * A * |v| * v / (2m); velocities stored in cm/s.
+ const AIR_K=1.225*.0003/(2*.002)/100;
+ function boostImpulse(s){
+   s.presses++;
+   if(s.physics===3){
+     const r=s.angle*Math.PI/180;
+     s.vx+=s.gain*Math.cos(r);s.vz+=s.gain*Math.sin(r);
+     s.v=Math.hypot(s.vx,s.vz);
+   }else s.v+=s.gain;
+ }
+ function stepDynamicStone(a,dt,falling){
+   const s=a.shot,oldX=s.dist,oldZ=s.height;
+   // Remap physical seconds to game seconds ONLY to preserve the requested 5 s apex.
+   // Gravity, drag, position and velocity are still integrated on every substep.
+   if(!falling){
+     const remaining=Math.max(dt,BOOST_T-(a.clock-dt));
+     s.timeScale=Math.max(.00001,s.vz/(GRAVITY*remaining));
+     if(s.angle===0)s.timeScale=.03; // horizontal release has no upward component
+   }
+   const h=dt*s.timeScale,speed=Math.hypot(s.vx,s.vz);
+   const cd=.3+3*Math.sin((s.pitch||0)*Math.PI/180)**2;
+   const k=AIR_K*cd*speed;
+   const vx=s.vx*Math.exp(-k*h);
+   let vz=(s.vz+GRAVITY/Math.max(k,1e-12))*Math.exp(-k*h)-GRAVITY/Math.max(k,1e-12);
+   if(k<1e-8)vz=s.vz-GRAVITY*h;
+   if(!falling)vz=Math.max(0,vz);
+   s.dist=Math.min(MAX_CM,s.dist+(s.vx+vx)*.5*h);
+   s.height=Math.max(0,s.height+(s.vz+vz)*.5*h);
+   s.vx=vx;s.vz=vz;s.v=Math.hypot(vx,vz);
+   s.drag=AIR_K*cd*s.v*s.v;
+   s.pitch=(s.pitch||0)*Math.exp(-dt/.45);
+   const dx=s.dist-oldX,dz=s.height-oldZ;
+   if(Math.abs(dx)+Math.abs(dz)>1e-10){s.directionX=dx;s.directionZ=dz;}
+ }
  function stepStone(a,dt,falling){
    const s=a.shot;if(!s)return;
+   if(s.physics===3){stepDynamicStone(a,dt,falling);return;}
+   if(s.physics===2){
+     const oldX=s.dist,oldZ=s.height;
+     const angle=s.angle*Math.PI/180;
+     if(!falling){
+       // Smooth accepted impulses visually without moving the 5-second apex.
+       s.displayV=(s.displayV??s.v)+(s.v-(s.displayV??s.v))*(1-Math.exp(-dt*18));
+       const u=clamp(a.clock/BOOST_T,0,1),v=s.displayV;
+       s.range=v*v*Math.sin(2*angle)/GRAVITY;
+       s.apex=v*v*Math.sin(angle)**2/(2*GRAVITY);
+       s.dist=Math.min(MAX_CM,s.range*.5*u);
+       s.height=s.apex*(2*u-u*u);
+     }else{
+       const u=clamp(a.clock/FALL_T,0,1);
+       s.height=s.apex*(1-u*u);
+       // Wave control remains an arcade drag penalty, not extra propulsion.
+       const drag=DRAG_FALL*(pitchDrag(s)-1);
+       s.glide=(s.glide??1)*Math.exp(-drag*dt);
+       s.dist=Math.min(MAX_CM,s.dist+s.range/(2*FALL_T)*s.glide*dt);
+       s.pitch=(s.pitch||0)*Math.exp(-dt/PITCH_EASE);
+     }
+     const dx=s.dist-oldX,dz=s.height-oldZ;
+     if(Math.abs(dx)+Math.abs(dz)>1e-10){s.directionX=dx;s.directionZ=dz;}
+     return;
+   }
    s.v=Math.max(0,s.v-s.v*(falling?DRAG_FALL*pitchDrag(s):DRAG)*dt);
    s.dist=Math.min(MAX_CM,s.dist+s.v*dt*(falling?1:ASCENT));
    if(falling)s.pitch=(s.pitch||0)*Math.exp(-dt/PITCH_EASE);   // หัวค่อย ๆ คืนแนวราบเอง ปล่อยมือแล้วพอแก้ตัวได้
  }
- /* กด Space ช่วงหินตก = งัดหัวขึ้น */
+ /* Contact starts at the nose; the crest reaches the midpoint after WAVE_WINDOW.
+    One attempt per wave prevents repeated presses from replacing timing. */
  function pitchUp(a){
-   const s=a.shot;if(!s)return false;
-   s.pitch=clamp((s.pitch||0)+PITCH_PRESS,-PITCH_MAX,PITCH_MAX);
+   const s=a.shot;if(!s||a.phase!=='waves')return false;
+   const w=s.waves.find(w=>w.hit==null&&a.clock<=w.at+WAVE_WINDOW+1e-9);
+   if(!w||w.tried)return false;
+   w.tried=true;
+   w.countered=a.clock>=w.at-1e-9&&a.clock<=w.at+WAVE_WINDOW+1e-9;
+   s.pitch=w.countered?0:PITCH_PRESS;
+   if(w.countered)waveHits(a,w,null);
+   pops.push({x:stoneX(a)/CM_PER_CELL,y:LANE_Y,text:w.countered?'ฝ่าไปได้!':'เร็วไป! รอคลื่นแตะหน้าหิน',color:w.countered?'#9fe3ee':'#ff8a7a',t:0});
    return true;
  }
  /* คลื่นถึงตัวหิน — ผลขึ้นกับมุมหัวตอนนั้น */
  function waveHits(a,w,aim){
-   const s=a.shot,p=s.pitch||0;
-   if(aim!=null){                       // บอท: ความแม่นตัดสินว่างัดหัวทันหรือไม่
-     s.pitch=Math.random()<aim?(Math.random()*2-1)*PITCH_FLAT:(Math.random()<.5?-PITCH_WAVE:PITCH_WAVE*1.3);
-   }else if(p>=PITCH_CATCH){
-     s.pitch=clamp(p+PITCH_WAVE,-PITCH_MAX,PITCH_MAX);          // เชิดค้าง = คลื่นมุดใต้ท้อง เชิดต่อ
-   }else{
-     s.pitch=clamp(p-PITCH_WAVE,-PITCH_MAX,PITCH_MAX);          // ปกติคลื่นตบหัวลง (งัดไว้พอดีก็กลับมาราบ)
-   }
-   w.hit=Math.abs(s.pitch)<=PITCH_FLAT;
+   if(w.hit!=null)return w.hit;
+   const s=a.shot;
+   w.hit=!!w.countered;
+   s.pitch=w.hit?0:-PITCH_WAVE;
    w.pitch=Math.round(s.pitch);
+   if(s.physics===3){
+     const incoming=Math.hypot(s.vx,s.vz);
+     const loss=w.hit?.01:clamp(.22+Math.abs(s.pitch)/180,.22,.6);
+     s.vx*=1-loss;
+     if(!w.hit)s.vz-=incoming*.08;
+     s.v=Math.hypot(s.vx,s.vz);
+     w.speedBefore=incoming;w.speedAfter=s.v;
+   }
    return w.hit;
  }
- const stoneX=a=>START_CM+(a.shot?a.shot.dist:0);
+ const stoneX=a=>(a.shot?.originX??START_CM)+(a.shot?a.shot.dist:0);
  function finishShot(){
    const a=state.active,s=a.shot,e=a.entrants[s.by];
-   const dist=s.dist;
+   const dist=clamp(s.dist+(s.originX??START_CM)-START_CM,0,MAX_CM);
    const onRing=Math.abs(dist-a.ring)<=RING_HALF;
    const score=Math.round(dist)+(onRing?RING_BONUS:0);
    e.shots.push({dist,score,ring:onRing});
@@ -399,45 +577,57 @@
    const a=state.active;if(!a||a.settled||!cur()?.bot)return;
    /* ข้าม: จำลองผลตาบอทตัวนี้ทันที (ใช้สูตรเดียวกับที่บอทเล่นจริง) */
    if(a.phase==='bot'){a.lockPower=a.botPower;a.lockAngle=a.botAngle;launch();}
-   const e=cur(),s=a.shot;
-   /* จำลองตาบอทแบบรวดเดียว: กดตามความแม่น + สุ่มพลาดคลื่น แล้วเดินฟิสิกส์ให้จบ */
-   const rate=4+6*e.aim,dt=.05;
-   for(let t=0,acc=0;t<BOOST_T;t+=dt){acc+=rate*dt;while(acc>=1){acc--;s.presses++;s.v+=s.gain;}stepStone(a,dt,false);}
-   /* ช่วงหินตก: ปล่อยคลื่นตามจังหวะจริงสลับกับเดินฟิสิกส์ มุมหัวจะได้มีผลต่อแรงต้านเหมือนตอนเล่นเอง */
-   for(let t=0;t<WAVE_LEAD+WAVES*WAVE_GAP;t+=dt){
-     for(const w of s.waves)if(w.hit==null&&t>=w.at)waveHits(a,w,e.aim);
-     stepStone(a,dt,true);
-   }
-   a.clock=WAVE_LEAD+WAVES*WAVE_GAP;finishShot();
+   // Continue the current shot, including partially played turns, using the same simulation.
+   for(let i=0;i<1500&&flying(a);i++)advance(1/120);
  }
  function advance(dt){
    const a=state.active;if(!a||a.settled)return;
+   if(cur()?.bot&&a.phase!=='intro'&&!(a.shot?.physics>=2))dt*=BOT_SPEED;
+   while(dt>1e-9){
+     const end=a.phase==='boost'?BOOST_T:a.phase==='waves'&&a.shot?.physics===2?FALL_T:Infinity;
+     const step=Math.min(dt,1/120,Math.max(1e-9,end-a.clock));
+     advanceStep(step);dt-=step;
+   }
+ }
+ function advanceStep(dt){
+   const a=state.active;if(!a||a.settled)return;
    const e=cur(),bot=!!e?.bot;
-   if(bot&&a.phase!=='intro')dt*=BOT_SPEED;                 // ตาบอทเดินเร็วขึ้น ไม่ต้องนั่งรอนาน
    a.clock+=dt;
-   if(a.phase==='intro'){if(a.clock>1)startTurn();return;}
+   if(a.phase==='intro'){if(bot&&a.clock>1)startTurn();return;}
    if(a.phase==='bot'){if(a.clock>1.1){a.lockPower=a.botPower;a.lockAngle=a.botAngle;launch();}return;}
    if(a.phase==='boost'){
      if(bot){                                               // บอทกด F/K ตามความแม่น (กี่ครั้ง/วิ)
        const rate=4+6*e.aim;
        a.shot._acc=(a.shot._acc||0)+rate*dt;
-       while(a.shot._acc>=1){a.shot._acc--;a.shot.presses++;a.shot.v+=a.shot.gain;}
+       while(a.shot._acc>=1){a.shot._acc--;boostImpulse(a.shot);}
      }
      stepStone(a,dt,false);
-     if(a.clock>=BOOST_T){a.phase='waves';a.clock=0;}
+     if(a.clock>=BOOST_T-1e-9){
+       if(a.shot.physics===3){
+         a.shot.vz=0;
+         a.shot.timeScale=Math.sqrt(2*a.shot.height/GRAVITY)/FALL_T;
+         a.shot.apex=a.shot.height;
+       }
+       a.phase='waves';a.clock=0;
+     }
      return;
    }
    if(a.phase==='waves'){
+     if(bot){
+       for(const w of a.shot.waves)if(w.hit==null&&!w.botTried&&a.clock>=w.at+WAVE_WINDOW*.45){
+         w.botTried=true;if(Math.random()<e.aim)pitchUp(a);
+       }
+     }
      for(const w of a.shot.waves){
-       if(w.hit!=null||a.clock<w.at)continue;
+       if(w.hit!=null||a.clock<=w.at+WAVE_WINDOW+1e-9)continue;
        const ok=waveHits(a,w,bot?e.aim:null);
        const p=a.shot.pitch;
        pops.push({x:stoneX(a)/CM_PER_CELL,y:LANE_Y,
-         text:ok?'เพรียวลม!':p>0?'หัวเชิดเกิน!':'หัวจม!',
+         text:ok?'ฝ่าไปได้!':'คลื่นซัด!',
          color:ok?'#9fe3ee':'#ff8a7a',t:0});
      }
      stepStone(a,dt,true);
-     if(a.shot.waves.every(w=>w.hit!=null)&&a.clock>a.shot.waves[WAVES-1].at)finishShot();
+     if(a.shot.physics===3?(a.shot.height<=0||a.clock>=12):a.shot.physics===2?a.clock>=FALL_T-1e-9:a.shot.waves.every(w=>w.hit!=null)&&a.clock>a.shot.waves[WAVES-1].at){a.shot.height=0;finishShot();}
      return;
    }
    if(a.phase==='land'&&a.clock>1){nextTurn();return;}
@@ -494,7 +684,7 @@
  /* ---------- วาดสนาม ---------- */
  function drawField(c,project,t){
    t=t||tank();if(!t)return;
-   const y0=LANE_Y-2.2,y1=LANE_Y+2.2;
+   const y0=0,y1=LANE_H;
    const line=(x,color,lw)=>{const p=project(x,y0),q=project(x,y1);c.strokeStyle=color;c.lineWidth=lw;c.beginPath();c.moveTo(p.x,p.y);c.lineTo(q.x,q.y);c.stroke();};
    c.save();
    const quad=[project(0,y0),project(t.def.w,y0),project(t.def.w,y1),project(0,y1)];
@@ -530,10 +720,21 @@
  }
  function drawItem(it){
    const a=state.active;if(!a)return;
+   if(it.part==='stone'&&['intro','angle','power','bot'].includes(a.phase)){
+     if(a.phase!=='intro')drawAimArrow(a);
+     const q=loadedStone(a);drawStone(S(q.x,q.y,q.z),Math.max(3,6*tankCam.zoom));return;
+   }
    if(it.part==='slug'){
      const e=a.entrants[it.i],s=sprites[it.i];if(!s)return;
      const active=it.i===a.turn&&!a.settled,sp=standSpot(it.i,active);
-     const st=active&&flying(a)&&a.shot?.by===it.i?'sneeze':'rest';
+     const preparing=active&&['intro','angle','power','bot'].includes(a.phase);
+     s.noBob=true;
+     if(preparing)s.throwLean=.15+aimAngle(a)/90*.8;
+     else if(active&&a.phase==='boost'&&a.clock<.3)s.throwLean=-.25*(1-a.clock/.3);
+     else delete s.throwLean;
+     // 2D renderer uses its existing appendage pose; 3D uses radians directly.
+     if(s.throwLean!==undefined)s.tugLean=clamp(s.throwLean/.6,-1,1);else delete s.tugLean;
+     const st='rest';
      drawSlugAt(s,sp.x,sp.y,0,st);
      nameTag((it.i===0?'คุณ':e.name)+(e.shots.length?' · '+scoreOf(e):''),sp.x,sp.y,it.i===0?'#153c42':'rgba(30,20,16,.85)',COLORS[it.i]);
      return;
@@ -542,10 +743,10 @@
      /* วงเป้าโบนัสของไม้นี้ */
      if(a.ring&&!a.settled){
        const x0=(START_CM+a.ring-RING_HALF)/CM_PER_CELL,x1=(START_CM+a.ring+RING_HALF)/CM_PER_CELL;
-       const q=[S(x0,LANE_Y-2.1,SAND_CELLS),S(x1,LANE_Y-2.1,SAND_CELLS),S(x1,LANE_Y+2.1,SAND_CELLS),S(x0,LANE_Y+2.1,SAND_CELLS)];
+       const q=[S(x0,0.15,SAND_CELLS),S(x1,0.15,SAND_CELLS),S(x1,LANE_H-.15,SAND_CELLS),S(x0,LANE_H-.15,SAND_CELLS)];
        tctx.save();tctx.fillStyle='rgba(159,227,166,.28)';tctx.strokeStyle='#9fe3a6';tctx.lineWidth=Math.max(1.5,2*tankCam.zoom);
        tctx.beginPath();q.forEach((p,i)=>i?tctx.lineTo(p.x,p.y):tctx.moveTo(p.x,p.y));tctx.closePath();tctx.fill();tctx.stroke();
-       const c=S((x0+x1)/2,LANE_Y-2.1,SAND_CELLS);
+       const c=S((x0+x1)/2,0.15,SAND_CELLS);
        tctx.font='bold '+Math.max(11,13*tankCam.zoom).toFixed(0)+'px "IBM Plex Sans Thai",sans-serif';tctx.textAlign='center';tctx.textBaseline='bottom';
        tctx.fillStyle='#d8ffd8';tctx.fillText('🎯 +'+RING_BONUS,c.x,c.y-4);tctx.restore();
      }
@@ -569,29 +770,43 @@
    }
    if(it.part==='stone'&&flying(a)&&a.shot){
      const s=a.shot,x=stoneX(a)/CM_PER_CELL;
+     const p=S(x,s.originY??LANE_Y,stoneHeight(a)),ahead=S(x+1,s.originY??LANE_Y,stoneHeight(a));
+     const radians=s.angle*Math.PI/180;
+     const flightAngle=s.physics>=2?projectedDirection(s.directionX??Math.cos(radians),s.directionZ??Math.sin(radians)):Math.atan2(ahead.y-p.y,ahead.x-p.x);
+     const r=Math.max(3,6*tankCam.zoom);
+     if(p.x<-400||p.x>TCW+400||p.y<-300||p.y>TCH+300)return;
      /* คลื่นที่กำลังซัดเข้ามาหาหิน (ช่วงหินตก) */
      if(a.phase==='waves'){
        for(const w of s.waves){
-         if(w.hit!=null)continue;
-         const lead=w.at-a.clock;if(lead<-.2||lead>1.6)continue;
-         const wx=x+lead*3.2;
-         const p0=S(wx,LANE_Y-2,SAND_CELLS),p1=S(wx,LANE_Y+2,SAND_CELLS),mid=S(wx-.5,LANE_Y,SAND_CELLS+.7);
-         tctx.save();tctx.strokeStyle='rgba(159,227,238,'+clamp(1-Math.abs(lead)/1.6,.2,1)+')';tctx.lineWidth=Math.max(2,3.5*tankCam.zoom);
-         tctx.beginPath();tctx.moveTo(p0.x,p0.y);tctx.quadraticCurveTo(mid.x,mid.y,p1.x,p1.y);tctx.stroke();tctx.restore();
+         const lead=w.at-a.clock;if(lead<-WAVE_WINDOW-.3||lead>1.6)continue;
+         // Same nose-to-midpoint coordinate used by the input window, independent of zoom.
+         const stoneAngle=flightAngle-(s.pitch||0)*Math.PI/180;
+         const front=r*Math.hypot(1.8*Math.cos(stoneAngle),.95*Math.sin(stoneAngle));
+         const distance=front*(1+lead/WAVE_WINDOW),span=TCH;
+
+         tctx.save();tctx.translate(p.x,p.y);
+         tctx.globalAlpha=clamp((1.6-lead)*2,0,.7)*(w.hit===true?.32:1)*clamp((lead+WAVE_WINDOW+.3)/.3,0,1);
+         tctx.drawImage(waveImage(),distance,-p.y,r*7,span);tctx.restore();
+
        }
      }
-     const total=BOOST_T+WAVE_LEAD+WAVES*WAVE_GAP;
-     const t=(a.phase==='boost'?a.clock:BOOST_T+a.clock)/total;
-     const peak=1.2+2.6*Math.sin(s.angle*Math.PI/180);
-     const p=S(x,LANE_Y,SAND_CELLS+peak*Math.sin(Math.PI*clamp(t,0,1)));
-     /* หินก้อนรียาว เอียงตามมุมหัว — เห็นได้ทันทีว่าหัวเชิด/หัวจม (ช่วงเร่งยังไม่มีมุม วาดราบ) */
-     const r=Math.max(3,6*tankCam.zoom),pitch=a.phase==='waves'?(s.pitch||0):0;
-     tctx.save();tctx.translate(p.x,p.y);tctx.rotate(-pitch*Math.PI/180);
-     tctx.fillStyle='#8d8373';tctx.strokeStyle='#4a443a';tctx.lineWidth=Math.max(1,1.5*tankCam.zoom);
-     tctx.beginPath();tctx.ellipse(0,0,r*1.8,r*.78,0,0,Math.PI*2);tctx.fill();tctx.stroke();
-     tctx.beginPath();tctx.moveTo(r*.6,-r*.12);tctx.lineTo(r*1.75,0);tctx.lineTo(r*.6,r*.14);   // ปลายหัวหิน ดูออกว่าหันทางไหน
-     tctx.fillStyle='#b3a894';tctx.fill();
-     tctx.restore();
+     if(a.phase==='boost'){
+       const speed=clamp(s.v/(s.physics>=2?400:40),.12,1),flash=clamp((boostFlashUntil-a.clock)/.16,0,1);
+       tctx.save();tctx.translate(p.x,p.y);tctx.rotate(flightAngle);tctx.lineCap='round';
+       // Eight curved water trails, no particle objects or extra animation loop.
+       for(let i=0;i<8;i++){
+         const travel=(a.clock*(1.5+speed*2)+i*.173)%1;
+         const y=((i%4)-1.5)*r*.9,tail=-r*(2+travel*7),length=r*(1+speed*2.8);
+         tctx.strokeStyle='rgba(161,229,237,'+((1-travel)*(.35+speed*.45+flash*.2)).toFixed(3)+')';
+         tctx.lineWidth=(1+flash)*Math.max(1,tankCam.zoom*.45);
+         tctx.beginPath();tctx.moveTo(tail,y);tctx.quadraticCurveTo(tail-length*.5,y+r*.12,tail-length,y+r*.35);tctx.stroke();
+       }
+       tctx.strokeStyle='rgba(235,255,255,'+(.25+flash*.65)+')';tctx.lineWidth=Math.max(1,tankCam.zoom*.5);
+       tctx.beginPath();tctx.ellipse(0,0,r*2.1,r*1.05,0,-.8,.8);tctx.stroke();tctx.restore();
+     }
+     /* หันตามทิศการเคลื่อนที่จริง แล้วบวกมุมหัวที่ผู้เล่นประคอง */
+     const pitch=a.phase==='waves'?(s.pitch||0):0;
+     drawStone(p,r,flightAngle-pitch*Math.PI/180);
      if(a.phase==='waves'&&Math.abs(pitch)>PITCH_FLAT){        // ริ้วลมปะทะตอนไม่เพรียว
        tctx.save();tctx.strokeStyle='rgba(255,138,122,'+clamp(Math.abs(pitch)/PITCH_MAX,.25,.8).toFixed(2)+')';
        tctx.lineWidth=Math.max(1,1.6*tankCam.zoom);
@@ -610,13 +825,14 @@
    const x0=Math.min(...pts.map(p=>p.x)),x1=Math.max(...pts.map(p=>p.x)),y0=Math.min(...pts.map(p=>p.y)),y1=Math.max(...pts.map(p=>p.y));
    const topPad=78,botPad=TCW<700?210:170;
    const fit=clamp(Math.min((TCW-24)/(x1-x0),(TCH-topPad-botPad)/(y1-y0)),.2,4);
-   const wantZoom=flying(a)?fit*2.1:fit;
-   const wantX=flying(a)?stoneX(a)/CM_PER_CELL:t.def.w/2;
+   const aiming=a&&['intro','angle','power','bot'].includes(a.phase);
+   const wantZoom=a?.phase==='boost'?clamp(fit*4.8,3.2,5):a?.phase==='waves'?clamp(fit*3.4,2.2,4.3):aiming?clamp(fit*2.5,1.7,3):fit;
+   const wantX=flying(a)?stoneX(a)/CM_PER_CELL:aiming?START_CM/CM_PER_CELL+2:t.def.w/2;
    const k=1-Math.exp(-dt*6);
    camZoom=camZoom==null?wantZoom:camZoom+(wantZoom-camZoom)*k;
    camX=camX==null?wantX:camX+(wantX-camX)*k;
    tankCam.zoom=camZoom;
-   const c=S(camX,LANE_Y,SAND_CELLS);
+   const c=S(camX,LANE_Y,flying(a)&&a.shot?stoneHeight(a):SAND_CELLS+(aiming?1:0));
    tankCam.ox=TCW/2-c.x;tankCam.oy=(topPad+(TCH-botPad))/2-c.y;tankNeedFit=false;
  }
  function updateHud(a){
@@ -625,48 +841,48 @@
    if(hud.turn.textContent!==turnText)hud.turn.textContent=turnText;
    const missed=a.shot?a.shot.waves.filter(w=>w.hit===false).length:0;
    const hint=a.settled?''
-     :a.phase==='intro'?'กด Space เริ่ม'
-     :a.phase==='power'?'กด Space หยุดแถบแรง — โซนแดงเกิน '+(FOUL_AT*100)+'% = พลาด'
-     :a.phase==='angle'?'กด Space หยุดแถบองศา (45° ไกลสุด)'
+     :a.phase==='intro'?'คลิกบนสนามเพื่อเริ่มเล็ง'
+     :a.phase==='power'?'ลูกศรยิ่งยาวยิ่งแรง — คลิกอีกครั้งเพื่อปา'
+     :a.phase==='angle'?'คลิกล็อกทิศลูกศร — 45° ไกลสุด'
      :a.phase==='bot'?e.name+' กำลังเล็ง…'
      :a.phase==='boost'?(mine?'กด F / K สลับกันรัว ๆ!':e.name+' กำลังเร่งแรง')
-     :a.phase==='waves'?(mine?(Math.abs(a.shot?.pitch||0)>PITCH_CATCH?'หัวเชิดเกินแล้ว! ปล่อยมือให้หัวคืนราบก่อน':'คลื่นมาแล้ว! กด Space งัดหัวหินรับคลื่นให้พอดี'):e.name+' กำลังประคองหัวหิน')
+     :a.phase==='waves'?(mine?'กด Space เมื่อคลื่นแตะหน้าหิน ก่อนเลยครึ่งก้อน · 1 ครั้ง/ลูก':e.name+' กำลังประคองหัวหิน')
      :a.shot?a.shot.dist.toFixed(0)+' ซม.'+(missed?' · เสียทรง '+missed+' ลูก':''):'';
    if(hud.hint.textContent!==hint)hud.hint.textContent=hint;
    /* แถบเล็ง */
    const aiming=a.phase==='power'||a.phase==='angle'||a.phase==='bot'||a.phase==='intro';
-   hud.meters.hidden=!aiming||a.settled;
+   hud.meters.hidden=!aiming||a.settled;ui.classList.toggle('is-aiming',aiming&&mine&&!a.settled);
    hud.fly.hidden=!flying(a);
    if(aiming){
-     const pv=a.lockPower!=null?a.lockPower:(a.phase==='power'||a.phase==='bot'?sweep(a.clock,SWEEP_POWER):0);
-     const av=a.lockAngle!=null?a.lockAngle:ANGLE_LO+(ANGLE_HI-ANGLE_LO)*(a.phase==='angle'||a.phase==='bot'?sweep(a.clock,angleSpeed(a)):0);
-     hud.power.mark.style.left=(pv*100)+'%';hud.power.val.textContent=Math.round(pv*100)+'%';
-     hud.angle.mark.style.left=((av-ANGLE_LO)/(ANGLE_HI-ANGLE_LO)*100)+'%';hud.angle.val.textContent=Math.round(av)+'°';
-     hud.angle.zone.style.left=((BEST_ANGLE-5-ANGLE_LO)/(ANGLE_HI-ANGLE_LO)*100)+'%';
-     hud.angle.zone.style.width=(10/(ANGLE_HI-ANGLE_LO)*100)+'%';
-     hud.power.box.classList.toggle('is-live',a.phase==='power'||a.phase==='bot');
-     hud.angle.box.classList.toggle('is-live',a.phase==='angle');
+     const angle=aimAngle(a),power=aimPower(a);
+     hud.aimStep.textContent=a.phase==='angle'?'1 · คลิกล็อกองศา':a.phase==='power'?'2 · คลิกเลือกแรงแล้วปา':a.phase==='bot'?'คู่แข่งกำลังเล็ง':'คลิกบนสนามเพื่อเริ่มเล็ง';
+     hud.aimValue.textContent=a.phase==='intro'?'องศา → ความแรง → ปา':Math.round(angle)+'° · '+(a.phase==='angle'?'รอเลือกแรง':Math.round(power*100)+'%');
+     hud.aimWarning.hidden=a.phase!=='power';
+     hud.aimWarning.textContent=power>FOUL_AT?'แรงเกิน! ปาตอนนี้จะเหวี่ยงพลาด':'เส้นประ = วิถีก่อนบูสต์และคลื่น · สีแดง = แรงเกิน 90%';
+
    }
    /* แถบบิน */
    if(flying(a)){
      const s=a.shot;
-     hud.boostFill.style.width=clamp(s.v/40*100,0,100)+'%';                 // 40 ซม./วิ = เต็มแถบ (แค่มาตรวัด ไม่ใช่เพดาน)
+     hud.boostTitle.textContent=a.phase==='boost'?'ความเร็วจริง — F / K เพิ่มแรง':'ความเร็วจริง — แรงโน้มถ่วง + แรงต้าน';
+     hud.boostFill.style.width=clamp(s.v/(s.physics>=2?400:40)*100,0,100)+'%'; // มาตรวัด ไม่ใช่เพดานแรง
      hud.boostVal.textContent=s.v.toFixed(0)+' ซม./วิ';
-     hud.boostTime.textContent=a.phase==='boost'?'เร่งได้อีก '+Math.max(0,BOOST_T-a.clock).toFixed(1)+' วิ':'หินกำลังตก';
-     hud.liveDist.textContent=s.dist.toFixed(0)+' ซม. · กดไปแล้ว '+s.presses+' ครั้ง';
+     hud.boostTime.textContent=a.phase==='boost'?'บูสต์ขึ้นยอดอีก '+Math.max(0,BOOST_T-a.clock).toFixed(1)+' วิ':'หินกำลังตก';
+     hud.liveDist.textContent=s.dist.toFixed(0)+' ซม. · '+(s.physics===3?'แรงต้าน '+(s.drag||0).toFixed(1)+' ซม./วิ²':'กดไปแล้ว '+s.presses+' ครั้ง');
      /* มาตรวัดมุมหัวหิน: ตรงกลาง = ราบ (เพรียวลม) · ขวา = หัวเชิด · ซ้าย = หัวจม */
      const pitch=s.pitch||0;
-     hud.waveVal.textContent=s.waves.filter(w=>w.hit===true).length+' / '+WAVES+' ลูก · หัว '+(Math.abs(pitch)<=PITCH_FLAT?'ราบ ✓':(pitch>0?'เชิด +':'จม ')+Math.round(pitch)+'°');
+     hud.waveVal.textContent=s.waves.filter(w=>w.hit===true).length+' / '+WAVES+' ฝ่าไปได้';
      hud.pitchMark.style.left=clamp(50+pitch/PITCH_MAX*50,0,100)+'%';
      hud.pitchBox.classList.toggle('is-flat',Math.abs(pitch)<=PITCH_FLAT);
      hud.pitchBox.classList.toggle('is-bad',Math.abs(pitch)>PITCH_CATCH);
-     hud.pitchBox.hidden=a.phase!=='waves';
+     hud.pitchBox.hidden=true;
      if(hud.waveTrack.children.length<WAVES+1)
        for(let i=hud.waveTrack.children.length-1;i<WAVES;i++)element('i',null,hud.waveTrack,'throw-wave');
      s.waves.forEach((w,i)=>{
        const el=hud.waveTrack.children[i+1];if(!el)return;
        const lead=w.at-(a.phase==='waves'?a.clock:-(BOOST_T-a.clock));
-       el.style.left=clamp(88-lead*24,-10,110)+'%';
+       el.style.left=clamp(50+lead*10/WAVE_WINDOW,-10,130)+'%';
+       el.hidden=lead>1.6||lead<-WAVE_WINDOW-.3;
        el.className='throw-wave'+(w.hit===true?' is-hit':w.hit===false?' is-miss':'');
      });
    }
@@ -678,8 +894,9 @@
    const boosting=a.phase==='boost'&&mine;
    hud.keyF.hidden=hud.keyK.hidden=!boosting;
    hud.go.disabled=a.settled||!mine||!(a.phase==='intro'||a.phase==='power'||a.phase==='angle'||a.phase==='waves');
-   hud.go.classList.toggle('is-live',!hud.go.disabled);
-   hud.goLabel.textContent=a.phase==='waves'?'โต้คลื่น':a.phase==='intro'?'เริ่ม':'ปา';
+   const canCounter=a.phase==='waves'&&a.shot.waves.some(w=>w.hit==null&&!w.tried&&a.clock>=w.at&&a.clock<=w.at+WAVE_WINDOW);
+   hud.go.classList.toggle('is-live',!hud.go.disabled&&(a.phase!=='waves'||canCounter));
+   hud.goLabel.textContent=a.phase==='waves'?(canCounter?'กดตอนนี้!':'รอคลื่น'):a.phase==='intro'?'เริ่มเล็ง':a.phase==='angle'?'ล็อกองศา':'ปา';
    hud.skip.hidden=a.settled||!e?.bot;
  }
  function updateTankFrame(now){

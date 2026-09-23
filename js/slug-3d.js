@@ -1,5 +1,5 @@
 import {projectedHeading,intersectsCanvas} from './slug-view-math.js?v=direction16';
-import {SlugCrowd} from './slug-crowd.js?v=glass2';
+import {SlugCrowd,throwCrownTips} from './slug-crowd.js?v=glass2-throw1';
 import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -51,14 +51,15 @@ function unleanBones(v){
  for(const x of v.leanRig.bones)x.b.quaternion.premultiply(leanQ.copy(x.d).invert());
  v.leanOn=false;
 }
-function leanBones(v,lean){
- if(!lean)return;
+function leanBones(v,lean,throwLean){
+ if(!lean&&throwLean===undefined)return;
  const rig=leanRig(v);v.model.updateMatrixWorld(true);
  for(const x of rig.bones){
+  if(throwLean!==undefined&&x.b.name.startsWith('rhino'))continue;
   x.b.parent.getWorldQuaternion(leanP);
   /* ฝั่งไปทางหางลดเหลือ 60% — ท่ายืนปกติของโมเดลเอนหงอนไปทางหางอยู่แล้ว
      เอียงเท่ากันสองฝั่ง ตอนกด F หงอนเลยนอนราบ ส่วนกด K แค่ตั้งตรง (เทสต์เห็นแล้ว) */
-  leanQ.setFromAxisAngle(rig.side,lean*x.k*(lean>0?.6:1));
+  leanQ.setFromAxisAngle(rig.side,throwLean??(lean*x.k*(lean>0?.6:1)));
   x.d.copy(leanP).invert().multiply(leanQ).multiply(leanP);   // หมุนรอบแกนโลก แปลงเป็นแกนของพ่อกระดูก: D = P⁻¹·Q·P
   x.b.quaternion.premultiply(x.d);
  }
@@ -103,13 +104,13 @@ function renderJob(job,now){
  const blinkPhase=(now/1000+v.slot*.731)%4.7;if(eyeTarget===1&&blinkPhase<.16)eyeTarget=.08;
  v.eyeOpen=(v.eyeOpen??1)+(eyeTarget-(v.eyeOpen??1))*(1-Math.exp(-dt*24));
  v.poseModel=null;unleanBones(v);
- if(instances.size>24&&meta[key]?.loop&&!lifted&&s.tugLean===undefined&&now-v.changedAt>300){
+ if(instances.size>24&&meta[key]?.loop&&!lifted&&s.tugLean===undefined&&s.throwLean===undefined&&now-v.changedAt>300){
   const phase=String(s.id).split('').reduce((a,c)=>a+c.charCodeAt(0),0)%8,poolKey=key+'|'+phase;
   let pose=posePool.get(poolKey);
   if(!pose){const model=cloneSkeleton(template),mixer=new THREE.AnimationMixer(model),clip=clips.find(c=>c.name===key),action=mixer.clipAction(clip);action.setLoop(THREE.LoopRepeat,Infinity).play();pose={model,mixer,clip,last:0};posePool.set(poolKey,pose);}
   if(pose.last!==now){pose.mixer.setTime(now/1000+phase*pose.clip.duration/8);pose.last=now;}
   v.poseModel=pose.model;
- }else{v.mixer.update(dt);leanBones(v,s.tugLean);}
+ }else{v.mixer.update(dt);leanBones(v,s.tugLean,s.throwLean);}
  if(v.last)api.stats.animationHz=api.stats.animationHz*.95+1000/(now-v.last)*.05;
  v.last=now;v.valid=true;api.clip=key;api.stats.renders++;api.stats.triangles=renderer.info.render.triangles;api.stats.drawCalls=renderer.info.render.calls;
 }
@@ -147,6 +148,7 @@ function flush(){
 
 /* wall = {hx,hy,dx,dy} ทิศ "หัว" กับ "หลัง" บนจอ (พิกัดแคนวาส) — ส่งมาเมื่อทากเกาะกระจก
    ตอนนั้น (x,y) คือจุดที่ "ท้องแตะกระจก" กลางลำตัว ไม่ใช่จุดเท้าบนพื้นทราย */
+api.throwCrownScreen=s=>instances.get(s.id)?.crownScreen;
 api.draw=(ctx,s,x,y,len,lifted=false,direction=null,wall=null)=>{
  if(!api.ready||!api.enabled||(!api.all&&s.id!==api.targetId))return false;
  const width=len*2.2,height=width*.75,top=y-height*(wall?WALL_ANCHOR:groundY),tr=ctx.getTransform();
@@ -154,6 +156,11 @@ api.draw=(ctx,s,x,y,len,lifted=false,direction=null,wall=null)=>{
  const v=instance(s);const pixelWidth=width*Math.hypot(tr.a,tr.b),wanted=Math.max(64,Math.min(1024,Math.ceil(Math.max(1,pixelWidth)/64)*64));if(!v.requestSize||wanted>v.requestSize||wanted<v.requestSize-64)v.requestSize=wanted;pending.set(s.id,{s,v,len,lifted,wall,size:v.requestSize,frame:viewFrame,heading:direction?projectedHeading(direction.x,direction.y):null});
  if(!scheduled){scheduled=true;requestAnimationFrame(flush);}
  if(v.valid){
+  const tip=throwCrownTips.get(s);
+  if(tip&&s.throwLean!==undefined){
+   const q=leanA.copy(tip).project(atlasCamera),px=(q.x+1)*atlasW/2,py=(1-q.y)*atlasH/2;
+   v.crownScreen={x:x-width/2+(px-v.sx)/v.sw*width,y:top+(py-v.sy)/v.sh*height};
+  }else v.crownScreen=null;
   /* เงาวงรีเป็นเงาบนพื้นทราย ตัวเกาะกระจกไม่มีพื้นให้ทอดเงา */
   if(!lifted&&!wall){ctx.save();ctx.translate(x,y);ctx.scale(1,.24);const r=len*.46,g=ctx.createRadialGradient(0,0,0,0,0,r);g.addColorStop(0,'rgba(0,0,0,.2)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.restore();}
   ctx.drawImage(v.page.canvas,v.sx,v.sy,v.sw,v.sh,x-width/2,top,width,height);api.stats.reuses++;

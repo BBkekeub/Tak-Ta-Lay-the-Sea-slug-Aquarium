@@ -61,4 +61,15 @@ const CoinGuard=(()=>{
   return {add,ck,sign,load,lock};
 })();
 /* ช่องทางเดียวที่โค้ดเกมใช้เปลี่ยนเงิน · บวก = ได้เงิน ลบ = จ่าย */
-function addCoin(delta){ return CoinGuard.add(delta); }
+function addCoin(delta){
+  const coin=CoinGuard.add(delta);
+  syncCoinHUD();
+  return coin;
+}
+/* เงินเปลี่ยนได้โดยไม่เรียก syncHUD ทั้งหน้า เช่น ค่าเข้าร้านของลูกค้า */
+function syncCoinHUD(){
+  if(document.hidden)return;
+  const el=document.getElementById('hCoin'),value=String(G.coin);
+  if(el&&el.textContent!==value)el.textContent=value;
+}
+document.addEventListener('visibilitychange',syncCoinHUD);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {SlugCrowd} from './slug-crowd.js?v=glass2';
+import {SlugCrowd,throwCrownTips} from './slug-crowd.js?v=glass2-throw1';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 
 // Visible WebGL canvas, not an atlas, snapshot, billboard or drawImage source.
@@ -209,6 +209,7 @@ api.splitTankBackground=()=>{
 };
 
 // Share the game's existing animated slug mesh so decoration/slug occlusion uses real depth.
+api.throwCrown=s=>{const p=throwCrownTips.get(s);return p&&curTank?{x:p.x/cellM+curTank.def.w/2,y:-p.z/cellM+curTank.def.h/2,z:p.y/cellM}:null;};
 api.drawSlug=s=>{
  const source=window.Slug3D?.meshSource?.();if(!api.ready||!source||!Slug3D.enabled)return false;
  const scale=TANK_SLUG_VIEW_SCALE*(curTank.def.shopSlugScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)/100*(s._breedScale||1);

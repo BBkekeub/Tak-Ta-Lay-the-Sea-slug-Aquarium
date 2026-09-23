@@ -8,6 +8,10 @@ body.throw-in-tank{overflow:hidden}
 .throw-in-tank #tankCv{pointer-events:none;touch-action:none}
 
 #throwTankHUD{position:absolute;inset:0;z-index:15;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;pointer-events:none}
+#throwTankHUD.is-aiming{pointer-events:auto;cursor:crosshair}
+.throw-aim-summary{box-sizing:border-box;padding:12px 18px;background:#10292ee8;border:1px solid #b69c66;border-radius:12px;text-align:center;color:#ffe19b}
+.throw-aim-summary span{font-size:18px;font-variant-numeric:tabular-nums;color:#fff0c8}
+.throw-aim-summary small{color:#ffb492}
 .throw-top{position:absolute;top:10px;left:50%;transform:translateX(-50%);max-width:calc(100% - 24px);box-sizing:border-box;padding:7px 22px;background:#17393fe8;border:1px solid #b69c66;border-radius:12px;text-align:center;color:#f3e8ca;white-space:nowrap;box-shadow:0 4px 16px #0004}
 .throw-turn{font-size:19px;font-weight:800;color:#ffe19b}
 .throw-hint{font-size:13px;color:#c8dbd2;margin-top:2px}
@@ -69,3 +73,13 @@ body.throw-in-tank{overflow:hidden}
 .throw-pitch-flat{position:absolute;left:42%;width:16%;top:0;bottom:0;background:#9fe3ee2e;border-left:1px solid #9fe3ee77;border-right:1px solid #9fe3ee77}
 .throw-pitch-mark{position:absolute;top:-3px;width:4px;height:22px;margin-left:-2px;border-radius:2px;background:#ffe1a0;box-shadow:0 0 6px #000a;transition:left .06s linear}
 .throw-pitch-labels{position:absolute;left:0;right:0;top:18px;display:flex;justify-content:space-between;font-size:10px;color:#a9c2c6}
+
+/* The pale crest moves right to left across the highlighted front half. */
+.throw-wave-track{height:38px}
+.throw-wave-track::before{content:'';position:absolute;left:30%;width:20%;top:10px;height:18px;border-radius:50%;background:#8d8373;border:1px solid #d6c6a1;box-sizing:border-box}
+.throw-wave-goal{left:40%;width:10%;margin:0;background:#a3efaf55;border-left:1px dashed #c8ffcf;border-right:1px solid #c8ffcf;box-shadow:none}
+.throw-wave{top:0;bottom:0;height:auto;width:20%;margin:0;border:0;border-left:2px solid #e7ffff;border-radius:0;background:linear-gradient(90deg,#80e5eccc,#147ba000)}
+.throw-wave.is-hit{background:linear-gradient(90deg,#a4ffc780,transparent);border-color:#bdffd5}
+.throw-wave[hidden]{display:none}
+.throw-wavebox .throw-meter-head{flex-wrap:wrap;gap:4px}
+.throw-hint{white-space:normal}

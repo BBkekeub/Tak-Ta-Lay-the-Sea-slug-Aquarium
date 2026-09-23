@@ -1185,7 +1185,7 @@ function drawSlug(ctx, P, cx, cy, flip, phase, scale, detail, moving, pose){
   const look = Math.max(0,Math.min(1,pose.look||0));
   /* ชักเย่อ: +1 = หงอน/หนวดสะบัดไปทางหาง (กด F) · −1 = ไปทางหัว (กด K) — ทุกพุ่มพร้อมกัน
      สไปรต์หันซ้ายเป็นค่าเริ่มต้น หมุนบวก (ตามเข็ม) ปลายจึงไปทางขวา = ทางหาง พอดี */
-  const lean = Math.max(-1,Math.min(1,pose.tugLean||0));
+  const lean = pose.throwLean!==undefined?0:Math.max(-1,Math.min(1,pose.tugLean||0));
   const bob   = (ANIM && !pose.noBob && !asleep) ? Math.sin(t/900)*9 : 0;
   const creep = (ANIM && mv) ? Math.sin(Number.isFinite(pose.creepT) ? pose.creepT : t/700) : 0; // คืบ = ยืด-หด เฉพาะตอนเดิน · pose.creepT = ผูกจังหวะกับระยะทางที่เดินจริง (ไม่ส่งมา = ใช้นาฬิกาเหมือนเดิม)
   const breathe = asleep ? Math.sin(t/1250)*0.018 : 0;
@@ -1203,6 +1203,7 @@ function drawSlug(ctx, P, cx, cy, flip, phase, scale, detail, moving, pose){
 
   const wakeEnvelope=Math.sin(Math.PI*wake);
   const sway  = i => {
+    if(pose.throwLean!==undefined)return pose.throwLean;
     if(!ANIM) return 0;
     const normal=Math.sin(t/560+i)*3.4;
     /* ตอนตื่นให้พุ่มเหงือกและ pilum สะบัดเป็นคลื่นไล่กัน ไม่กระดิกพร้อมกันทั้งพุ่ม */

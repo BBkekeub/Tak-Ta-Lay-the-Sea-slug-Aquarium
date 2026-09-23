@@ -1,0 +1,18 @@
+{
+  "threeClicks": true,
+  "resume": {
+    "phase": "power",
+    "angle": 42
+  },
+  "checks": {
+    "accepted": true,
+    "repeat": false,
+    "velocityIncreased": true,
+    "cacheReused": true,
+    "bitmapPixels": 32768,
+    "drawMsP50": 0.010000002384185792,
+    "drawMsP95": 0.029999998211860657
+  },
+  "passed": true,
+  "errors": []
+}

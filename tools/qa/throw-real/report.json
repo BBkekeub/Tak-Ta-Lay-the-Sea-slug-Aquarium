@@ -1,0 +1,109 @@
+{
+  "network": [
+    {
+      "url": "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Trirong:wght@500;600&display=swap",
+      "failure": "net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/utils/SkeletonUtils.js",
+      "failure": "net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "failure": "net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/environments/RoomEnvironment.js",
+      "failure": "net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js",
+      "failure": "net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "url": "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Trirong:wght@500;600&display=swap",
+      "failure": "net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "failure": "net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/GLTFLoader.js",
+      "failure": "net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/environments/RoomEnvironment.js",
+      "failure": "net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "url": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/utils/SkeletonUtils.js",
+      "failure": "net::ERR_NETWORK_ACCESS_DENIED"
+    }
+  ],
+  "threeClicks": true,
+  "renderer": {
+    "crownAPI": false
+  },
+  "1280-angle": {
+    "loaded": {
+      "x": 2.275273904485385,
+      "y": 2,
+      "z": 2.583210261970174
+    },
+    "lean": 0.4972000000000001
+  },
+  "1280-power": {
+    "loaded": {
+      "x": 2.261185543205954,
+      "y": 2,
+      "z": 2.5768388618195903
+    },
+    "lean": 0.5233333333333333
+  },
+  "480-angle": {
+    "loaded": {
+      "x": 2.2752739044853856,
+      "y": 2,
+      "z": 2.5832102619701742
+    },
+    "lean": 0.4972000000000001
+  },
+  "480-power": {
+    "loaded": {
+      "x": 2.2611855432059538,
+      "y": 2,
+      "z": 2.5768388618195894
+    },
+    "lean": 0.5233333333333333
+  },
+  "assets": {
+    "stoneReused": true,
+    "laneCm": 20
+  },
+  "resume": {
+    "phase": "power",
+    "angle": 42
+  },
+  "waveAxis": [
+    {
+      "b": 0,
+      "c": 0
+    },
+    {
+      "b": 0,
+      "c": 0
+    }
+  ],
+  "checks": {
+    "accepted": true,
+    "repeat": false,
+    "velocityIncreased": true,
+    "cacheReused": true,
+    "bitmapPixels": 32768,
+    "drawMsP50": 0.010000002384185792,
+    "drawMsP95": 0.025
+  },
+  "passed": true,
+  "errors": []
+}
