@@ -83,6 +83,7 @@ export class SlugCrowd {
    this.parts.push({name:source.name,mesh,pose,colors,skin,metal,traits,glass,rank,strain:/^EyeStrain_/.test(source.name)});
   });
   this.transform=new THREE.Matrix4();this.rotation=new THREE.Matrix4();this.offset=new THREE.Matrix4();this.shape=new THREE.Matrix4();this.appendage=new THREE.Matrix4();this.anchor=new THREE.Vector3();
+  this.heldCrown=new WeakMap();   // ทาก → หงอนที่ถือหินอยู่ (ล็อกตลอดการเล็ง)
  }
  update(jobs,up,columns){
   for(const part of this.parts)part.mesh.count=jobs.length;
@@ -123,7 +124,7 @@ export class SlugCrowd {
    /* girth (d.size) ต้องขยายทั้ง 3 แกนเหมือน 2D (bw=stretch*size, bh=size) ไม่ใช่แค่ X
       floorLift วัดมาจากโพสท่าที่ยังไม่ scale — คูณ size เข้าไปด้วยกันจุดสัมผัสพื้นถึงจะไม่ลอย/จม */
    this.shape.makeScale(d.stretch*d.size,d.size,d.size);this.shape.setPosition(0,floorLift*d.size,0);
-   let crown=null;
+   let crown=null,crownPart=null;
    for(const part of this.parts){const src=parts.get(part.name);
     this.appendage.identity();
     /* ⚠️ ห้ามกลับไปใช้ startsWith('Gill') — หงอนใน GLB ตั้งชื่อสองชุด
@@ -149,7 +150,10 @@ export class SlugCrowd {
     if(job.s.throwLean!==undefined&&/gill/i.test(part.name)&&!(part.rank>=d.nGill)){
      if(src.userData.throwTip===undefined){const p=src.geometry.attributes.position;let k=0;for(let n=1;n<p.count;n++)if(p.getY(n)>p.getY(k))k=n;src.userData.throwTip=k;}
      src.getVertexPosition(src.userData.throwTip,this.anchor);this.anchor.applyMatrix4(this.transform);
-     if(!crown||this.anchor.y>crown.y){if(!crown)crown=throwCrownTips.get(job.s)||new THREE.Vector3();crown.copy(this.anchor);}
+     /* ล็อกหงอนที่ถือหินไว้ตัวเดียวตลอดการเล็ง — ถ้าเลือก "ปลายที่สูงสุด" ทุกเฟรม
+        พอเอียงแรง (องศาใกล้ 90) ปลายหงอนอีกเส้นจะสูงกว่า แล้วหินกระโดดข้ามหงอน */
+     const held=this.heldCrown.get(job.s);
+     if(held?held===part:(!crown||this.anchor.y>crown.y)){if(!crown)crown=throwCrownTips.get(job.s)||new THREE.Vector3();crown.copy(this.anchor);if(!held)crownPart=part;}
     }
     if(part.strain&&!v.strain)this.transform.scale(HIDDEN);   // ตา ＞＜ (slug-skin.js) โผล่เฉพาะตอนออกแรงชักเย่อ
     part.traits.setXYZW(i,d.aura,d.nSpot,d.shape==='sq'?1:d.shape==='tri'?2:0,part.name==='Body'?d.deep:d.gdeep);part.mesh.setMatrixAt(i,this.transform);part.pose.setX(i,i);part.metal.setX(i,part.name==='Body'?v.bodyMetal:v.gillMetal);
@@ -157,6 +161,7 @@ export class SlugCrowd {
      for(const [k,attr] of Object.entries(part.colors)){const c=v.palette[k];attr.setXYZ(i,c.r,c.g,c.b);}
      if(src.morphTargetInfluences?.length)part.mesh.setMorphAt(i,src);}
    if(crown)throwCrownTips.set(job.s,crown);else throwCrownTips.delete(job.s);
+   if(job.s.throwLean===undefined)this.heldCrown.delete(job.s);else if(crownPart)this.heldCrown.set(job.s,crownPart);
   });
   this.texture.needsUpdate=true;
   for(const p of this.parts){p.mesh.instanceMatrix.needsUpdate=true;p.pose.needsUpdate=true;p.metal.needsUpdate=true;p.traits.needsUpdate=true;for(const a of Object.values(p.colors))a.needsUpdate=true;if(p.mesh.morphTexture)p.mesh.morphTexture.needsUpdate=true;}

@@ -107,26 +107,31 @@
 
  /* ---- สไปรต์: วาดครั้งเดียวแล้วแคช ----
     ไม่สแกน bbox ต่อตัว (486 ตัว × แสนพิกเซล = ช้าเกิน) ใช้กรอบคงที่ที่เผื่อไว้แล้ว
-    อัตราส่วนวัดจากอาร์ตจริง: ตัวกินราว x[-1.0H,+0.7H] y[-1.25H,0] รอบจุดยึด */
+    ⚠️ 2026-09-23 วัดอาร์ตปัจจุบันใหม่ (ยีนสุดขั้วทั้ง 0/100): ตัวกินราว x[±0.83H] y[-0.61H,+0.44H]
+       คือ "อยู่กลางจุดยึด" ไม่ใช่ยืนบนจุดยึดแบบอาร์ตรุ่นเก่า — จุดยึดเดิม (64,83) ทำให้ครึ่งล่างล้นขอบ
+       แคนวาส ผู้เล่นเห็นทากโดนตัดเหลือครึ่งบน จึงย้ายจุดยึดมาไว้ที่ 55% ความสูง ตรงกับที่ blit() วาง */
  /* ขนาดต้นฉบับตั้งให้ "ดอก" (ชั้นที่ผู้เล่นดูจริง) ไม่ต้องขยายเลยแม้ซูมสุด — ดอกกว้างสุด ~90px
     ส่วนดุม/สายเป็นตัวแทนประดับ ยอมให้ซอฟต์ได้ตอนซูมสุด แลกกับแคชที่ไม่บวม
     (แคช 1 ช่อง = 1 แคนวาส ~43KB · ต่อให้เก็บครบ 486 ช่องก็ราว 20MB และใช้ซ้ำทั้งสามชั้น) */
- const SPW=116, SPH=92, SPH_H=41, ANX=64, ANY=83;
+ const SPW=116, SPH=92, SPH_H=41, ANX=58, ANY=51;
+ /* ซูมใกล้: ตัวที่ขยายเกินขนาดต้นฉบับ อบใหม่ละเอียดขึ้น HI_SCALE เท่า ในถังแยกที่เล็กกว่า
+    (1 ช่อง ~520KB × HI_MAX 24 ≈ 12MB) · ขอได้ไม่เกิน HI_MAX-4 ตัวต่อเฟรม กันแคชไล่ทิ้งตัวที่ยังอยู่บนจอ */
+ const HI_SCALE=3.5, HI_MAX=24;
  /* แคชมีเพดานและวิธีปล่อย (กฎหมวด 9):
       key      = 'r-<ช่อง>' สำหรับตัวจริง · 'ghost-<ขั้นหงอน>' สำหรับเงา
       invalid  = ไม่มี — ยีนของช่องถูกล็อกตอนบันทึกครั้งแรก ภาพจึงไม่เปลี่ยนอีก
       เพดาน    = CACHE_MAX ตัวจริง (LRU ทิ้งตัวที่ไม่ได้ใช้นานสุด) · เงา 6 ตัวอยู่คนละถัง ไม่โดนทิ้ง
       ปล่อย    = ตั้ง width=0 ให้เบราว์เซอร์คืนบิตแมปทันที ไม่รอ GC */
  const CACHE_MAX=220;
- const cache=new Map(), ghosts=new Map();
- function render(genes,dark){
-  const c=document.createElement('canvas'); c.width=SPW; c.height=SPH;
+ const cache=new Map(), ghosts=new Map(), hiCache=new Map();
+ function render(genes,dark,s=1){
+  const c=document.createElement('canvas'); c.width=Math.round(SPW*s); c.height=Math.round(SPH*s);
   const x=c.getContext('2d');
   try{
    const wasAnim=SlugEngine.ANIM; SlugEngine.ANIM=false;      // สมุดเป็นภาพนิ่ง ไม่ต้องให้มันขยับ
-   SlugEngine.drawSlug(x,SlugEngine.slugParts(sane(genes),SPH_H),ANX,ANY,false,0,1,true,false,{});
+   SlugEngine.drawSlug(x,SlugEngine.slugParts(sane(genes),SPH_H*s),ANX*s,ANY*s,false,0,1,true,false,{});
    SlugEngine.ANIM=wasAnim;
-   if(dark){ x.globalCompositeOperation='source-in'; x.fillStyle=dark; x.fillRect(0,0,SPW,SPH); x.globalCompositeOperation='source-over'; }
+   if(dark){ x.globalCompositeOperation='source-in'; x.fillStyle=dark; x.fillRect(0,0,c.width,c.height); x.globalCompositeOperation='source-over'; }
   }catch(e){}
   return c;
  }
@@ -135,10 +140,11 @@
   return ghosts.get(k);
  };
  function evict(){
-  while(cache.size>CACHE_MAX){
-   const old=cache.keys().next().value, cv0=cache.get(old);
-   cache.delete(old); if(cv0) cv0.width=0;
-  }
+  for(const [m,max] of [[cache,CACHE_MAX],[hiCache,HI_MAX]])
+   while(m.size>max){
+    const old=m.keys().next().value, cv0=m.get(old);
+    m.delete(old); if(cv0) cv0.width=0;
+   }
  }
  /* ⚠️ อบทากตัวหนึ่งใช้ ~45 ms (gradient-map + แสง + ประกาย — เหตุผลเดียวกับที่ boot.js ต้องอบล่วงหน้า)
     ถ้าอบทุกตัวที่เห็นตอนเปิดสมุด เซฟที่เก็บครบ 486 ช่องจะค้างเป็นสิบวินาที
@@ -150,7 +156,9 @@
   const step=()=>{
    const t0=performance.now(); let did=0;
    for(const [id,g] of pending){
-    pending.delete(id); cache.set(id,render(g,null)); evict(); did++;
+    pending.delete(id);
+    if(id.startsWith('h-')) hiCache.set(id,render(g,null,HI_SCALE)); else cache.set(id,render(g,null));
+    evict(); did++;
     if(performance.now()-t0>10) break;
    }
    if(did) draw();
@@ -164,12 +172,23 @@
   if(!pending.has(id)){ pending.set(id,e.g); pump(); }
   return null;                                   // ยังไม่พร้อม — ผู้เรียกจะใช้เงาไปก่อน
  }
- window.slugCodexCacheSize=()=>cache.size+ghosts.size;
+ /* เลือกความละเอียดตามขนาดบนจอ: ใหญ่เกินต้นฉบับ → ขอตัวละเอียด ระหว่างรอใช้ตัวปกติไปก่อน */
+ let hiReq=0;
+ function spriteFor(key,e,wpx){
+  const base=realSprite(key,e);
+  if(!base||wpx<=SPW*1.25||hiReq>=HI_MAX-4) return base;
+  hiReq++;
+  const id='h-'+key;
+  if(hiCache.has(id)){ const c=hiCache.get(id); hiCache.delete(id); hiCache.set(id,c); return c; }
+  if(!pending.has(id)){ pending.set(id,e.g); pump(); }
+  return base;
+ }
+ window.slugCodexCacheSize=()=>cache.size+ghosts.size+hiCache.size;
  window.slugCodexPending=()=>pending.size;
 
  /* ---- หน้าต่าง ---- */
  let dlg=null,cv=null,ctx=null,span=3720,camx=C,camy=C,sel=null;
- const FULL=3720, MINSPAN=520;
+ const FULL=3720, MINSPAN=200;   // 2026-09-23 ผู้เล่นขอซูมได้ใกล้กว่านี้ (เดิม 520)
  function build(){
   if(dlg) return;
   dlg=document.createElement('dialog'); dlg.id='slugCodex';
@@ -219,6 +238,7 @@
  function draw(){
   if(!dlg||!dlg.open||document.hidden) return;      // เอกสารถูกซ่อน = ไม่ต้องวาดอะไรเลย
   const S=fit(), u=S.u, K=S.dpr;
+  hiReq=0;
   ctx.fillStyle='#0a1518'; ctx.fillRect(0,0,S.w,S.h);
   /* คัดของนอกจอก่อนงานวาด — ซูมเข้าแล้วส่วนใหญ่ของ 577 จุดอยู่นอกกรอบ
      เผื่อขอบ MARGIN ไว้ เพราะจุดยึดอาจอยู่นอกจอแต่ตัวทากยังโผล่เข้ามา */
@@ -255,13 +275,13 @@
    for(let j=0;j<9;j++) for(let k=0;k<6;k++){
     const l=P3[i][j][k]; if(!vis(l)) continue;
     const key=i+'-'+j+'-'+k, e=G.codex[key], p=w2s(l.x,l.y,S);
-    blit((e&&realSprite(key,e))||ghostSprite(k), p.x, p.y, wid3, !!e, !!sel&&sel.t==='leaf'&&sel.k===key, K); drew++;
+    blit((e&&spriteFor(key,e,wid3))||ghostSprite(k), p.x, p.y, wid3, !!e, !!sel&&sel.t==='leaf'&&sel.k===key, K); drew++;
    }
    for(let j=0;j<9;j++){
     const s=P2[i][j]; if(!vis(s)) continue;
     const p=w2s(s.x,s.y,S);
     let rep=null; for(let k=0;k<6;k++){ const e=G.codex[i+'-'+j+'-'+k]; if(e){rep=[i+'-'+j+'-'+k,e];break;} }
-    blit((rep&&realSprite(rep[0],rep[1]))||ghostSprite(0), p.x, p.y, wid2, !!rep, false, K); drew++;
+    blit((rep&&spriteFor(rep[0],rep[1],wid2))||ghostSprite(0), p.x, p.y, wid2, !!rep, false, K); drew++;
     if(showName){
      ctx.fillStyle=rep?'#a8c2bd':'#4a686d'; ctx.font=Math.round(11*K)+'px "IBM Plex Sans Thai",system-ui,sans-serif';
      ctx.textAlign='center'; ctx.fillText(GN()[j].n, p.x, p.y-wid2*0.42-7*K);
@@ -270,7 +290,7 @@
    const h=P1[i], p=w2s(h.x,h.y,S);
    let rep=null,bn=0;
    for(let j=0;j<9;j++)for(let k=0;k<6;k++){ const e=G.codex[i+'-'+j+'-'+k]; if(e){ bn++; if(!rep)rep=[i+'-'+j+'-'+k,e]; } }
-   if(vis(h)){ blit((rep&&realSprite(rep[0],rep[1]))||ghostSprite(0), p.x, p.y, wid1, !!rep, false, K); drew++; }
+   if(vis(h)){ blit((rep&&spriteFor(rep[0],rep[1],wid1))||ghostSprite(0), p.x, p.y, wid1, !!rep, false, K); drew++; }
    ctx.fillStyle=bn?'#c9bda2':'#55757a'; ctx.font=Math.round(13*K)+'px "IBM Plex Sans Thai",system-ui,sans-serif';
    ctx.textAlign='center';
    /* ป้ายกิ่งวางที่ "ขอบนอกของพุ่ม" ไม่ใช่ข้างดุม — ชิดดุมแล้วทั้ง 9 ป้ายจะกองทับกันกลางจอ

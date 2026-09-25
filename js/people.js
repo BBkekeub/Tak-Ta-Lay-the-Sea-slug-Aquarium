@@ -27,6 +27,10 @@ const PERSON_SPEED_CM = 82;      // ความเร็วเดินชม�
    GAIT_LEAN_WALK = เอนตัวไปหน้าตอนเดิน เทียบส่วนสูง (0.021 ≈ 7° วัดจากช่วงสะโพก→อก)
    ตัวเลขที่มาของค่าเริ่มต้นอยู่ในคอมเมนต์ตรงจุดที่ใช้จริง (ค้นคำว่า "ขาแบะ") */
 let GAIT_NARROW_STAND = 0.30, GAIT_NARROW_WALK = 0.30, GAIT_LEAN_WALK = 0.021;
+/* หันข้างเบียดผ่าน: ก้าวสไลด์ข้าง (เท้านำก้าวออก เท้าตามชิดเข้า) แทนท่าเดินหน้า
+   ⚠️ 2026-09-24 ผู้เล่น: "หันข้างแต่เดินไปข้างหน้า ดูไม่เป็นธรรมชาติ" — เดิมหมุนแค่ตัว ขายังก้าวหน้า-หลังตามทิศที่หัน */
+const SHUFFLE_A = 0.034;          // เท้าแกว่งซ้าย-ขวาข้างละเท่านี้ (เทียบส่วนสูง ~6 ซม.) — ต้องน้อยกว่าครึ่งฐานเท้า เท้าจะได้ไม่ไขว้กัน
+const SHUFFLE_PACE = 0.55;        // ความเร็วตอนสไลด์ข้าง เทียบเดินปกติ
 const WALK_STEP = 0.235;       // ความยาวก้าว เทียบส่วนสูง (~40 ซม. ที่ส่วนสูง 172) — 0.30 ก้าวยาวเกิน ขากางเป็นตัว A
 /* ⚠️ 2026-09-23 ผู้เล่น: "ก้าวโอเคแล้วแต่ยกขาเยอะไป" (ส่งรูปมา: เข่าหลังงอสูงเหมือนเดินสวนสนาม)
    ความสูงของเข่ามาจากสองค่านี้ และมันคูณกัน:
@@ -40,14 +44,15 @@ let GAIT_LIFT = 0.015;           // ยกเท้าสูงสุดตอ�
 let GAIT_TUCK = 0.010;           // ดึงเท้าเข้าใต้ตัวกลางช่วงเหวี่ยง (ยิ่งมาก เข่ายิ่งงอสูง)
 const PERSON_R        = 2.5;     // รัศมีกันชนกับตู้/ของ (ช่องเล็ก ≈ 16 ซม.)
 const PERSON_EDGE     = 2.0;     // เว้นจากขอบพื้นร้าน (ช่องเล็ก)
-const LOOK_MIN = 5, LOOK_MAX = 5;    // ยืนดูตู้นานแค่ไหน (วินาที)
+const LOOK_MIN = 6, LOOK_MAX = 6;    // ยืนดูตู้นานแค่ไหน (วินาที) · 2026-09-24 ผู้เล่น: 5 → 6 (+20%) "ดูเร่งรีบเกินไป เสียบรรยากาศ" — ใช้ทั้งคนเดี่ยวและครอบครัว
 const STROLL_MIN = 1, STROLL_MAX = 2;    // เดินเล่นกี่จุดคั่นระหว่างตู้
 /* ดูกี่ตู้ก่อนกลับ — 2–5 → 3–7 (2026-09-19): ลูกค้าอยู่ในร้านนานขึ้น คนเลยค้างอยู่ในฉากพร้อมกันเยอะขึ้น
    ทำให้ร้านดูคึกคักโดยไม่ต้องเร่งอัตราคนเข้าอย่างเดียว (เดินเข้า-ออกถี่ ๆ ดูวุ่นแต่ร้านโล่ง) */
 const VISIT_MIN = 3,  VISIT_MAX = 7;
 // Arrival timing is computed from the slugs displayed in the shop.
-const PERSON_GAP = 7.0;          // ระยะห่างระหว่างคน (ช่องเล็ก = 35 ซม.) — กันยืนซ้อนกัน
-/* ⚠️ ดันขึ้นเป็น 8.5 แล้วแย่ลง: แรงแยกไปชนกันชนของตู้บ่อยขึ้น ดันไม่ออก
+const PERSON_GAP = 9.5;          // ระยะห่างจุดยืนระหว่างคน (ช่องเล็ก = 47.5 ซม.) — ต้อง ≥ 2×BODY_R ไม่งั้นเดินเข้าจุดข้างคนที่ยืนอยู่ไม่ได้ (2026-09-24 เดิม 7.0)
+/* (ประวัติ: ตอนยังใช้ separatePeople() ดันขึ้นเป็น 8.5 แล้วแย่ลง — ตอนนี้ฟังก์ชันนั้นไม่ถูกเรียกแล้ว ค่านี้ใช้แค่จองจุดยืน)
+   ⚠️ ดันขึ้นเป็น 8.5 แล้วแย่ลง: แรงแยกไปชนกันชนของตู้บ่อยขึ้น ดันไม่ออก
    วัดได้ว่าเฟรมที่ "เดินอยู่แต่ไม่ขยับ" เพิ่มจาก 6 → 281 และระยะใกล้สุดกลับลดลง 6.6 → 6.29 */
 
 /* ---------- จานสี ---------- */
@@ -304,7 +309,7 @@ function personGesture(action,t,dur){
   return ss(Math.max(0,Math.min(1,(d-t)/fall)));
 }
 function beginPersonBrowse(p){
-  p.state='look';p.t=0;p.lookT=(p.raceChallenger||p.tugChallenger||p.eatChallenger||p.throwChallenger||p.sumoChallenger)?Infinity:5;p._browseActed=false;
+  p.state='look';p.t=0;p.lookT=(p.raceChallenger||p.tugChallenger||p.eatChallenger||p.throwChallenger||p.sumoChallenger)?Infinity:LOOK_MIN+Math.random()*(LOOK_MAX-LOOK_MIN);p._browseActed=false;
   p.action='watch';p.actionT=0;p.actionDuration=0;p.socialPartner=null;
   p.socialCooldown=.5+Math.random()*.5;
 }
@@ -662,7 +667,7 @@ function stepFamilies(dt){
       }
       for(const p of ready){p.state='wait';}
       if(ready.length===g.members.length||g.time-g.firstArrivedAt>=2){
-        g.stage='look';g.time=0;g.lookFor=5;
+        g.stage='look';g.time=0;g.lookFor=LOOK_MIN+Math.random()*(LOOK_MAX-LOOK_MIN);
         for(const p of ready){beginPersonBrowse(p);p._groupViewed=true;p.lookT=Infinity;}
       }
     }
@@ -785,18 +790,41 @@ function makePerson(options={}){
 }
 
 /* เป้าหมายถัดไป: ตู้ → เดินเล่น → ตู้ → ... → ดูครบแล้วเดินออก */
+/* รัศมีตัวคน (ช่องเล็ก 5 ซม.) — ⚠️ 2026-09-24 ผู้เล่น: "ทำไมคนเบียดกันจัง เว้น 2 ช่องยังติดกัน"
+   เดิม 3.05 = ห่างกันแค่ 30 ซม. ศูนย์ถึงศูนย์ แต่ไหล่คนกว้าง ~45 ซม. ตัวเลยซ้อนกันบนจอ
+   และตอน "หัวร้อน" (_angryUntil) เดิมข้ามการชนคนทั้งหมด = เดินทะลุกัน (วัดได้ใกล้สุด 0 ซม.)
+   หันข้างเบียด 12.5 ซม. รวมสองคนหันข้าง = 25 ซม. · หันเฉพาะตอนก้าวติดจริง (squeezeOnDemand)
+   หัวร้อนแล้วให้ "หันข้างเบียด" ก่อน ทะลุได้เฉพาะเบียดแล้วยังติดเกิน SQUEEZE_GIVEUP วิ
+   ⚠️ ลองขยายตัวเป็น 3.75 (37.5 ซม.) และ 4.5 แล้ว — ทางเดินแคบ 50 ซม. (ตู้ 9 ใบ คน ~14) คนจับกลุ่มตันหน้าทาง
+      ("ดูดิ" + รูปคน 4 คนหัวร้อนกองกัน) · วัด 4 seed × 150 วิ เฟรมที่มีคนหัวร้อน ≥2 พร้อมกัน:
+      โค้ดเดิม ~480 · 3.75 ~620 · 3.3 ~570 · 3.05 + detour ก่อน/หันข้างตามจริง ~375 (น้อยสุด และเดินทะลุน้อยกว่าเดิม ~3 เท่า)
+      ผู้เล่นก็ทักเองว่า "คนตัวกว้างเกินไป" จึงกลับมาใช้ 3.05 — แก้ "เบียด" ด้วยจุดยืน PERSON_GAP ที่ห่างขึ้นแทน */
+const BODY_R=3.05, SQUEEZE_R=2.5, FAMILY_GAP=6.5, SQUEEZE_GIVEUP=1, ANGRY_AFTER=3;
+const bodyR=p=>p._squeezeUntil>_peopleT?SQUEEZE_R:BODY_R;
+/* หันข้างเฉพาะ "ตอนก้าวติดจริง" และหันแล้วผ่านได้ — ไม่หันล่วงหน้า
+   อนุญาตเมื่อ: หัวร้อน หรือคนที่ขวางอยู่หันข้างหลบให้แล้ว · นอกนั้นรอ/เดินอ้อมแบบหน้าตรง */
+function squeezeOnDemand(p,nx,ny){
+  if(p._squeezeUntil>_peopleT)return false;
+  const r=2*BODY_R+2;
+  if(!(p._angryUntil>_peopleT)&&!peopleInArea(p.x-r,p.y-r,p.x+r,p.y+r).some(q=>q!==p&&q._squeezeUntil>_peopleT&&Math.hypot(q.x-p.x,q.y-p.y)<r))return false;
+  const h=visitorTravelHeading(p);
+  p._squeezeFacing={x:h.y,y:-h.x};p._squeezeUntil=_peopleT+.6;
+  if(crowdClear(p,{x:nx,y:ny},p))return true;
+  p._squeezeUntil=0;return false;
+}
 function crowdClear(a,b,self){
   if(!personClear(a,b))return false;
-  if(self&&self._angryUntil>_peopleT)return true;
+  // ทางสุดท้ายกันร้านตัน: หันข้างเบียดแล้วยังติดเกิน SQUEEZE_GIVEUP วิ ค่อยยอมให้ผ่าน
+  if(self&&self._angryUntil>_peopleT&&(self._angryStuck||0)>SQUEEZE_GIVEUP)return true;
   const dx=b.x-a.x,dy=b.y-a.y,ll=dx*dx+dy*dy;
-  for(const q of peopleInArea(Math.min(a.x,b.x)-7,Math.min(a.y,b.y)-7,Math.max(a.x,b.x)+7,Math.max(a.y,b.y)+7)){
+  for(const q of peopleInArea(Math.min(a.x,b.x)-9,Math.min(a.y,b.y)-9,Math.max(a.x,b.x)+9,Math.max(a.y,b.y)+9)){
     if(q===self)continue;
     const start=Math.hypot(q.x-a.x,q.y-a.y);
     const t=Math.max(0,Math.min(1,((q.x-a.x)*dx+(q.y-a.y)*dy)/(ll||1)));
     const distance=Math.hypot(q.x-a.x-dx*t,q.y-a.y-dy*t);
     // Allow someone already too close to step outward, never further inward.
     const sameGroup=self?.family&&self.family===q.family;
-    const gap=sameGroup?5:(self?._squeezeUntil>_peopleT?2.5:3.05)+(q._squeezeUntil>_peopleT?2.5:3.05);
+    const gap=sameGroup?FAMILY_GAP:(self?bodyR(self):BODY_R)+bodyR(q);
     if(distance<gap && !(start<gap+.1&&Math.hypot(q.x-b.x,q.y-b.y)>start+.01&&t<.01))return false;
   }
   return true;
@@ -1003,9 +1031,14 @@ function stepPeopleSlice(dt){
     let wantedBoost=p._regroup?Math.min(2.1,1.3+Math.hypot(p.x-p._regroup.leader.x,p.y-p._regroup.leader.y)/40):1;
     p.catchupBoost=(p.catchupBoost||1)+(wantedBoost-(p.catchupBoost||1))*(1-Math.exp(-dt*6));
     pace*=p._angryUntil>_peopleT?Math.max(1.9,p.catchupBoost):p.catchupBoost;
+    if(p._squeezeUntil>_peopleT)pace*=SHUFFLE_PACE;   // คนจริงสไลด์ข้างช้ากว่าเดินหน้า
     const step=Math.min(wd,p.spd*dt*pace);
     let nx=p.x+ux*step, ny=p.y+uy*step;
-    if(!crowdClear(p,{x:nx,y:ny},p)){nx=p.x;ny=p.y;}
+    if(!crowdClear(p,{x:nx,y:ny},p)&&!squeezeOnDemand(p,nx,ny)){nx=p.x;ny=p.y;}
+    // นับเวลาที่หัวร้อนแล้วยังเบียดไม่ผ่าน · ยอมทะลุแล้วให้ทะลุจนหายหัวร้อน (ไม่สลับติด-หลุดทุกเฟรม)
+    if(!(p._angryUntil>_peopleT))p._angryStuck=0;
+    else if(nx===p.x&&ny===p.y)p._angryStuck=(p._angryStuck||0)+dt;
+    else if((p._angryStuck||0)<=SQUEEZE_GIVEUP)p._angryStuck=0;
     if(Math.hypot(nx-p.x,ny-p.y)<0.01){
       p.stuck+=dt;
       if(p.stuck>8&&!p.family){nextGoal(p);p.stuck=0;}
@@ -1042,7 +1075,9 @@ function stepPeopleSlice(dt){
       // shrank the stride/lift almost to zero while the body kept translating.
       /* หนึ่งรอบ (2π) = ก้าวสองก้าว · ก้าวหนึ่งยาว WALK_STEP เท่าของส่วนสูง
          เดิมใช้ค่าคงที่ .72 = ก้าวละ ~22 ซม. ซึ่งสั้นถี่เหมือนซอยเท้า */
-      p.phase+=distance*Math.PI/Math.max(1e-3,WALK_STEP*(p.hCm/CM_PER_CELL));p.motion=1;
+      // หันข้างเบียด = ก้าวสไลด์ข้างสั้น ๆ (เท้าข้างละ ±SHUFFLE_A) จังหวะต้องถี่ขึ้นตามระยะก้าวจริง ไม่งั้นเท้าไถล
+      const stepLen=p._squeezeUntil>_peopleT?2*SHUFFLE_A:WALK_STEP;
+      p.phase+=distance*Math.PI/Math.max(1e-3,stepLen*(p.hCm/CM_PER_CELL));p.motion=1;
     }
   }
   personGrid=null;
@@ -1659,6 +1694,8 @@ function drawPerson(p){
   const facingX=turned?turned.x:p.fdx,facingY=turned?turned.y:p.fdy;
   const n=Math.hypot(facingX,facingY)||1, fx=facingX/n, fy=facingY/n;
   const right=[fy,-fx], faces=[], build=p.build||1;
+  // หันข้างแล้วยังเคลื่อนที่ = สไลด์ข้างไปทางไหน (+1 = ขวาของตัว) · 0 = เดินปกติ
+  const shuffleDir=turned?(Math.sign(p.fdx*right[0]+p.fdy*right[1])||1):0;
   const skirt=p.outfit==='skirt'||p.outfit==='dress';
   const shoulderWidth=p.gender==='female'?.94:1;
   const motion=p.motion||0, phase=p.phase;
@@ -1846,7 +1883,7 @@ function drawPerson(p){
              ช่วงยกเท้าวาดเป็นส่วนโค้ง แล้วหาเข่าด้วย IK โดยความยาวท่อนขาคงที่ */
   const LEGL1=dist(JT.hipL,JT.kneeL), LEGL2=dist(JT.kneeL,JT.ankleL), LEGMAX=(LEGL1+LEGL2)*0.999;
   const LEGREST=JT.hipL[2]-JT.ankleL[2];
-  const STEPA=WALK_STEP*0.5*motion;                 // เท้าแกว่งไป-กลับข้างละเท่านี้
+  const STEPA=(shuffleDir?SHUFFLE_A:WALK_STEP*0.5)*motion;   // เท้าแกว่งไป-กลับข้างละเท่านี้ (สไลด์ข้าง = แกว่งซ้าย-ขวาแทน)
   /* ก้าวยาวขึ้น = ขากางขึ้น = สะโพกต้องต่ำลงตามเรขาคณิต ไม่งั้นเท้าลอย/ขายืด
      นี่คือที่มาของการ "ยุบ-ยืด" ตามจังหวะเดินของคนจริง */
   {
@@ -1896,6 +1933,10 @@ function drawPerson(p){
     }
     /* หมุนเท้ารอบข้อเท้าเฉย ๆ ส้น/ปลายเท้าจะจมพื้น — ยกข้อเท้าชดเชยตามมุม
        (คนจริงก็ยกข้อเท้าขึ้นตอนถีบปลายเท้าอยู่แล้ว ไม่ใช่การโกง) */
+    /* สไลด์ข้าง: ใช้เส้นโค้งจังหวะเดียวกัน แต่ย้ายจากแกนหน้า-หลังไปแกนข้างตัว
+       เท้าแต่ละข้างแกว่งรอบตำแหน่งของตัวเองไม่ข้ามแนวกลาง = ก้าวออก-ชิดเข้า ไม่ใช่ขาไขว้ · เท้าราบ ไม่ถีบปลายเท้า */
+    let lx=0;
+    if(shuffleDir){lx=shuffleDir*fy;fy=0;pitch=0;fz*=0.7;}
     fz+=Math.max(0,pitch)*0.030+Math.max(0,-pitch)*0.050;
     /* เชิงกรานหมุน (ข้อสะโพกเลื่อนตามการหมุน) · ส่ายไปทับเท้าข้างที่ยืนพื้น
        · ข้างที่ยกขาเชิงกรานตกลงเล็กน้อย (pelvic drop จริงราว 4°) — เท้าไม่ส่ายตาม เพราะเหยียบพื้นอยู่ */
@@ -1909,8 +1950,8 @@ function drawPerson(p){
        คนจริงเดินเท้าเกือบเรียงเส้นเดียว ฐานกว้างราว 8–12 ซม. และแคบลงอีกตอนเดินเร็ว
        จึงดึงข้อเท้าเข้าหาแนวกลางตัว: ยืน 30% (เหลือ ~17.8 ซม.) · เดินเต็มสปีด 60% (เหลือ ~10.2 ซม.)
        เข่ากับต้นขาเอียงตามเองผ่าน IK = การหุบขาเข้าจริง ๆ ไม่ใช่แค่ขยับเท้า */
-    const narrow=GAIT_NARROW_STAND+GAIT_NARROW_WALK*motion;
-    const ax=J('ankle')[0]*(1-narrow);
+    const narrow=GAIT_NARROW_STAND+(shuffleDir?0:GAIT_NARROW_WALK*motion);   // สไลด์ข้างต้องยืนฐานกว้าง เท้าจะได้ไม่ชนกัน
+    const ax=J('ankle')[0]*(1-narrow)+lx;
     const ankle=[ax,J('ankle')[1]+fy,J('ankle')[2]+fz];
     const knee=legIK(hip,ankle,LEGL1,LEGL2);
     const rl=MDL.parts['thigh'+S],cl=MDL.parts['calf'+S],fl=MDL.parts['foot'+S];
@@ -2271,6 +2312,7 @@ function askVisitorToStepAside(p,route){
   // No room for a step: stand side-on with a 25 cm collision diameter.
   q._squeezeFacing={x:heading.y,y:-heading.x};q._squeezeUntil=_peopleT+1.5;
   q._yieldWaitUntil=q._squeezeUntil;q._asideUntil=q._squeezeUntil;
+  // คนที่ขอทางไม่หันข้างล่วงหน้า — จะหันเองตอนก้าวติดจริง (squeezeOnDemand)
   p._asideUntil=_peopleT+1.5;
   return true;
 }
@@ -2285,19 +2327,26 @@ function followingMovingRelative(p){
     return along>0&&along<7&&Math.abs(dx*h.y-dy*h.x)<4&&other.x*h.x+other.y*h.y>.6;
   });
 }
+function routeLen(p,route){let n=0,a=p;for(const b of route){n+=Math.hypot(b.x-a.x,b.y-a.y);a=b;}return n;}
+/* หันข้างแค่ตอนเบียดจริง — พ้นคนแล้ว (ไม่มีใครอยู่ใกล้กว่าระยะเดินปกติ) ก็หันกลับทันที ไม่ต้องรอครบเวลา */
+function endSqueezeIfClear(p){
+  if(!(p._squeezeUntil>_peopleT)||p._angryUntil>_peopleT)return;
+  const r=2*BODY_R+.5;
+  if(!peopleInArea(p.x-r,p.y-r,p.x+r,p.y+r).some(q=>q!==p&&Math.hypot(q.x-p.x,q.y-p.y)<r))p._squeezeUntil=0;
+}
 function updateBlockedVisitor(p,dt,distance){
+  endSqueezeIfClear(p);
   // Let a moving family member ahead advance instead of ordering them to stop.
   if(distance<.01&&followingMovingRelative(p)){p._yieldWaitUntil=_peopleT+.15;p._blockedFor=0;return;}
   const goal=p._familyGoal||p.tgt;
   const trying=['walk','leave'].includes(p.state)&&goal&&Math.hypot(p.x-goal.x,p.y-goal.y)>1;
   if(p._angryUntil>_peopleT){p._blockedFor=0;return;}
   p._blockedFor=trying&&distance<.01?(p._blockedFor||0)+dt:0;
-  if(p._blockedFor>3){
+  if(p._blockedFor>ANGRY_AFTER){
     if(p.family?._column)endFamilyColumn(p.family);
     if(p.family)p.family._columnCooldown=_peopleT+6;
     stopRegroup(p);p._columnHold=false;p._columnFollower=false;p._yieldWaitUntil=0;p._routeRetryAt=0;p._pathRetryAt=0;
-    p._angryUntil=_peopleT+2;p._blockedFor=0;p.stuck=0;
-    p.route=personRoute(p,p.tgt);p.routeGoal=p.tgt;return;
+    p._angryUntil=_peopleT+2;p._blockedFor=0;p.stuck=0;    p.route=personRoute(p,p.tgt);p.routeGoal=p.tgt;return;
   }
   if(p._blockedFor>0&&_peopleT>=(p._blockedRouteAt||0)){
     p._blockedRouteAt=_peopleT+.5;
@@ -2306,8 +2355,13 @@ function updateBlockedVisitor(p,dt,distance){
       if(crowdClear(p,route[0],p)){p.route=route;return;}
       const right=rightVisitorBypass(p,route);
       if(right.length){p.route=right;return;}
+      /* ⚠️ 2026-09-24 ผู้เล่น: "ติดนิดหน่อยก็ไซด์ข้าง บางทีแค่เดินอ้อมก็พอแล้ว"
+         เดิมขอให้คนหลบ/หันข้างก่อน แล้วค่อยหาทางอ้อม → ตอนนี้ลองเดินอ้อมก่อน
+         ถ้าทางอ้อมไม่ยาวเกินไป (≤ 1.6 เท่า + 60 ซม.) ก็อ้อมไปเลย หันข้างเบียดเป็นทางเลือกรองจริง ๆ */
+      const detour=crowdRoute(p,p.tgt);
+      if(detour.length&&routeLen(p,detour)<=routeLen(p,route)*1.6+12){p.route=detour;return;}
       if(askVisitorToStepAside(p,route)){p.route=route;return;}
-      const detour=crowdRoute(p,p.tgt);p.route=detour.length?detour:route;
+      p.route=detour.length?detour:route;
     }
   }
 }

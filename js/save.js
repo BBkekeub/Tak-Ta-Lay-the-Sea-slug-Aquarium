@@ -43,7 +43,7 @@ function saveGame(){
       v:1, seenAt:Number.isFinite(G.seenAt)?G.seenAt:Date.now(),   /* ครั้งสุดท้ายที่ร้านยัง "มีคนเฝ้า" — people.js ใช้คิดค่าเข้าย้อนหลังตอนกลับมา */
       racing:G.racing||null, tug:G.tug||null, eat:G.eat||null, throwing:G.throwing||null, sumo:G.sumo||null, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||{}, floorTiles:G.floorTiles||null, floorPaint:G.floorPaint||{}, wallPaint:G.wallPaint||{}, coin:G.coin, ck:CoinGuard.ck(), boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, codex:G.codex||{}, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, orders:G.orders||[], nextOrderAt:G.nextOrderAt||0, orderSeq:G.orderSeq||0, nextPeddlerAt:G.nextPeddlerAt||0, nextWholesalerAt:G.nextWholesalerAt||0, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, doors:(G.doors||[]).map(d=>({side:d.side,offset:d.offset,dir:d.dir||'both',allow:d.allow||null,paid:d.paid||0})), shopOpen:peopleOn,
       newSlugNotices:G.newSlugNotices||[],
-      research:{cap:(G.research&&G.research.cap)||0, price:(G.research&&G.research.price)||0},
+      research:{cap:(G.research&&G.research.cap)||0, price:(G.research&&G.research.price)||0, dep:(G.research&&G.research.dep)||{}},
       objs:(G.objs||[]).map(_saveObj),
       shelter:(G.shelter||[]).map(_saveObj),
       inv:(G.inv||[]).map(_saveSlug)
@@ -170,7 +170,9 @@ function loadGame(){
     /* ขั้นวิจัยที่ทำสำเร็จ (research.js) — clamp 0–5 ไว้ตรงนี้ เซฟที่ถูกแก้มือจะได้ไม่ดันเพดานตู้ทะลุ */
     {const r=(d.research&&typeof d.research==='object')?d.research:{};
      const fix=v=>Math.max(0,Math.min(5,Math.round(_NUM(v,0))));
-     G.research={cap:fix(r.cap), price:fix(r.price)};}
+     /* ทากที่ส่งเข้าวิจัยไว้ก่อน (ต่อสาย ต่อกลุ่มโจทย์) — เลขจำนวนเต็ม 0–999 · research.js ตัดส่วนเกินโจทย์เองอีกชั้น */
+     const dep={};if(r.dep&&typeof r.dep==='object')for(const k of ['cap','price'])if(Array.isArray(r.dep[k]))dep[k]=r.dep[k].slice(0,8).map(v=>Math.max(0,Math.min(999,Math.floor(_NUM(v,0)))));
+     G.research={cap:fix(r.cap), price:fix(r.price), dep};}
     /* ledger จดหมาย 'ส่งครั้งเดียวตลอดกาล' + สถานะกดรับของ — ต้องคงข้ามรีโหลด ไม่งั้นจดหมายที่ลบไปจะถูกส่งใหม่ / กดรับซ้ำ */
     G.mailSent=(d.mailSent&&typeof d.mailSent==='object')?d.mailSent:{};
     G.claimed=(d.claimed&&typeof d.claimed==='object')?d.claimed:{};

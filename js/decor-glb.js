@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {SlugCrowd,throwCrownTips} from './slug-crowd.js?v=glass2-throw1';
+import {SlugCrowd,throwCrownTips} from './slug-crowd.js?v=glass2-throw2';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 
 // Visible WebGL canvas, not an atlas, snapshot, billboard or drawImage source.

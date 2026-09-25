@@ -478,10 +478,10 @@ function drawFloor(){
   if(appMode==='build' && hoverCell){            // เงาพรีวิว เฉพาะโหมดก่อสร้าง
     if(moving){
       const r=moving.rot|0, o=snapFootprint(hoverCell, moving.def, r), why=placeIssue(o.cx,o.cy,moving.def,moving,r);
-      ghost={cx:o.cx, cy:o.cy, def:moving.def, rot:r, ok:!why, why};
+      ghost={cx:o.cx, cy:o.cy, def:moving.def, key:moving._key, rot:r, ok:!why, why};
     } else if(tool==='place' && buyKey){
       const def=CATALOG[buyKey], o=snapFootprint(hoverCell,def,buyRot), why=placeIssue(o.cx,o.cy,def,null,buyRot);
-      ghost={cx:o.cx, cy:o.cy, def, rot:buyRot, ok:!why, why};
+      ghost={cx:o.cx, cy:o.cy, def, key:buyKey, rot:buyRot, ok:!why, why};
     }
   }
 
@@ -806,6 +806,13 @@ function drawGhost(g){
     const sH=tankStandH(d), tH=tankGlassH(d);
     isoBox(g.cx+0.15,g.cy+0.15,gw-0.3,gh-0.3,0,sH, col+'0.25)', col+'0.15)', col+'0.15)');
     isoBox(g.cx,g.cy,gw,gh,sH,tH, col+'0.25)', col+'0.15)', col+'0.15)');
+  }
+  /* เคาน์เตอร์: กล่องใสสูงเท่าของจริง + จุดยืนลูกค้าด้านหน้า (ต้องเว้นทางตรงนั้น) — ผู้เล่นทักว่าไม่มีโกส 2026-09-23 */
+  if(g.key==='counter'){
+    isoBox(g.cx,g.cy,gw,gh,0,decoH({_key:'counter',def:d}), col+'0.3)', col+'0.18)', col+'0.18)');
+    const f=counterFront({cx:g.cx,cy:g.cy,def:d,rot:g.rot|0}), m=P(f.x,f.y,0), e=P(f.x+PERSON_R,f.y,0), r=Math.max(4,Math.hypot(e.x-m.x,e.y-m.y)*0.9);
+    ctx.save(); ctx.beginPath(); ctx.ellipse(m.x,m.y,r*1.6,r*0.8,0,0,Math.PI*2);
+    ctx.fillStyle=col+'0.35)'; ctx.fill(); ctx.setLineDash([4,3]); ctx.strokeStyle=col+'0.95)'; ctx.lineWidth=1.5; ctx.stroke(); ctx.restore();
   }
   /* วางไม่ได้ = บอกเหตุผลไว้ใต้เงาเลย ไม่ต้องกดก่อนแล้วค่อยรู้ (ผู้เล่นขอ 2026-09-21) */
   if(!g.ok&&g.why)ghostWhyLabel(g.why,(c0.x+c2.x)/2,Math.max(c0.y,c1.y,c2.y,c3.y)+10);
