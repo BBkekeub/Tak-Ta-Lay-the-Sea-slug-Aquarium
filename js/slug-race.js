@@ -833,7 +833,7 @@
  },true);
  document.addEventListener('visibilitychange',()=>{lastFrame=0;if(document.hidden)for(const a of burstAnimations)a.cancel();saveGame();});
  /* ผู้ท้าแข่งยืนรออยู่ที่ตู้แข่ง = ลูกค้าปกติไม่มาดูตู้นี้ (people.js eventReservedTank) */
- window.SlugRace={reserved:o=>!!o?.def?.race&&(tourOn()||visitors.some(p=>PEOPLE.includes(p))),tour:()=>state.tour,purchased,goal,drawTrack,drawChallengers,isOpen:()=>!!modal?.open,isRacing,normalSlugs,stepNormal,updateTankFrame,racingItems,drawRunner,stride};
+ window.SlugRace={reserved:o=>!!o?.def?.race&&(tourOn()||visitors.some(p=>PEOPLE.includes(p))),tour:()=>state.tour,purchased,goal,drawTrack,drawChallengers,isOpen:()=>!!modal?.open,isRacing,normalSlugs,stepNormal,updateTankFrame,racingItems,drawRunner,stride,GOAL};
  // Settled races retain their receipt; unfinished races resume, never reroll.
  if(state.active?.entrants?.length===3||(state.active?.tour&&state.active?.entrants?.length===2)){
    state.active.entrants.forEach(r=>{if(r.finished===null&&state.active.settled)r.finished=Infinity;});

@@ -598,14 +598,10 @@
  }
 
  /* ---------- วาดตัวแข่ง ---------- */
- const glSlugs=()=>!!(engineReady&&window.DecorGLB?.ready&&window.Slug3D?.ready&&Slug3D.enabled);
  function drawSlug(s,e){
-   s.fx=e.x;s.fy=e.y;s.wall=null;s.climbZ=0;s._motionHeading=s.dir=s.turn=e.dir;
+   s.fx=e.x;s.fy=e.y;s.wall=null;s.climbZ=0;s.dir=s.turn=e.dir;
    s.flip=Math.cos(e.dir)*CELLW+Math.sin(e.dir)*DEPX>0;
-   if(glSlugs()&&DecorGLB.drawSlug(s))return;
    const len=TANK_SLUG_VIEW_SCALE*slugCm(s.genes)*depthPxPerCm(),p=S(e.x,e.y,SAND_CELLS);
-   const dir={x:CELLW*Math.cos(e.dir)+DEPX*Math.sin(e.dir),y:-DEPY*Math.sin(e.dir)};
-   if(engineReady&&window.Slug3D?.draw(tctx,s,p.x,p.y,len,false,dir))return;
    const P=slugPartsOf(s);if(!P)return;
    const scale=len/(P.bw*P.s),h=P.h*scale;
    drawTankSlug(s,P,scale,p.x-((P.L+P.R)/2-P.bw/2)*P.s*scale,p.y-h*.44,false);

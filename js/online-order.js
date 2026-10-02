@@ -2,6 +2,7 @@
    online-order.js — ออเดอร์ออนไลน์ (ลูกค้าเจ้ายศส่งใบสั่งทากมาทางคอมพิวเตอร์ร้าน)
    - ทุก ๆ 45–60 นาที (เวลาจริง นับต่อแม้ปิดเกม) จะมีออเดอร์ใหม่เข้ากล่อง "📬 เควส / ออเดอร์ออนไลน์"
    - แต่ละออเดอร์ล็อกยีนมา 3 ค่า ที่เหลือไม่สนใจ · แนบรูปตัวอย่างทากที่ฟิก 3 ยีนนั้น ที่เหลือสุ่ม
+   - ระบุสายพันธุ์ด้วย (สุ่มจากพันธุ์ที่ปลดล็อกแล้ว · ผู้เล่นขอ 2026-10-03) ส่งได้เฉพาะพันธุ์นั้น · ใบเก่าที่ไม่มี sp = รับทุกพันธุ์
    - ไม่มีกำหนดส่ง · ส่งทากที่ยีนตรง (คลาดได้ ±10% ของช่วงยีน = matchPct 90) รับ 1,500 เหรียญ
    - ข้อมูลออเดอร์อยู่ใน G.orders / G.nextOrderAt (เซฟใน save.js) · จดหมายในกล่องอ้างถึงด้วย id เดียวกัน
    ใช้: SlugEngine (GENES/randGene/colorName) · drawSlugPortrait (slug-transfer.js)
@@ -69,18 +70,27 @@
   var g={}; for(var i=0;i<KEYS.length;i++) g[KEYS[i]]=Math.round(Math.random()*rangeOf(KEYS[i]));
   return g;
  }
+ /* พันธุ์ที่ผู้เล่นหาได้จริง = ตัวเดิม + พันธุ์ที่ปลดล็อกที่โต๊ะวิจัยแล้ว (และมีข้อมูลวาดในเครื่องนี้) */
+ function unlockedSpecies(){
+  var all=(typeof SlugEngine!=='undefined'&&SlugEngine.species)?SlugEngine.species().map(function(o){return o.key;}):['legacy'];
+  return all.filter(function(k){ return k==='legacy'||(SlugEngine.hasSpecies&&SlugEngine.hasSpecies(k)&&typeof speciesUnlocked==='function'&&speciesUnlocked(k)); });
+ }
+ function spName(k){ return (typeof SlugEngine!=='undefined'&&SlugEngine.speciesName)?SlugEngine.speciesName(k):k; }
+ function speciesOf(s){ return typeof slugSpecies==='function'?slugSpecies(s):((s&&s.genes&&s.genes.sp)||'legacy'); }
  function makeOrder(){
   var keys = pickKeys(FIXED_N), want = {}, i;
   for(i=0;i<keys.length;i++) want[keys[i]] = wantValue(keys[i]);
+  var sps = unlockedSpecies(), sp = sps[Math.floor(Math.random()*sps.length)] || 'legacy';
   var genes = randomGenes();                       // ยีนที่เหลือ = สุ่ม
+  if(sp!=='legacy') genes.sp = sp; else delete genes.sp;   // รูปตัวอย่างวาดเป็นพันธุ์ที่สั่ง
   for(i=0;i<keys.length;i++) genes[keys[i]] = want[keys[i]];   // 3 ค่าที่บังคับ = ฟิกตรงเป๊ะ (ใช้เป็นรูปตัวอย่าง)
   var buyer = BUYERS[Math.floor(Math.random()*BUYERS.length)];
   G.orderSeq = (G.orderSeq|0) + 1;
-  return { id:'order-'+G.orderSeq, at:Date.now(), keys:keys, want:want, genes:genes,
+  return { id:'order-'+G.orderSeq, at:Date.now(), sp:sp, keys:keys, want:want, genes:genes,
            reward:REWARD, buyer:buyer.name, taunt:buyer.taunt, done:false, doneAt:0, slugId:'' };
  }
  function orderBody(o){
-  var lines = ['ต้องการทากที่ยีน 3 ค่านี้ตรงตามสเปก:'];
+  var lines = [o.sp ? 'ต้องการทากพันธุ์'+spName(o.sp)+' ที่ยีน 3 ค่านี้ตรงตามสเปก:' : 'ต้องการทากที่ยีน 3 ค่านี้ตรงตามสเปก:'];
   for(var i=0;i<o.keys.length;i++){
    var k=o.keys[i];
    lines.push('   • '+label(k)+' = '+geneText(k,o.want[k])+'  (คลาดได้ ±'+tolOf(k)+')');
@@ -137,7 +147,8 @@
    if(!ok) all=false;
    rows.push({k:k, mine:mine, want:o.want[k], off:off, tol:tol, ok:ok});
   }
-  return {ok:all, rows:rows};
+  var spOk = !o.sp || speciesOf(s)===o.sp;          // ใบเก่าไม่มี sp = รับทุกพันธุ์
+  return {ok:all&&spOk, spOk:spOk, rows:rows};
  }
  function candidates(){
   var out=[], i, j;
@@ -160,7 +171,9 @@
   var list=candidates(), hit=null;
   for(var i=0;i<list.length;i++) if(list[i].s.id===slugId) hit=list[i];
   if(!hit){ if(typeof toast==='function') toast('ทากตัวนี้ส่งไม่ได้ (ถูกย้าย/กำลังผสม/มีข้อเสนอซื้ออยู่)','bad'); return false; }
-  if(!geneMatch(o,hit.s).ok){ if(typeof toast==='function') toast('ยีนยังไม่ตรงสเปกของออเดอร์นี้','bad'); return false; }
+  var gm=geneMatch(o,hit.s);
+  if(!gm.spOk){ if(typeof toast==='function') toast('ออเดอร์นี้ต้องการพันธุ์'+spName(o.sp)+' — ตัวนี้เป็นพันธุ์'+spName(speciesOf(hit.s)),'bad'); return false; }
+  if(!gm.ok){ if(typeof toast==='function') toast('ยีนยังไม่ตรงสเปกของออเดอร์นี้','bad'); return false; }
   var src = hit.tank ? hit.tank.slugs : G.inv, at = src.indexOf(hit.s);
   if(at<0){ if(typeof toast==='function') toast('ทากตัวนี้ถูกย้ายไปแล้ว','bad'); return false; }
   src.splice(at,1);
@@ -201,6 +214,7 @@
    left.append(cap);
    var right=document.createElement('div'); right.style.cssText='flex:1;min-width:230px';
    var spec='<div style="font-size:13px;color:#f1cc75;font-weight:600;margin-bottom:6px">สเปกที่ต้องการ · ค่าตอบแทน '+o.reward.toLocaleString()+' เหรียญ · ไม่มีกำหนดส่ง</div><table style="font-size:12px;border-collapse:collapse;width:100%">';
+   if(o.sp) spec+='<tr><td style="padding:2px 8px 2px 0;opacity:.85">สายพันธุ์</td><td style="padding:2px 0;color:#e7d6a8">'+esc(spName(o.sp))+' <span style="opacity:.6">ต้องตรง</span></td></tr>';
    for(var i=0;i<o.keys.length;i++){ var k=o.keys[i];
     spec+='<tr><td style="padding:2px 8px 2px 0;opacity:.85">'+esc(label(k))+'</td><td style="padding:2px 0;color:#e7d6a8">'+esc(geneText(k,o.want[k]))+' <span style="opacity:.6">±'+tolOf(k)+'</span></td></tr>';
    }
@@ -245,13 +259,14 @@
     cell.append(pv);SlugHover.mark(cell,s);SlugBrowser.heart(cell,s,paint,'order');
     var cap=document.createElement('div');
     cap.innerHTML='<b>'+esc(SlugBrowser.name(s))+'</b> '+(x.m.ok?'<span style="color:#a6d68a">ตรงสเปก ✓</span>':'')
+      +(x.m.spOk?'':'<br><span style="color:#e0a37c">พันธุ์'+esc(spName(speciesOf(s)))+' ไม่ตรง</span>')
       +'<br>'+x.m.rows.map(function(r){
         return '<span style="color:'+(r.ok?'#a6d68a':'#e0a37c')+'">'+esc(label(r.k))+' '+Math.round(r.mine)+'</span>';
       }).join('<br>');
     cell.append(cap);
     cell.onclick=function(ev){
      ev.preventDefault(); ev.stopPropagation();
-     if(!x.m.ok){ if(typeof toast==='function') toast('ตัวนี้ยีนยังไม่ตรงสเปก','bad'); return; }
+     if(!x.m.ok){ if(typeof toast==='function') toast(x.m.spOk?'ตัวนี้ยีนยังไม่ตรงสเปก':'ออเดอร์นี้ต้องการพันธุ์'+spName(o.sp),'bad'); return; }
      picked=s.id;
      [].forEach.call(grid.children,function(el){ el.style.boxShadow=''; });
      cell.style.boxShadow='0 0 0 2px #f1cc75 inset';

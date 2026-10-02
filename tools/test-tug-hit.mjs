@@ -3,11 +3,11 @@ import fs from 'node:fs';import path from 'node:path';import http from 'node:htt
 import {fileURLToPath} from 'node:url';import {createRequire} from 'node:module';import assert from 'node:assert/strict';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),out=path.join(root,'tools/qa/tug-hit');fs.mkdirSync(out,{recursive:true});
 const {chromium}=createRequire(import.meta.url)('C:/Users/ACER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
-const server=http.createServer((req,res)=>{const f=path.resolve(root,'.'+(new URL(req.url,'http://local').pathname==='/'?'/index.html':decodeURIComponent(new URL(req.url,'http://local').pathname)));if(!f.startsWith(root+path.sep)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404).end();return;}res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.glb':'model/gltf-binary'})[path.extname(f)]||'application/octet-stream');fs.createReadStream(f).pipe(res);});
+const server=http.createServer((req,res)=>{const f=path.resolve(root,'.'+(new URL(req.url,'http://local').pathname==='/'?'/index.html':decodeURIComponent(new URL(req.url,'http://local').pathname)));if(!f.startsWith(root+path.sep)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404).end();return;}res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png'})[path.extname(f)]||'application/octet-stream');fs.createReadStream(f).pipe(res);});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser,page;const report={},errors=[];
 try{
  browser=await chromium.launch({channel:'chrome',headless:true});page=await browser.newPage({viewport:{width:1440,height:1050}});page.setDefaultTimeout(20000);page.on('pageerror',e=>errors.push(e.message));
- await page.goto(`http://127.0.0.1:${server.address().port}/`,{waitUntil:'load'});await page.waitForFunction(()=>!window.BOOTING&&window.DecorGLB?.ready,null,{timeout:70000});
+ await page.goto(`http://127.0.0.1:${server.address().port}/`,{waitUntil:'load'});await page.waitForFunction(()=>!window.BOOTING&&typeof engineReady!=='undefined'&&engineReady,null,{timeout:70000});
  await page.evaluate(()=>{const t=G.objs.find(o=>o.type==='tank');t.def=CATALOG.tank_tug;t._key='tank_tug';t.cx=20;t.cy=20;t.rot=0;t.decor=[];G.objs=[t];G.door={side:'north',offset:0};PEOPLE.length=0;peopleOn=true;stepPeople=()=>{};setMode('view');G.tug.purchased=true;G.tug.nextAt=0;G.tug.active=null;G.tug.offer=null;});
  console.log('FIXTURE_READY');await page.waitForFunction(()=>PEOPLE.some(p=>p.tugChallenger));console.log('CHALLENGER_SPAWNED');
  await page.evaluate(()=>{
@@ -39,7 +39,7 @@ try{
  assert.equal(await page.evaluate(()=>curTank.slugs.length),before.tank);report.transferOutAndBack=true;
  await page.locator('#slugTransfer [data-close]').click();await page.evaluate(()=>{exitTank();hitQA.camera();});await page.waitForTimeout(150);
  await click(targets.person);await page.waitForFunction(()=>SlugTug.isOpen());report.personOpensChallenge=true;await page.screenshot({path:path.join(out,'challenge.png')});
- await page.getByRole('button',{name:'ขอไปเตรียมทากก่อน',exact:true}).click();assert.equal(await page.evaluate(()=>SlugTug.isOpen()),false);
+ await page.getByRole('button',{name:'ไปเตรียมทากก่อน',exact:true}).click();assert.equal(await page.evaluate(()=>SlugTug.isOpen()),false);
  await click(targets.tank);await page.waitForFunction(()=>tankMode);await page.evaluate(()=>{exitTank();hitQA.camera();});await page.waitForTimeout(150);
  await page.mouse.move(targets.person.x,targets.person.y);await page.mouse.down();await page.mouse.move(targets.person.x+65,targets.person.y+25,{steps:5});await page.mouse.up();assert.equal(await page.evaluate(()=>SlugTug.isOpen()||tankMode),false);report.dragDoesNotChallenge=true;
  await page.evaluate(()=>{hitQA.camera();setMode('build');});await page.waitForTimeout(100);await click(targets.person);assert.equal(await page.evaluate(()=>SlugTug.isOpen()),false);report.buildModeDoesNotChallenge=true;

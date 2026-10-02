@@ -26,13 +26,11 @@
  for(const s of sections){for(const p of s.querySelectorAll(':scope > p:not(#shopStatus):not(#doorPosition):not(#shelfStatus)'))p.hidden=true;}
  document.querySelector('.brand small')?.remove();
  const settings=document.createElement('div');settings.className='sec';settings.dataset.panel='settings';settings.innerHTML='<h2>ตั้งค่า</h2>';rail.append(settings);
- /* ⚠️ 2026-09-20 ผู้เล่น: "หน้าปรับ 2D/3D ตัวทาก · สมุดบันทึกทาก ให้ย้ายไปอยู่ในหน้า setting"
-    bSlug3D เดิมอยู่บนแถบบนสุด (index.html) — ย้ายทั้งปุ่มมาเลย ไม่ได้สร้างใหม่
-    ตัวสลับ 2D/3D ยังผูก onclick ไว้ใน slug-3d-toggle.js เหมือนเดิม ย้ายที่อยู่อย่างเดียว */
- for(const id of ['bMusic','bAnim','bFit','bSlug3D'])settings.append(document.getElementById(id));
+ /* ⚠️ 2026-09-20 ผู้เล่น: "สมุดบันทึกทาก ให้ย้ายไปอยู่ในหน้า setting" · ปุ่มเดิมบนแถบบนสุด (index.html) ย้ายมาทั้งปุ่ม */
+ for(const id of ['bMusic','bAnim','bFit'])settings.append(document.getElementById(id));
  /* สมุดบันทึกสายพันธุ์ — เดิมเปิดได้จากคอมพิวเตอร์ร้านที่เดียว ย้ายมาไว้ในตั้งค่าตามที่ผู้เล่นสั่ง */
  const codexBtn=document.createElement('button');codexBtn.className='tbtn';codexBtn.id='navCodex';
- const codexLabel=()=>'📓 สมุดบันทึกทาก'+(typeof slugCodexCount==='function'?' ('+slugCodexCount()+'/486)':'');
+ const codexLabel=()=>'📓 สมุดบันทึกทาก'+(typeof slugCodexCount==='function'?' ('+slugCodexCount()+'/'+(typeof slugCodexTotal==='function'?slugCodexTotal():486)+')':'');
  codexBtn.textContent=codexLabel();
  codexBtn.onclick=()=>{if(typeof openSlugCodex==='function')openSlugCodex();else toast('สมุดบันทึกยังโหลดไม่เสร็จ','bad');};
  settings.append(codexBtn);

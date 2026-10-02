@@ -5,12 +5,16 @@ Claude outputs/
 *.blend1
 _to_delete/
 
-# ⏸ ของตกแต่ง 3D — ปิดไว้ ยังไม่ให้ขึ้น GitHub Pages (PUSH.bat ใช้ git add -A)
+# ⛔ ของตกแต่ง 3D เลิกใช้ถาวร 2026-09-26 — ห้ามเอาไฟล์ชุด 3D กลับเข้ามา
 Decor/
-assets/tidal-decor/
 assets/decor3d/
-assets/aquarium_decor_blender/
-assets/pumice-mobile/
-js/tidal-decor-defs.js
-js/reference-decor-defs.js
-js/mobile-pumice-defs.js
+
+# Keep the new baked 2D driftwood assets (Windows matches Decor/ case-insensitively).
+!assets/decor/
+assets/decor/*
+!assets/decor/driftwood/
+assets/decor/driftwood/*
+!assets/decor/driftwood/consistent-v2/
+
+# Local backups before saving decoration grids
+.local-backups/

@@ -87,6 +87,11 @@
   if(!p) return false;
   var genes=(typeof SlugEngine!=='undefined'&&SlugEngine.randGene)?SlugEngine.randGene():null;
   if(!genes||typeof makeSlug!=='function') return false;
+  /* สายพันธุ์ที่ปลดล็อกที่โต๊ะวิจัยแล้ว พ่อค้าเร่ก็หามาขายได้ (สุ่มเท่ากันกับตัวเดิม) */
+  var sps=(SlugEngine.species?SlugEngine.species():[]).map(function(o){return o.key;})
+   .filter(function(k){return k!=='legacy'&&SlugEngine.hasSpecies&&SlugEngine.hasSpecies(k)&&typeof speciesUnlocked==='function'&&speciesUnlocked(k);});
+  var pick=Math.floor(Math.random()*(sps.length+1));
+  if(pick<sps.length) genes.sp=sps[pick];
   var slug=makeSlug(genes);
   p.wantsSell=true; p.wantsBuy=false; p.sellSlug=slug; p.carrySlug=slug; p.sellPrice=peddlerValue(genes);
   p.carryTank=true; p.carryColor='#2f6f78'; p.carryAccent=slugBodyHex(genes);
@@ -148,7 +153,7 @@
   return '<div class="trade-offer-card">'
    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
    +'<canvas data-trade-slug="'+o.id+'" width="120" height="80" style="width:100px;height:66px;flex-shrink:0;background:radial-gradient(ellipse at center,#385e5b,#172e32);border:1px solid #ffffff20;border-radius:10px"></canvas>'
-   +'<div style="min-width:0"><small style="color:#b9ceca">ทากจากพ่อค้า</small><div style="font-size:17px;font-weight:700;overflow-wrap:anywhere">'+esc(o.slug.id)+'</div>'
+   +'<div style="min-width:0"><small style="color:#b9ceca">ทากจากพ่อค้า'+(typeof slugSpecies==='function'&&slugSpecies(o.slug)!=='legacy'?' · พันธุ์'+esc(slugSpeciesName(o.slug)):'')+'</small><div style="font-size:17px;font-weight:700;overflow-wrap:anywhere">'+esc(o.slug.id)+'</div>'
    +'<small style="color:#b9ceca" data-live="card-status">'+(o.arrived?'รอคำตอบ · '+remaining+' วิ':'กำลังเดินมา')+'</small></div></div>'
    +'<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;font-size:12px;line-height:1.45;margin-bottom:14px">'+list+'</div>'
    +'<div style="display:flex;align-items:baseline;gap:5px;margin-bottom:10px"><b style="font-size:26px;line-height:1.2;color:#ffda80">'+o.price.toLocaleString()+'</b><span style="font-size:12px;color:#dfd3b6">เหรียญ</span></div>'

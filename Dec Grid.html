@@ -1,0 +1,493 @@
+<!doctype html><html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dec grid · ของตกแต่ง 4 ทิศ</title>
+<style>
+:root{--bg:#0b1f25;--panel:#12313a;--panel2:#0f2830;--field:#0c262d;--line:#27454e;--line2:#1d3a42;--teal:#5fa8ae;--text:#e4edec;--muted:#9cb4b7;--faint:#6f8a8e;
+ --red:#e85656;--green:#5ac878;--blue:#5696e8;--amber:#e0b64a;--ok:#5ac878;--warn:#e0b64a;--bad:#e85656}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 "IBM Plex Sans Thai",system-ui,sans-serif;overflow:hidden}
+button,.filebtn{font:inherit;font-size:12.5px;padding:6px 10px;border:1px solid var(--line);border-radius:7px;background:#123039;color:var(--text);cursor:pointer;white-space:nowrap}
+button:hover:not(:disabled),.filebtn:hover{border-color:var(--teal)}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
+button.on{background:rgba(95,168,174,.25);border-color:var(--teal)}
+button.red.on{background:rgba(232,86,86,.3);border-color:var(--red)} button.blue.on{background:rgba(86,150,232,.3);border-color:var(--blue)}
+button.green.on{background:rgba(90,200,120,.28);border-color:var(--green)} button.amber.on{background:rgba(224,182,74,.28);border-color:var(--amber)}
+button.primary{background:#1d5b52;border-color:#3f9d8a} button.danger{color:#ffb4b4}
+input[type=text],input[type=number],select{width:100%;padding:6px 8px;background:var(--field);border:1px solid var(--line);border-radius:7px;color:var(--text);font:inherit;font-size:13px}
+input[type=range]{width:100%}
+label.f{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+.swatch{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:5px}
+.hint{color:var(--muted);font-size:11.5px;line-height:1.5;margin:4px 0 0}
+.val{color:#e7d7b0;font-weight:600}
+kbd{background:var(--field);border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:10.5px}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.app{height:100vh;display:grid;grid-template-rows:auto 1fr;}
+header{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel2);flex-wrap:wrap}
+header h1{font-size:16px;margin:0 8px 0 0;white-space:nowrap}
+header .sp{flex:1}
+.main{display:grid;grid-template-columns:230px minmax(0,1fr) 340px;min-height:0}
+.list{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--panel2)}
+.list .top{padding:10px;display:grid;gap:6px;border-bottom:1px solid var(--line2)}
+#items{overflow:auto;padding:6px;display:flex;flex-direction:column;gap:4px;flex:1}
+.item{display:block;width:100%;text-align:left;padding:7px 9px;border-radius:8px;background:var(--field);border:1px solid var(--line2)}
+.item.sel{border-color:var(--teal);background:rgba(95,168,174,.14)}
+.item b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.item small{display:block;color:var(--muted);font-size:10.5px;overflow:hidden;text-overflow:ellipsis}
+.item .st{float:right;font-size:10.5px;margin-left:6px}
+.center{display:flex;flex-direction:column;min-width:0;min-height:0}
+.views{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:8px 10px;border-bottom:1px solid var(--line2)}
+.vtab{display:grid;grid-template-columns:54px 1fr;gap:8px;align-items:center;padding:6px;text-align:left;border-radius:9px;min-width:0}
+.vtab .th{width:54px;height:40px;border-radius:6px;background:#0c3540 center/contain no-repeat;border:1px solid var(--line2)}
+.vtab b{display:block;font-size:13px}
+.vtab small{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:0}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 10px;border-bottom:1px solid var(--line2)}
+.toolbar .sep{width:1px;height:22px;background:var(--line)}
+.canvasWrap{position:relative;flex:1;min-height:0}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair;background:#0c3540}
+.statusbar{padding:5px 10px;border-top:1px solid var(--line2);color:var(--muted);font-size:11.5px;display:flex;gap:14px;flex-wrap:wrap}
+.statusbar b{color:var(--text);font-weight:500}
+.side{border-left:1px solid var(--line);overflow:auto;padding:10px;min-height:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.card h2{font-size:12px;letter-spacing:.04em;color:var(--muted);margin:0 0 4px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.issues{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:4px;font-size:12px}
+.issues li{padding:5px 7px;border-radius:6px;background:var(--field)}
+.issues li.bad{border-left:3px solid var(--bad)} .issues li.warn{border-left:3px solid var(--warn)} .issues li.ok{border-left:3px solid var(--ok)}
+.pathok{color:var(--ok)} .pathbad{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#e4edec;color:#0b1f25;padding:8px 16px;border-radius:99px;font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .18s;z-index:9;max-width:80vw;text-align:center}
+.toast.on{opacity:1}
+@media (max-width:1100px){body{overflow:auto}.app{height:auto}.main{grid-template-columns:1fr}.list{max-height:220px;border-right:0;border-bottom:1px solid var(--line)}.canvasWrap{height:62vh;flex:none}.side{border-left:0}.views{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Editing workspace: compact tools, distinct preview controls, readable sidebar. */
+:root{--bg:#0b1b23;--panel:#142c36;--panel2:#10232c;--field:#0c2029;--line:#2b4652;--teal:#6cc6ba;--text:#e8f0f2;--muted:#a5bbc4}
+header{padding:12px 16px;gap:8px;box-shadow:0 2px 12px #0002;z-index:2}
+header h1{font-size:15px}header button{padding:8px 11px}
+.main{grid-template-columns:210px minmax(0,1fr) 320px}
+.side{padding:12px;background:#0e222b}.card{padding:12px;border-radius:12px;margin-bottom:10px}
+.shape-card{border-color:#4c8d89;background:#17363e}.shape-card input[type=number]{font-size:17px;font-weight:600;padding:9px}
+.card h2{color:#d1e5e9;font-size:13px}.card-body{padding-top:6px}
+.card .hint{line-height:1.65}.pair{gap:12px}.card input[type=range]{accent-color:#6cc6ba;margin-top:9px}
+.views{padding:10px;gap:7px;background:#102630}.vtab{padding:9px 7px}.vtab.on{box-shadow:inset 0 0 0 1px #6cc6ba}
+.toolbar{padding:8px 10px;gap:6px;background:#112a34}.toolbar button{min-height:34px;border-radius:8px}
+.preview-toolbar{background:#0c222c;padding:5px 10px}.preview-toolbar button{min-height:29px;padding:3px 10px}.toolbar-caption{color:var(--muted);font-size:11px;margin-right:6px}
+.item{padding:9px 10px}.item.sel{border-left:3px solid var(--teal)}.item small{font-size:10px}.statusbar{background:#102630;padding:8px 10px}
+.advanced-settings{grid-column:1/-1}.advanced-settings>summary{cursor:pointer;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--panel);color:var(--text);font-weight:600}.advanced-settings[open]>summary{margin-bottom:8px}.advanced-settings>summary:hover{border-color:var(--teal)}
+@media(max-width:1100px){.main{grid-template-columns:1fr}.side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.side .card{margin:0}.list{max-height:180px}}
+@media(max-width:600px){.side{grid-template-columns:1fr}header h1{width:100%}.toolbar .sep{display:none}}
+</style></head>
+<body><div class="app">
+<header>
+  <h1>🪨 Dec grid · ของตกแต่ง 4 ทิศ</h1>
+  <button id="bNew">＋ ชิ้นใหม่</button><button id="bDup">ทำสำเนา</button><button id="bDel" class="danger">ลบชิ้นนี้</button>
+  <span class="sep"></span>
+  <button id="bUndo" title="เลิกทำ (Ctrl+Z)">↶</button><button id="bRedo" title="ทำซ้ำ (Ctrl+Y)">↷</button>
+  <span class="sp"></span>
+  <button id="bCopy" title="คัดลอกนิยามชิ้นนี้เป็น JSON">📋 คัดลอกชิ้นนี้</button>
+  <button id="bExport" class="primary" title="รวมทุกชิ้นที่พร้อมเป็นไฟล์ js/sprite-decor-defs.js">⬇︎ บันทึก sprite-decor-defs.js</button>
+</header>
+<div class="main">
+  <aside class="list">
+    <div class="top"><input id="q" type="text" placeholder="ค้นหาชื่อหรือ key…"><p class="hint" id="itemsN" style="margin:0"></p></div>
+    <div id="items"></div>
+  </aside>
+  <section class="center">
+    <div class="views" id="views"></div>
+    <div class="toolbar">
+      <button id="mWalk" class="on" title="กริดการเดิน">🚶 กริดการเดิน</button><button id="mPlace" class="amber" title="กริดพื้นที่วาง">🟨 พื้นที่วาง</button>
+      <span class="sep"></span>
+      <span id="toolsWalk" class="row">
+        <button id="tSolid" class="red on" title="Q"><span class="swatch" style="background:var(--red)"></span>เดินไม่ได้</button>
+        <button id="tFront" class="green" title="W"><span class="swatch" style="background:var(--green)"></span>อยู่หน้า/ทับได้</button>
+        <button id="tBehind" class="blue" title="E"><span class="swatch" style="background:var(--blue)"></span>อยู่หลัง</button>      </span>
+      <span id="toolsPlace" class="row" style="display:none"><button id="tPlace" class="amber on" title="R"><span class="swatch" style="background:#f0be3c"></span>ทาพื้นที่วาง</button></span>
+      <button id="tErase" title="X">🧽 ลบ</button>
+      <span class="sep"></span>
+      <label class="row" style="gap:4px;color:var(--muted)">แปรง <select id="brush" style="width:auto;padding:4px 6px"><option value="1">1 ช่อง</option><option value="2">2×2</option><option value="3">3×3</option><option value="4">4×4</option></select></label>
+      <label class="row" style="gap:4px;color:var(--muted)">รูปทึบ <input id="opa" type="range" min="10" max="100" value="100" style="width:80px"></label>
+      <label class="row" style="gap:4px;color:var(--muted)"><input id="ghost" type="checkbox" style="width:auto"> เทียบกริดทิศต้นแบบ</label>
+      <span class="sp" style="flex:1"></span>
+      <button id="zOut" title="ซูมออก">－</button><button id="zFit" title="พอดีจอ (0)">พอดีจอ</button><button id="zIn" title="ซูมเข้า">＋</button>
+    </div>
+    <div class="canvasWrap"><canvas id="cv"></canvas></div>
+    <div class="statusbar" id="status"></div>
+  </section>
+  <aside class="side">
+    <div class="card"><h2>ชิ้นนี้</h2>
+      <label class="f">ชื่อที่ผู้เล่นเห็น</label><input id="fName" type="text" class="thai">
+      <div class="pair">
+        <div><label class="f">key (sprite_…)</label><input id="fKey" type="text" spellcheck="false"></div>
+        <div><label class="f">หมวดในแถบของ</label><input id="fCat" type="text"></div>
+      </div>
+      <label class="f">ความกว้างจริงที่ใช้คิดราคา <span class="val" id="priceV"></span></label>
+      <input id="fPrice" type="number" min="1" max="200" step="0.5">
+      <p class="hint" id="keyErr"></p>
+    </div>
+    <div class="card" id="refCard"><h2>ทิศต้นแบบ<span id="refName"></span></h2>
+      <button id="bRef" class="primary" style="width:100%;justify-content:center" title="ใช้ทิศที่เปิดอยู่เป็นต้นแบบ แล้วปรับอีก 3 ทิศให้เข้ากัน">⭐ ใช้ทิศนี้เป็นต้นแบบ แล้วปรับอีก 3 ทิศ</button>
+      <p class="hint">จัดขนาด จุดฐาน และกริดของทิศนี้ให้เรียบร้อยก่อน แล้วกดปุ่ม — อีก 3 ทิศจะได้<br>• <b>ขนาด</b> สเกลเดียวกัน (คิดจากพิกเซลของรูป)<br>• <b>จุดฐาน</b> หาจากขอบล่างของรูปแต่ละทิศ (อ่านรูปไม่ได้ = ใช้ค่าเดียวกับต้นแบบ)<br>• <b>กริด</b> หมุนตามทิศ (ทับกริดเดิมของทิศนั้น) · กด Ctrl+Z ย้อนได้ทั้งหมดในครั้งเดียว</p>
+    </div>
+    <div class="card"><h2>รูปมุม<span id="viewName"></span></h2>
+      <label class="f">path ของรูป (เทียบกับโฟลเดอร์เกม เช่น assets/decor/…)</label>
+      <div class="row" style="flex-wrap:nowrap"><input id="fSrc" type="text" spellcheck="false"><button id="bLoadSrc" title="โหลดรูปจาก path">โหลด</button></div>
+      <p class="hint" id="srcState"></p>
+      <div class="row" style="margin-top:6px">
+        <label class="filebtn">เลือกรูปมุมนี้…<input id="file" type="file" accept="image/*" hidden></label>
+        <label class="filebtn" title="เลือกโฟลเดอร์ที่มีรูป 4 ทิศ (ชื่อไฟล์มี front/right/back/left หรือ 0/90/180/270)">📁 โฟลเดอร์ 4 ทิศ<input id="dir" type="file" webkitdirectory directory multiple hidden></label>
+      </div>
+      <label class="f"><input id="fUniform" type="checkbox" style="width:auto;vertical-align:-2px"> ใช้สเกลเดียวกันทั้ง 4 ทิศ (ตามทิศต้นแบบ)</label>
+      <label class="f" id="wLabel">ความกว้าง <span class="val" id="wV"></span></label>
+      <input id="fW" type="range" min="4" max="80" step="0.5">
+      <p class="hint" id="hV"></p>
+      <div class="pair"><label class="f">ยืดตามแนวกริด ↔ (ซม.)<input id="fStretchW" type="number" min="1" max="200" step="0.5"></label><label class="f">ยืดตามแนวลึก ↗ (ซม.)<input id="fStretchH" type="number" min="1" max="200" step="0.5"></label></div>
+      <button id="bAspect" style="margin-top:6px">คืนสัดส่วนรูปเดิม</button>
+      <p class="hint">ยืดเฉพาะรูปมุมนี้รอบจุดฐาน กริดคงเดิม — ปรับกริดให้ตรงรูปหลังยืด</p>
+      <div class="pair">
+        <div><label class="f">จุดฐาน แนวนอน <span class="val" id="axV"></span></label><input id="fAx" type="range" min="0" max="1" step="0.005"></div>
+        <div><label class="f">จุดฐาน แนวตั้ง <span class="val" id="ayV"></span></label><input id="fAy" type="range" min="0.4" max="1" step="0.005"></div>
+      </div>
+      <div class="row" style="margin-top:6px"><button id="bAuto" title="หาจุดสัมผัสพื้นจากขอบล่างของรูป">🎯 หาจุดฐานอัตโนมัติ</button></div>
+    </div>
+    <div class="card"><h2>กริดมุมนี้<span id="gridCount"></span></h2>
+      <div class="row">
+        <button id="bCopyFront" title="เอากริดทิศต้นแบบมาหมุนให้ตรงทิศนี้ แล้วค่อยแต่งต่อ">⟳ คัดจากทิศต้นแบบ (หมุนให้)</button>
+        <button id="bRot" title="หมุนกริดของมุมนี้ 90°">↻ หมุน 90°</button>
+        <button id="bClear" class="danger">ล้างกริดมุมนี้</button>
+      </div>
+      <p class="hint">กริดเดิน/พื้นที่วาง "ตามรูปจริง" ของแต่ละทิศ · มุมหน้า→ขวา→หลัง→ซ้าย = วัตถุหมุนตามเข็มนาฬิกาทีละ 90° (มองจากบน) · อยู่หน้า/อยู่หลังขึ้นกับมุมกล้อง ต้องแต่งทีละทิศ</p>
+    </div>
+    <div class="card"><h2>ความพร้อม<span id="readyV"></span></h2><ul class="issues" id="issues"></ul></div>
+    <div class="card"><h2>ส่งออก</h2>
+      <p class="hint" style="margin-top:0">ปุ่ม <b>บันทึก sprite-decor-defs.js</b> รวมทุกชิ้นที่พร้อม เป็นไฟล์เดียว → วางทับ <code>js/sprite-decor-defs.js</code> · เกมจะโหลดไฟล์นี้เมื่อมี <code>&lt;script src="js/sprite-decor-defs.js"&gt;</code> ใน index.html</p>
+      <p class="hint">ของตกแต่งแบบเก่า 1 รูปใน <code>js/decor-defs.js</code> ไม่ถูกแก้ ยังใช้ในเกมได้ตามเดิม<span id="legacyN"></span></p>
+    </div>
+    <div class="card"><h2>คีย์ลัด</h2><p class="hint" style="margin:0">
+      <kbd>1</kbd>–<kbd>4</kbd> เปลี่ยนทิศ · <kbd>Q</kbd> เดินไม่ได้ <kbd>W</kbd> อยู่หน้า <kbd>E</kbd> อยู่หลัง <kbd>R</kbd> พื้นที่วาง <kbd>X</kbd> ลบ · <kbd>[</kbd> <kbd>]</kbd> ขนาดแปรง<br>
+      คลิก/ลาก = ระบาย · คลิกขวาลาก = ลบ · ล้อเมาส์ = ซูม · คลิกกลางลาก หรือ <kbd>Space</kbd>+ลาก = เลื่อนจอ · <kbd>0</kbd> พอดีจอ · <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd></p></div>
+  </aside>
+</div></div>
+<div class="toast" id="toast"></div>
+<script src="js/driftwood-decor-defs.js"></script>
+<script src="js/driftwood-variants-defs.js"></script>
+<script src="js/driftwood-complex-defs.js"></script>
+<script src="js/driftwood-natural-defs.js"></script>
+<script src="js/decor-grid-overrides.js"></script>
+<script>const DECOR_GRID_EDITABLE=new Set(Object.keys(SPRITE_DECOR_DEFS));</script>
+<script src="js/sprite-decor-defs.js" onerror="void 0"></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const VIEWS=[{th:'หน้า',deg:0,re:/(front|หน้า|(^|[-_ ])0([-_ .]|$))/i},{th:'ขวา',deg:90,re:/(right|ขวา|(^|[-_ ])90([-_ .]|$))/i},{th:'หลัง',deg:180,re:/(back|rear|หลัง|(^|[-_ ])180([-_ .]|$))/i},{th:'ซ้าย',deg:270,re:/(left|ซ้าย|(^|[-_ ])270([-_ .]|$))/i}];
+const STORE='decor4:',LAST='decor4-last',KEY_RE=/^sprite_[a-z0-9_]{1,40}$/;
+const CELLW=34,DEPX=16,DEPY=18,PXCM=CELLW/5,DX0=-12,DX1=12,DY0=-8,DY1=12;
+let STEP=.5; // Per-item authoring grid, in units of 5 cm.
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const r3=v=>Math.round(v*1000)/1000;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),2600);}
+
+/* ---------- ข้อมูล: 1 ชิ้น = 4 ทิศ ---------- */
+const blankView=()=>({src:'',pxW:0,pxH:0,wCm:28,anchor:{x:0.5,y:0.9},state:{},place:{}});
+const blankItem=key=>({key,name:'ของตกแต่งใหม่',cat:'หิน 2D · 4 มุม',priceCm:null,uniform:true,ref:0,frontW:28,views:[0,1,2,3].map(blankView)});
+let items={},cur=null,view=0;
+function cleanView(v){const o=blankView();if(!v)return o;o.src=String(v.src||'');o.pxW=+v.pxW||0;o.pxH=+v.pxH||0;o.wCm=clamp(+v.wCm||28,1,200);if(Number.isFinite(v.hCm)&&v.hCm>0)o.hCm=clamp(v.hCm,1,200);
+ if(Number.isFinite(v.shearCm))o.shearCm=v.shearCm;
+ o.anchor={x:clamp(+v.anchor?.x||0.5,0,1),y:clamp(+(v.anchor?.y??0.9),0,1)};
+ for(const L of ['state','place']){const m=v[L]&&typeof v[L]==='object'?v[L]:{};for(const [k,val] of Object.entries(m))if(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(k)&&k.split(',').every(n=>Math.abs(+n)<=200)&&(L==='place'?val===1:[1,2,3].includes(val)))o[L][k]=val}
+ return o}
+function cleanItem(it){const o=blankItem(String(it.key));o.name=String(it.name||o.name).slice(0,60);o.cat=String(it.cat||o.cat).slice(0,40);o.priceCm=Number.isFinite(+it.priceCm)&&+it.priceCm>0?+it.priceCm:null;
+ o.cell=[.1,.2].includes(it.cell)?it.cell:.5;if(typeof it.gridSource==='string')o.gridSource=it.gridSource.slice(0,40);o.uniform=it.uniform!==false;o.ref=[0,1,2,3].includes(it.ref)?it.ref:0;o.frontW=clamp(+it.frontW||28,1,200);o.views=[0,1,2,3].map(i=>cleanView(it.views?.[i]));return o}
+function loadAll(){for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!k.startsWith(STORE))continue;try{const it=cleanItem(JSON.parse(localStorage.getItem(k)));if(KEY_RE.test(it.key))items[it.key]=it}catch(_){}}}
+let dirty=new Set(),saveTimer=0,quotaWarned=false;
+function persistSoon(key){dirty.add(key);clearTimeout(saveTimer);saveTimer=setTimeout(persistNow,250)}
+function persistNow(){clearTimeout(saveTimer);for(const k of dirty){try{if(items[k])localStorage.setItem(STORE+k,JSON.stringify(items[k]));else localStorage.removeItem(STORE+k);quotaWarned=false}catch(_){if(!quotaWarned){quotaWarned=true;alert('บันทึกลงเบราว์เซอร์ไม่สำเร็จ (พื้นที่เต็ม) — กด “บันทึก sprite-decor-defs.js” เก็บงานไว้ก่อน')}}}dirty.clear();try{if(cur)localStorage.setItem(LAST,cur)}catch(_){}}
+addEventListener('pagehide',persistNow);document.addEventListener('visibilitychange',()=>{if(document.hidden)persistNow()});
+const it=()=>items[cur],vw=()=>items[cur].views[view];
+
+/* ---------- ขนาด: สเกลเดียวกันทุกทิศ = กล้องเดียวกัน ---------- */
+/* สเกลคิดจาก "ทิศต้นแบบ" (item.ref) — frontW = ความกว้างของทิศต้นแบบ · ทิศอื่นกว้างตามอัตราส่วนพิกเซล */
+function wCmOf(item,i){const v=item.views[i];if(!item.uniform)return v.wCm;const r=item.ref|0,f=item.views[r];if(i===r)return item.frontW;if(!f.pxW||!v.pxW)return v.wCm;return item.frontW*v.pxW/f.pxW}
+const turnsFromRef=(item,i)=>(i-(item.ref|0)+4)%4;
+const hCmOf=(item,i)=>{const v=item.views[i];return v.hCm||(v.pxW?wCmOf(item,i)*v.pxH/v.pxW:0)};
+
+/* ---------- รูป: โหลดจาก path ครั้งเดียว เก็บไว้ใช้ซ้ำ ---------- */
+const IMGS=new Map();   // path → {img, ok, err, local}
+function imageFor(src){if(!src)return null;let e=IMGS.get(src);if(e)return e;e={img:new Image(),ok:false,err:false};IMGS.set(src,e);
+ e.img.onload=()=>{e.ok=true;e.err=false;for(const item of Object.values(items))item.views.forEach(v=>{if(v.src===src&&(v.pxW!==e.img.naturalWidth||v.pxH!==e.img.naturalHeight)){v.pxW=e.img.naturalWidth;v.pxH=e.img.naturalHeight;persistSoon(item.key)}});refresh()};
+ e.img.onerror=()=>{e.err=true;refresh()};e.img.src=src;return e}
+/* รูปที่เลือกจากเครื่อง: ใช้แสดงได้ทันที (อ่านพิกเซลได้ หาจุดฐานได้) แต่ในไฟล์เกมยังอ้าง path */
+function localImage(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=r.result};r.onerror=rej;r.readAsDataURL(file)})}
+const LOCAL=new Map();   // path → Image จากไฟล์ที่เลือก (ใช้แทนตอน path ยังโหลดไม่ได้)
+function shownImage(src){const e=imageFor(src);if(e?.ok)return e.img;return LOCAL.get(src)||null}
+function autoAnchor(im){try{const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(im,0,0);const d=x.getImageData(0,0,c.width,c.height).data,W=c.width,H=c.height;
+ let bottom=-1;for(let y=H-1;y>=0&&bottom<0;y--)for(let i=0;i<W;i++)if(d[(y*W+i)*4+3]>24){bottom=y;break}
+ if(bottom<0)return null;const band=Math.max(2,Math.round(H*.06));let sx=0,n=0;for(let y=Math.max(0,bottom-band);y<=bottom;y++)for(let i=0;i<W;i++)if(d[(y*W+i)*4+3]>24){sx+=i;n++}
+ return{x:r3((n?sx/n:W/2)/W),y:r3((bottom+1)/H)}}catch(_){return null}}
+
+/* ---------- Undo (ต่อชิ้น) ---------- */
+let undoStack=[],redoStack=[];
+function push(){undoStack.push(JSON.stringify(it()));if(undoStack.length>80)undoStack.shift();redoStack=[];upButtons()}
+function restore(from,to){if(!from.length)return;to.push(JSON.stringify(it()));const o=cleanItem(JSON.parse(from.pop()));items[cur]=o;persistSoon(cur);refresh(true)}
+const undo=()=>restore(undoStack,redoStack),redo=()=>restore(redoStack,undoStack);
+function upButtons(){$('bUndo').disabled=!undoStack.length;$('bRedo').disabled=!redoStack.length}
+
+/* ---------- กริด ---------- */
+const keyc=(x,y)=>r3(x)+','+r3(y);
+const cellsOf=m=>Object.keys(m).map(k=>k.split(',').map(Number));
+/* หมุน 90° ตามเข็ม (มองจากบน · y = ลึกเข้าไปในตู้): ช่องมุมล่างซ้าย (x,y) → (y, −x−0.5) */
+function rotMap(m,times){let out=m;for(let t=0;t<times;t++){const n={};for(const [k,val] of Object.entries(out)){const [x,y]=k.split(',').map(Number);n[keyc(y,-x-STEP)]=val}out=n}return out}
+const shiftMap=(m,dx,dy)=>Object.fromEntries(Object.entries(m).map(([k,v])=>{const [x,y]=k.split(',').map(Number);return[keyc(x+dx,y+dy),v]}));
+function boxOf(m){const c=cellsOf(m);if(!c.length)return null;const xs=c.map(p=>p[0]),ys=c.map(p=>p[1]);return{x0:Math.min(...xs),x1:Math.max(...xs)+STEP,y0:Math.min(...ys),y1:Math.max(...ys)+STEP}}
+/* ย้ายกริดไปทิศอื่น: หมุนรอบ "กลางกริด" ไม่ใช่รอบจุดฐาน
+   จุดฐาน (0,0) ในรูปคือขอบล่างสุดของวัตถุ = ขอบหน้าสุดที่แตะพื้น ไม่ใช่จุดกลางวัตถุ
+   ถ้าหมุนรอบจุดนั้น กริดจะเหวี่ยงออกข้างเหมือนประตูหมุนรอบบานพับ
+   จึงหมุนแล้วเลื่อนให้ "ขอบหน้าสุด" และ "กึ่งกลางซ้าย-ขวา" อยู่ตำแหน่งเดียวกับทิศต้นแบบเทียบกับจุดฐาน
+   (ตรงกับที่จุดฐานของแต่ละรูปคือกลางขอบล่างของวัตถุเหมือนกัน) · ช่องหมุนถูกต้องครบทุกช่อง ขยับทั้งก้อนทีละ 2.5 ซม. */
+function transferGrid(src,turns){const basis=Object.keys(src.place).length?src.place:src.state,b0=boxOf(basis);
+ let state=rotMap(src.state,turns),place=rotMap(src.place,turns);if(!b0||!turns)return{state,place};
+ const b1=boxOf(Object.keys(src.place).length?place:state),snap=v=>Math.round(v/STEP)*STEP;
+ const dx=snap((b0.x0+b0.x1)/2-(b1.x0+b1.x1)/2),dy=snap(b0.y0-b1.y0);
+ return{state:shiftMap(state,dx,dy),place:shiftMap(place,dx,dy)}}
+
+/* ---------- วาด (เฉพาะตอนมีอะไรเปลี่ยน) ---------- */
+const cv=$('cv'),ctx=cv.getContext('2d');let DPR=1,CW=0,CH=0,zoom=1,panX=0,panY=0,frame=0,hover=null;
+const OX=()=>CW*0.47,OY=()=>CH*0.74;
+function S(fx,fy){return{x:OX()+panX+(fx*CELLW+fy*DEPX)*zoom,y:OY()+panY-fy*DEPY*zoom}}
+function cellAt(mx,my){const fyr=(OY()+panY-my)/(DEPY*zoom),fxr=((mx-OX()-panX)/zoom-fyr*DEPX)/CELLW;return{fx:Math.floor(fxr/STEP)*STEP,fy:Math.floor(fyr/STEP)*STEP}}
+function draw(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;if(!document.hidden)drawNow()})}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)draw()});
+new ResizeObserver(()=>{const r=cv.getBoundingClientRect();DPR=Math.min(2,devicePixelRatio||1);CW=r.width;CH=r.height;cv.width=Math.max(1,Math.round(CW*DPR));cv.height=Math.max(1,Math.round(CH*DPR));draw()}).observe(cv);
+function quad(cx,cy){const a=S(cx,cy),b=S(cx+STEP,cy),c=S(cx+STEP,cy+STEP),d=S(cx,cy+STEP);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.closePath();return[a,b,c,d]}
+function drawNow(){
+ ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#0c3540';ctx.fillRect(0,0,CW,CH);if(!cur)return;
+ const item=it(),v=vw(),W=mode==='walk';
+ ctx.fillStyle='#c9a568';{const p=[S(DX0,DY0),S(DX1,DY0),S(DX1,DY1),S(DX0,DY1)];ctx.beginPath();p.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.closePath();ctx.fill()}
+ for(const [x,y] of cellsOf(v.state)){const s=v.state[keyc(x,y)],A=W?.55:.13;quad(x,y);ctx.fillStyle=s===1?`rgba(232,86,86,${A})`:s===2?`rgba(86,150,232,${A})`:`rgba(90,200,120,${A})`;ctx.fill()}
+ ctx.lineWidth=W?1.2:2.6;
+ for(const [x,y] of cellsOf(v.place)){const [a,b,c,d]=quad(x,y);ctx.fillStyle=W?'rgba(240,190,60,.13)':'rgba(240,190,60,.6)';ctx.fill();ctx.strokeStyle=W?'rgba(240,190,60,.5)':'#ffd766';
+  for(const [p,q,nx,ny] of [[a,b,x,y-STEP],[b,c,x+STEP,y],[c,d,x,y+STEP],[d,a,x-STEP,y]]){if(v.place[keyc(nx,ny)])continue;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke()}}
+ ctx.strokeStyle='rgba(90,70,40,.3)';ctx.lineWidth=1;ctx.beginPath();
+ for(let i=Math.round(DX0/STEP);i<=Math.round(DX1/STEP);i++){const p=S(i*STEP,DY0),q=S(i*STEP,DY1);ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y)}
+ for(let i=Math.round(DY0/STEP);i<=Math.round(DY1/STEP);i++){const p=S(DX0,i*STEP),q=S(DX1,i*STEP);ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y)}ctx.stroke();
+ ctx.strokeStyle='rgba(50,38,20,.7)';ctx.lineWidth=1.6;ctx.beginPath();
+ for(let m=DX0;m<=DX1;m++){const p=S(m,DY0),q=S(m,DY1);ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y)}
+ for(let m=DY0;m<=DY1;m++){const p=S(DX0,m),q=S(DX1,m);ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y)}ctx.stroke();
+ if(ghostOn&&view!==item.ref){const g=transferGrid(item.views[item.ref],turnsFromRef(item,view)).place;ctx.setLineDash([5,4]);ctx.strokeStyle='#fff';ctx.lineWidth=1.4;
+  for(const [x,y] of cellsOf(g)){const [a,b,c,d]=[S(x,y),S(x+STEP,y),S(x+STEP,y+STEP),S(x,y+STEP)];for(const [p,q,nx,ny] of [[a,b,x,y-STEP],[b,c,x+STEP,y],[c,d,x,y+STEP],[d,a,x-STEP,y]]){if(g[keyc(nx,ny)])continue;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke()}}ctx.setLineDash([])}
+ const im=shownImage(v.src);
+ if(im){const w=wCmOf(item,view)*PXCM*zoom,h=hCmOf(item,view)*PXCM*zoom,o=S(0,0);ctx.save();ctx.globalAlpha=opa;ctx.translate(o.x,o.y);ctx.transform(1,0,(v.shearCm||0)*PXCM*zoom/h,1,0,0);ctx.drawImage(im,-w*v.anchor.x,-h*v.anchor.y,w,h);ctx.restore()}
+ if(im&&opa>0.6){ctx.strokeStyle=mode==='place'?'#ffd766':'rgba(255,215,102,.7)';ctx.lineWidth=mode==='place'?2.2:1.2;ctx.setLineDash(mode==='place'?[]:[4,3]);   // ขอบพื้นที่วางทับรูป — เห็นแม้รูปทึบ
+  for(const [x,y] of cellsOf(v.place)){const [a,b,c,d]=[S(x,y),S(x+STEP,y),S(x+STEP,y+STEP),S(x,y+STEP)];for(const [p,q,nx,ny] of [[a,b,x,y-STEP],[b,c,x+STEP,y],[c,d,x,y+STEP],[d,a,x-STEP,y]]){if(v.place[keyc(nx,ny)])continue;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.stroke()}}ctx.setLineDash([])}
+ {const pa=SPRITE_DECOR_DEFS[cur]?.frames?.[view]?.path;   // ทางคลานบนกิ่ง (คำนวณจากโมเดล · ดูอย่างเดียว) วาดยกตามความสูงจริง ต้องอยู่บนสันกิ่งในรูป
+  if(pa?.n?.length){const up=n=>{const q=S(n[0],n[1]);return{x:q.x,y:q.y-n[2]*PXCM*.75*zoom}};
+   ctx.lineCap='round';ctx.lineWidth=Math.max(2,2.4*zoom);ctx.strokeStyle=W?'rgba(255,225,74,.95)':'rgba(255,225,74,.4)';ctx.beginPath();
+   for(const [a,b] of pa.e){const p=up(pa.n[a]),q=up(pa.n[b]);ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y)}ctx.stroke();
+   ctx.fillStyle=ctx.strokeStyle='#4dff88';ctx.lineWidth=1.5;
+   for(const i of pa.in){const p=up(pa.n[i]),g=S(pa.n[i][0],pa.n[i][1]);ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(g.x,g.y);ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.arc(p.x,p.y,Math.max(3,3.5*zoom),0,Math.PI*2);ctx.fill()}}}
+ const o=S(0,0),R=7*Math.max(1,zoom);ctx.strokeStyle='#e7d7b0';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(o.x-R,o.y);ctx.lineTo(o.x+R,o.y);ctx.moveTo(o.x,o.y-R);ctx.lineTo(o.x,o.y+R);ctx.stroke();
+ if(hover){ctx.strokeStyle='#fff';ctx.lineWidth=1.5;for(const [x,y] of brushCells(hover)){quad(x,y);ctx.stroke()}}
+}
+
+/* ---------- ระบาย ---------- */
+let mode='walk',tool='solid',brush=1,opa=1,ghostOn=false,painting=false,erasing=false,panning=false,spaceDown=false,plx=0,ply=0,strokeChanged=false;
+function brushCells(c){const out=[];for(let i=0;i<brush;i++)for(let j=0;j<brush;j++){const x=c.fx+i*STEP,y=c.fy+j*STEP;if(x>=DX0&&x<DX1&&y>=DY0&&y<DY1)out.push([x,y])}return out}
+function paintAt(mx,my){const v=vw(),c=cellAt(mx,my);let changed=false;
+ for(const [x,y] of brushCells(c)){const k=keyc(x,y),s0=v.state[k],p0=v.place[k];const er=erasing||tool==='erase';
+  if(mode==='place'){if(er)delete v.place[k];else v.place[k]=1}
+  else if(er)delete v.state[k];else v.state[k]=tool==='solid'?1:tool==='behind'?2:3;
+  if(v.state[k]!==s0||v.place[k]!==p0)changed=true}
+ if(changed){if(!strokeChanged){strokeChanged=true}draw();updateGridCount()}}
+function pos(e){const r=cv.getBoundingClientRect();return{mx:e.clientX-r.left,my:e.clientY-r.top}}
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+cv.addEventListener('pointerdown',e=>{if(!cur)return;cv.setPointerCapture(e.pointerId);
+ if(e.button===1||spaceDown){panning=true;plx=e.clientX;ply=e.clientY;e.preventDefault();return}
+ painting=true;erasing=e.button===2;strokeChanged=false;undoStack.push(JSON.stringify(it()));if(undoStack.length>80)undoStack.shift();const p=pos(e);paintAt(p.mx,p.my)});
+cv.addEventListener('pointermove',e=>{const p=pos(e);
+ if(panning){panX+=e.clientX-plx;panY+=e.clientY-ply;plx=e.clientX;ply=e.clientY;draw();return}
+ const c=cur?cellAt(p.mx,p.my):null;if(!hover||!c||hover.fx!==c.fx||hover.fy!==c.fy){hover=c;draw();showStatus()}
+ if(painting)paintAt(p.mx,p.my)});
+function endStroke(){if(painting){if(strokeChanged){redoStack=[];persistSoon(cur);refreshMeta()}else undoStack.pop();upButtons()}painting=false;erasing=false;panning=false}
+cv.addEventListener('pointerup',endStroke);cv.addEventListener('pointercancel',endStroke);
+cv.addEventListener('pointerleave',()=>{if(hover){hover=null;draw();showStatus()}});
+cv.addEventListener('wheel',e=>{e.preventDefault();const p=pos(e);zoomAt(p.mx,p.my,zoom*Math.exp(-e.deltaY*0.0016))},{passive:false});
+function zoomAt(px,py,nz){nz=clamp(nz,0.3,30);panX=px-OX()-(px-OX()-panX)*(nz/zoom);panY=py-OY()-(py-OY()-panY)*(nz/zoom);zoom=nz;draw();showStatus()}
+function fitView(){if(!cur||!CW)return;const item=it(),v=vw(),w=(wCmOf(item,view)+Math.abs(v.shearCm||0))*PXCM,h=hCmOf(item,view)*PXCM||w;const fy=Math.min(CW/(w*1.6||1),CH/(h*1.5+80||1));zoom=clamp(fy,0.3,6);panX=0;panY=-CH*0.08;draw();showStatus()}
+function setMode(m){mode=m;$('mWalk').classList.toggle('on',m==='walk');$('mPlace').classList.toggle('on',m==='place');$('toolsWalk').style.display=m==='walk'?'':'none';$('toolsPlace').style.display=m==='place'?'':'none';setTool(m==='walk'?'solid':'place')}
+function setTool(t){if(t==='place'&&mode!=='place'){setMode('place');return}if(['solid','front','behind'].includes(t)&&mode!=='walk'){mode='walk';setMode('walk')}tool=t;
+ for(const [id,name] of [['tSolid','solid'],['tFront','front'],['tBehind','behind'],['tPlace','place'],['tErase','erase']])$(id).classList.toggle('on',tool===name);draw()}
+$('mWalk').onclick=()=>setMode('walk');$('mPlace').onclick=()=>setMode('place');
+$('tSolid').onclick=()=>setTool('solid');$('tFront').onclick=()=>setTool('front');$('tBehind').onclick=()=>setTool('behind');$('tPlace').onclick=()=>setTool('place');$('tErase').onclick=()=>setTool('erase');
+$('brush').onchange=e=>{brush=+e.target.value;draw()};
+$('opa').oninput=e=>{opa=+e.target.value/100;draw()};
+$('ghost').onchange=e=>{ghostOn=e.target.checked;draw()};
+$('zIn').onclick=()=>zoomAt(CW/2,CH/2,zoom*1.25);$('zOut').onclick=()=>zoomAt(CW/2,CH/2,zoom/1.25);$('zFit').onclick=fitView;
+
+/* ---------- ทิศ / ชิ้น ---------- */
+function selectView(i){view=i;hover=null;renderViews();renderView();fitView()}
+function selectItem(key){persistNow();if(!items[key])return;cur=key;undoStack=[];redoStack=[];upButtons();try{localStorage.setItem(LAST,key)}catch(_){}refresh(true);fitView()}
+function uniqueKey(base){let k=base,i=2;while(items[k])k=base+'_'+(i++);return k}
+$('bNew').onclick=()=>{const k=uniqueKey('sprite_new');items[k]=blankItem(k);persistSoon(k);selectItem(k);view=0;renderViews();toast('สร้างชิ้นใหม่แล้ว — ตั้งชื่อ key แล้วเลือกรูปทั้ง 4 ทิศ');$('fName').focus()};
+$('bDup').onclick=()=>{if(!cur)return;const k=uniqueKey(cur+'_copy'),o=cleanItem({...JSON.parse(JSON.stringify(it())),key:k,name:it().name+' (สำเนา)'});items[k]=o;persistSoon(k);selectItem(k);toast('ทำสำเนาแล้ว')};
+$('bDel').onclick=()=>{if(!cur)return;if(!confirm('ลบ “'+it().name+'” ('+cur+') ออกจากเครื่องมือ?\nไฟล์รูปไม่ถูกลบ · ถ้าเคยส่งออกไปแล้ว ของในเกมยังอยู่จนกว่าจะบันทึกไฟล์ใหม่'))return;const k=cur;delete items[k];persistSoon(k);persistNow();cur=Object.keys(items).sort()[0]||null;if(!cur){const n='sprite_new';items[n]=blankItem(n);persistSoon(n);cur=n}selectItem(cur)};
+$('bUndo').onclick=undo;$('bRedo').onclick=redo;
+
+/* ---------- ช่องกรอก (ค่าตัวเลขบันทึก 1 ขั้น undo ต่อการลาก) ---------- */
+function field(id,apply,live){const el=$(id);let pushed=false;el.addEventListener('input',()=>{if(!cur)return;if(!pushed){push();pushed=true}apply(el);persistSoon(cur);live?.();draw()});el.addEventListener('change',()=>{pushed=false;refreshMeta()})}
+field('fName',el=>{it().name=el.value.slice(0,60)},()=>{renderItems()});
+field('fCat',el=>{it().cat=el.value.slice(0,40)});
+field('fPrice',el=>{const v=+el.value;it().priceCm=v>0?v:null},showPrice);
+field('fW',el=>{const item=it(),rv=item.views[item.ref];if(item.uniform&&view===item.ref)item.frontW=+el.value;else if(item.uniform&&rv.pxW&&vw().pxW)item.frontW=+el.value*rv.pxW/vw().pxW;else vw().wCm=+el.value},showSize);
+field('fAx',el=>{vw().anchor.x=+el.value},showSize);
+field('fAy',el=>{vw().anchor.y=+el.value},showSize);
+function stretchAxis(axis,value){if(!Number.isFinite(value)||value<1||value>200)return;const item=it(),heights=item.views.map((v,i)=>hCmOf(item,i)),widths=item.views.map((v,i)=>wCmOf(item,i));item.views.forEach((v,i)=>v.wCm=widths[i]);item.uniform=false;if(!heights[view]||!widths[view])return;const sx=axis==='wCm'?value/widths[view]:1,sy=axis==='hCm'?value/heights[view]:1;/* P diag(sx,sy) P^-1 preserves projected grid directions. */vw().shearCm=sx*(vw().shearCm||0)+(DEPX/DEPY)*(sx-sy)*heights[view];vw().hCm=heights[view];vw()[axis]=value;$('fUniform').checked=false;$('fW').value=vw().wCm;}
+field('fStretchW',el=>stretchAxis('wCm',Number(el.value)),showSize);
+field('fStretchH',el=>stretchAxis('hCm',Number(el.value)),showSize);
+$('bAspect').onclick=()=>{push();delete vw().hCm;delete vw().shearCm;persistSoon(cur);refresh();};
+$('fUniform').onchange=e=>{push();const item=it();if(!e.target.checked)item.views.forEach((v,i)=>v.wCm=r3(wCmOf(item,i)));item.uniform=e.target.checked;if(item.uniform)item.frontW=item.views[item.ref].wCm;persistSoon(cur);renderView();draw()};
+$('fKey').addEventListener('change',e=>{let k=e.target.value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'_');if(!k.startsWith('sprite_'))k='sprite_'+k.replace(/^_+/,'');
+ if(!KEY_RE.test(k)){$('keyErr').textContent='key ต้องเป็น sprite_ ตามด้วย a–z 0–9 _ (ไม่เกิน 40 ตัว)';e.target.value=cur;return}
+ if(k===cur){e.target.value=k;$('keyErr').textContent='';return}if(items[k]){$('keyErr').textContent='key '+k+' มีอยู่แล้ว — ใช้ชื่ออื่น';e.target.value=cur;return}
+ const o=it();delete items[cur];persistSoon(cur);o.key=k;items[k]=o;persistSoon(k);cur=k;$('keyErr').textContent='';refresh(true);toast('เปลี่ยน key เป็น '+k)});
+
+/* ---------- รูปของทิศนี้ ---------- */
+function setViewSrc(i,src,img){const item=it(),v=item.views[i];v.src=src;if(img){v.pxW=img.naturalWidth;v.pxH=img.naturalHeight;LOCAL.set(src,img);const a=autoAnchor(img);if(a)v.anchor=a}imageFor(src)}
+$('bLoadSrc').onclick=()=>{const s=$('fSrc').value.trim();if(!s)return;push();setViewSrc(view,s);persistSoon(cur);refresh()};
+$('fSrc').addEventListener('keydown',e=>{if(e.key==='Enter')$('bLoadSrc').click()});
+const folderOf=src=>src.includes('/')?src.slice(0,src.lastIndexOf('/')+1):'';
+function guessFolder(){const item=it();for(const v of item.views)if(v.src)return folderOf(v.src);return 'assets/decor/'}
+$('file').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;let im;try{im=await localImage(f)}catch(_){toast('เปิดรูปนี้ไม่ได้');return}
+ push();setViewSrc(view,guessFolder()+f.name,im);persistSoon(cur);refresh();fitView();toast('ตั้งรูปมุม'+VIEWS[view].th+'แล้ว — ตรวจว่า path ตรงกับที่วางไฟล์ในเกม')};
+$('dir').onchange=async e=>{const depth=f=>(f.webkitRelativePath||'').split('/').length;   // ไฟล์ชั้นบนสุดก่อน (ไม่หยิบ thumbs/ ข้างใน)
+ const files=[...e.target.files].filter(f=>/\.(png|webp|jpe?g)$/i.test(f.name)).sort((a,b)=>depth(a)-depth(b));e.target.value='';if(!files.length)return;
+ const found=VIEWS.map(V=>files.find(f=>V.re.test(f.name.replace(/\.[a-z]+$/i,''))));
+ if(found.filter(Boolean).length<4){toast('หาไม่ครบ 4 ทิศ — ตั้งชื่อไฟล์ให้มี front/right/back/left หรือ 0/90/180/270');if(!found.some(Boolean))return}
+ const rel=(found.find(Boolean).webkitRelativePath||'').split('/');let folder;
+ if(files.some(f=>/(^|\/)index\.html$/.test(f.webkitRelativePath)))folder=rel.slice(1,-1).join('/');   // เลือกโฟลเดอร์เกมทั้งโฟลเดอร์
+ else if(rel[0]==='assets')folder=rel.slice(0,-1).join('/');
+ else folder=(folderOf(guessFolder())==='assets/decor/'&&!it().views.some(v=>v.src)?'assets/decor-studies/':guessFolder().replace(/[^/]+\/$/,''))+rel.slice(0,-1).join('/');
+ folder=folder.replace(/\/+$/,'')+'/';push();
+ for(let i=0;i<4;i++){const f=found[i];if(!f)continue;let im=null;try{im=await localImage(f)}catch(_){}setViewSrc(i,folder+f.name,im)}
+ persistSoon(cur);refresh();fitView();toast('ใส่รูป '+found.filter(Boolean).length+'/4 ทิศจาก '+folder)};
+$('bAuto').onclick=()=>{const im=shownImage(vw().src);if(!im){toast('ยังไม่มีรูปมุมนี้');return}const a=autoAnchor(im);if(!a){toast('อ่านพิกเซลไม่ได้ (เปิดไฟล์ตรงจากเครื่อง) — เลือกรูปผ่านปุ่ม “เลือกรูปมุมนี้…” หรือเปิดผ่านเซิร์ฟเวอร์');return}push();vw().anchor=a;persistSoon(cur);renderView();draw()};
+
+/* ---------- กริดทิศนี้ ---------- */
+$('bCopyFront').onclick=()=>{const item=it();if(view===item.ref){toast('ทิศนี้คือทิศต้นแบบอยู่แล้ว');return}const f=item.views[item.ref];if(!Object.keys(f.place).length&&!Object.keys(f.state).length){toast('ทิศต้นแบบ ('+VIEWS[item.ref].th+') ยังไม่มีกริด');return}
+ push();const t=turnsFromRef(item,view),g=transferGrid(f,t);vw().state=g.state;vw().place=g.place;persistSoon(cur);refresh();toast('คัดกริดทิศ'+VIEWS[item.ref].th+'มาหมุน '+t*90+'° แล้ว — แต่งช่องอยู่หน้า/อยู่หลังให้ตรงรูปอีกที')};
+/* ⭐ ทิศต้นแบบ: ปรับอีก 3 ทิศให้เข้ากับทิศที่เปิดอยู่ในครั้งเดียว (1 ขั้น undo) */
+$('bRef').onclick=()=>{const item=it(),r=view,R=item.views[r];
+ if(!R.src||!R.pxW){toast('ใส่รูปทิศ'+VIEWS[r].th+'ให้โหลดได้ก่อน แล้วค่อยใช้เป็นต้นแบบ');return}
+ const refW=wCmOf(item,r),hasGrid=Object.keys(R.place).length+Object.keys(R.state).length>0;push();
+ item.ref=r;item.uniform=true;item.frontW=refW;let auto=0,copied=0,noImg=[];
+ for(let i=0;i<4;i++){if(i===r)continue;const v=item.views[i],im=shownImage(v.src);
+  if(!v.src||!v.pxW)noImg.push(VIEWS[i].th);
+  const a=im&&autoAnchor(im);if(a){v.anchor=a;auto++}else{v.anchor={x:R.anchor.x,y:R.anchor.y};copied++}
+  if(hasGrid){const g=transferGrid(R,turnsFromRef(item,i));v.state=g.state;v.place=g.place}}
+ persistSoon(cur);refresh();
+ toast('ปรับตามทิศ'+VIEWS[r].th+'แล้ว: ขนาดสเกลเดียวกัน · จุดฐานหาเอง '+auto+' ทิศ'+(copied?' / ใช้ค่าต้นแบบ '+copied+' ทิศ':'')+(hasGrid?' · กริดหมุนตามทิศ':' · ต้นแบบยังไม่มีกริด เลยไม่ได้คัดกริด')+(noImg.length?' · ยังไม่มีรูป: '+noImg.join(', '):''))};
+$('bRot').onclick=()=>{push();const g=transferGrid(vw(),1);vw().state=g.state;vw().place=g.place;persistSoon(cur);refresh()};
+$('bClear').onclick=()=>{push();vw().state={};vw().place={};persistSoon(cur);refresh()};
+
+/* ---------- ตรวจความพร้อม ---------- */
+function issuesOf(item){const out=[];
+ if(!KEY_RE.test(item.key))out.push(['bad','key ต้องขึ้นต้นด้วย sprite_']);
+ if(!item.name.trim())out.push(['bad','ยังไม่มีชื่อ']);
+ item.views.forEach((v,i)=>{const n='มุม'+VIEWS[i].th;const e=imageFor(v.src);
+  if(!v.src)out.push(['bad',n+': ยังไม่มีรูป']);
+  else if(e?.err)out.push(['bad',n+': ไม่พบไฟล์ที่ '+v.src+' — วางไฟล์ในโฟลเดอร์เกม หรือแก้ path']);
+  if(!Object.keys(v.place).length)out.push(['bad',n+': ยังไม่ได้ทาพื้นที่วาง (สีเหลือง)']);
+  if(!Object.values(v.state).includes(1))out.push(['warn',n+': ไม่มีช่องเดินไม่ได้ — ทากจะเดินทะลุ']);});
+ if(item.uniform&&item.views.some((v,i)=>i!==item.ref&&v.src&&!v.pxW))out.push(['warn','รอขนาดรูปบางทิศ — ขนาด cm จะคำนวณเมื่อโหลดรูปได้']);
+ return out}
+const isReady=item=>!issuesOf(item).some(x=>x[0]==='bad');
+
+/* ---------- ส่งออก ---------- */
+const sortCells=m=>cellsOf(m).sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+function frameOf(item,i){const v=item.views[i],w=wCmOf(item,i);return{src:v.src,wCm:r3(w),hCm:r3(hCmOf(item,i)||w),shearCm:r3(v.shearCm||0),anchor:{x:r3(v.anchor.x),y:r3(v.anchor.y)},
+ place:sortCells(v.place),solid:sortCells(Object.fromEntries(Object.entries(v.state).filter(([,s])=>s===1))),front:sortCells(Object.fromEntries(Object.entries(v.state).filter(([,s])=>s===3))),behind:sortCells(Object.fromEntries(Object.entries(v.state).filter(([,s])=>s===2)))}}
+function defOf(item){const frames=[0,1,2,3].map(i=>frameOf(item,i)),base=SPRITE_DECOR_DEFS[item.key]||{};
+ frames.forEach((f,i)=>{const p=base.frames?.[i]?.path;if(p)f.path=p;});   // ทางคลานบนกิ่งมาจากโมเดล (tools/analyze-decor-grid.cjs) — บันทึกกริดแล้วต้องไม่หาย
+ const shopFrames=base.shopFrames?.map((f,i)=>{const sx=frames[i].wCm/base.frames[i].wCm,sy=frames[i].hCm/base.frames[i].hCm;return{...f,wCm:r3(f.wCm*sx),hCm:r3(f.hCm*sy),shearCm:r3((frames[i].shearCm||0)*f.hCm/base.frames[i].hCm)}});
+ return{...base,...frames[0],name:item.name.trim(),cat:item.cat.trim()||'หิน 2D · 4 มุม',priceCm:r3(item.priceCm||frames[0].wCm),cell:item.cell||.5,...(item.gridSource?{gridSource:item.gridSource}:{}),flips:'rotate',sprite:true,frames,shopFrames}}
+function buildFile(list){const D={};for(const item of list)D[item.key]=defOf(item);
+ return `/* sprite-decor-defs.js — สร้างจากเครื่องมือ "Dec grid" (ของตกแต่ง 4 ทิศ) — อย่าแก้ด้วยมือ ให้แก้ในเครื่องมือแล้วบันทึกใหม่
+   1 ชิ้น = 4 รูป: frames[0..3] = หน้า 0° · ขวา 90° · หลัง 180° · ซ้าย 270° (ในเกมกด R หมุนทีละ 90°)
+   ขนาดช่อง = cell × 5 ซม. ของแต่ละชิ้น · พิกัดช่อง = มุมล่างซ้าย หน่วย 5 ซม. นับจากจุดฐาน (0,0)
+   place = ต้องว่างถึงวางได้ · solid = เดินไม่ได้ · front = ทับ/อยู่หน้าได้ · behind = ทากอยู่หลัง
+   วาด/ชนโดย js/sprite-decor-runtime.js · config.js รวมตารางนี้เข้า TANK_DECOR */
+var SPRITE_DECOR_DEFS=typeof SPRITE_DECOR_DEFS==='object'&&SPRITE_DECOR_DEFS?SPRITE_DECOR_DEFS:{};
+(()=>{
+ const D=${JSON.stringify(D,null,1)};
+ for(const d of Object.values(D)){if(!d.shopFrames)d.shopFrames=d.frames;for(const k of ['src','wCm','hCm','shearCm','anchor','place','solid','front','behind'])d[k]=d.frames[0][k];}
+ Object.assign(SPRITE_DECOR_DEFS,D);
+})();
+`}
+$('bExport').onclick=async()=>{persistNow();const all=Object.values(items),ready=all.filter(isReady),skip=all.filter(x=>!isReady(x));
+ if(!ready.length){toast('ยังไม่มีชิ้นที่พร้อม — ดูรายการ “ความพร้อม” ของแต่ละชิ้น');return}
+ if(skip.length&&!confirm('จะบันทึก '+ready.length+' ชิ้นที่พร้อม\nข้าม '+skip.length+' ชิ้นที่ยังไม่พร้อม: '+skip.map(x=>x.name).join(', ')+'\n(ชิ้นที่ข้ามจะไม่อยู่ในไฟล์เกม)'))return;
+ const text=buildFile(ready.sort((a,b)=>a.key<b.key?-1:1));
+ if(window.showSaveFilePicker){try{const h=await showSaveFilePicker({suggestedName:'sprite-decor-defs.js',types:[{description:'JavaScript',accept:{'text/javascript':['.js']}}]});const w=await h.createWritable();await w.write(text);await w.close();toast('บันทึก '+ready.length+' ชิ้นแล้ว');return}catch(err){if(err?.name==='AbortError')return}}
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/javascript'}));a.download='sprite-decor-defs.js';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast('ดาวน์โหลด '+ready.length+' ชิ้นแล้ว — วางทับ js/sprite-decor-defs.js')};
+$('bCopy').onclick=async()=>{if(!cur)return;const text=JSON.stringify({[cur]:defOf(it())},null,1);try{await navigator.clipboard.writeText(text);toast('คัดลอกนิยามชิ้นนี้แล้ว')}catch(_){const t=document.createElement('textarea');t.value=text;document.body.append(t);t.select();try{document.execCommand('copy');toast('คัดลอกนิยามชิ้นนี้แล้ว')}catch(_){toast('คัดลอกไม่ได้')}t.remove()}};
+
+/* ---------- แสดงผล ---------- */
+function showPrice(){const item=it(),cm=item.priceCm||r3(wCmOf(item,0));$('priceV').textContent=cm+' ซม. ≈ '+Math.max(20,Math.round(cm*2))+' เหรียญ'+(item.priceCm?'':' (ใช้ความกว้างมุมหน้า)')}
+function showSize(){const item=it(),v=vw(),w=wCmOf(item,view);$('wV').textContent=r3(w)+' ซม.';$('hV').textContent=v.pxW?'สูง '+r3(hCmOf(item,view))+' ซม. · รูป '+v.pxW+'×'+v.pxH+' px':'ยังไม่รู้ขนาดรูป';
+ $('axV').textContent=(+v.anchor.x).toFixed(3);$('ayV').textContent=(+v.anchor.y).toFixed(3);showPrice()}
+function updateGridCount(){const v=vw(),s=Object.values(v.state);$('gridCount').textContent='วาง '+Object.keys(v.place).length+' · เดินไม่ได้ '+s.filter(x=>x===1).length+' · หน้า '+s.filter(x=>x===3).length+' · หลัง '+s.filter(x=>x===2).length+(()=>{const p=SPRITE_DECOR_DEFS[cur]?.frames?.[view]?.path;return p?.n?.length?' · ทางคลานบนกิ่ง '+p.n.length+' จุด (เส้นเหลือง · จุดเขียว = ปีนขึ้น/ลง)':''})()}
+function renderView(){if(!cur)return;const item=it(),v=vw(),e=imageFor(v.src);
+ $('viewName').textContent=VIEWS[view].th+' '+VIEWS[view].deg+'°';$('fSrc').value=v.src;
+ $('srcState').innerHTML=!v.src?'ยังไม่มีรูป':e?.ok?'<span class="pathok">✓ พบไฟล์ในโฟลเดอร์เกม</span>':e?.err?'<span class="pathbad">✗ ไม่พบไฟล์ที่ path นี้</span>'+(LOCAL.has(v.src)?' — แสดงจากไฟล์ที่เลือกไว้ชั่วคราว ก๊อปไฟล์ไปไว้ที่ path นี้ในโฟลเดอร์เกม':''):'กำลังโหลด…';
+ $('fUniform').checked=item.uniform;$('wLabel').firstChild.textContent=item.uniform&&view!==item.ref?'ความกว้าง (ตามสเกลทิศ'+VIEWS[item.ref].th+') ':'ความกว้าง ';
+ $('refName').textContent='ตอนนี้: '+VIEWS[item.ref].th+' '+VIEWS[item.ref].deg+'°';$('bRef').textContent=view===item.ref?'⭐ ปรับอีก 3 ทิศตามทิศนี้ (ต้นแบบ)':'⭐ ใช้ทิศ'+VIEWS[view].th+'เป็นต้นแบบ แล้วปรับอีก 3 ทิศ';
+ $('fW').value=wCmOf(item,view);if(document.activeElement!==$('fStretchW'))$('fStretchW').value=r3(wCmOf(item,view));if(document.activeElement!==$('fStretchH'))$('fStretchH').value=r3(hCmOf(item,view));$('fAx').value=v.anchor.x;$('fAy').value=v.anchor.y;showSize();updateGridCount()}
+function renderViews(){const box=$('views');if(!cur){box.innerHTML='';return}const item=it();
+ box.innerHTML=VIEWS.map((V,i)=>{const v=item.views[i],e=imageFor(v.src),ok=e?.ok||LOCAL.has(v.src),grid=Object.keys(v.place).length>0,col=!v.src||e?.err&&!LOCAL.has(v.src)?'var(--bad)':!grid?'var(--warn)':'var(--ok)';
+  return '<button class="vtab'+(i===view?' on':'')+'" data-v="'+i+'" title="'+esc(v.src||'ยังไม่มีรูป')+' ('+(i+1)+')"><span class="th"'+(ok?'':' data-empty="1"')+'></span><span style="min-width:0"><b><span class="dot" style="background:'+col+'"></span>'+(i===item.ref?'⭐ ':'')+V.th+' '+V.deg+'°</b><small>'+(v.src?esc(v.src.split('/').pop()):'ยังไม่มีรูป')+'</small><small>'+(grid?'กริดพร้อม':'ยังไม่ทาพื้นที่วาง')+'</small></span></button>'}).join('');
+ // รูปย่อ = รูปเดียวกับที่โหลดไว้แล้ว (path หรือไฟล์ที่เลือกจากเครื่อง) ไม่โหลดซ้ำ
+ box.querySelectorAll('.vtab .th').forEach((el,i)=>{const v=item.views[i],im=shownImage(v.src);if(im)el.style.backgroundImage='url("'+im.src.replace(/"/g,'%22')+'")'})}
+function renderItems(){const q=$('q').value.trim().toLowerCase(),keys=Object.keys(items).sort((a,b)=>items[a].name.localeCompare(items[b].name,'th')),list=keys.filter(k=>!q||k.includes(q)||items[k].name.toLowerCase().includes(q));
+ $('items').innerHTML=list.map(k=>{const x=items[k],r=isReady(x);return '<button class="item'+(k===cur?' sel':'')+'" data-k="'+esc(k)+'"><span class="st" style="color:'+(r?'var(--ok)':'var(--warn)')+'">'+(r?'✓ พร้อม':'ยังไม่ครบ')+'</span><b>'+esc(x.name||'(ไม่มีชื่อ)')+'</b><small>'+esc(k)+'</small></button>'}).join('');
+ $('itemsN').textContent=keys.length+' ชิ้น · พร้อมส่งออก '+keys.filter(k=>isReady(items[k])).length+(q?' · ตรงคำค้น '+list.length:'')}
+function renderIssues(){const list=issuesOf(it());$('readyV').textContent=list.some(x=>x[0]==='bad')?'ยังไม่พร้อม':'พร้อมส่งออก';$('readyV').style.color=list.some(x=>x[0]==='bad')?'var(--bad)':'var(--ok)';
+ $('issues').innerHTML=(list.length?list:[['ok','ครบทั้ง 4 ทิศ']]).map(([k,t])=>'<li class="'+k+'">'+esc(t)+'</li>').join('')}
+function refreshMeta(){renderItems();renderViews();renderIssues()}
+function refresh(full){if(!cur)return;const item=it();STEP=item.cell||.5;if(window.syncGridStep)window.syncGridStep();if(full||document.activeElement!==$('fName'))$('fName').value=item.name;if(full||document.activeElement!==$('fCat'))$('fCat').value=item.cat;
+ if(full||document.activeElement!==$('fPrice'))$('fPrice').value=item.priceCm??'';$('fKey').value=item.key;if(full)$('keyErr').textContent='';renderView();refreshMeta();draw();upButtons()}
+function showStatus(){$('status').innerHTML=cur?'<span>ชิ้น <b>'+esc(it().name)+'</b></span><span>มุม <b>'+VIEWS[view].th+' '+VIEWS[view].deg+'°</b></span><span>ซูม <b>'+Math.round(zoom*100)+'%</b></span>'+(hover?'<span>ช่อง <b>'+hover.fx+', '+hover.fy+'</b> ('+r3(hover.fx*5)+', '+r3(hover.fy*5)+' ซม.)</span>':'')+'<span>แปรง <b>'+brush+'×'+brush+'</b></span>':''}
+$('views').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b)selectView(+b.dataset.v)});
+$('items').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(b)selectItem(b.dataset.k)});
+$('q').oninput=renderItems;
+
+/* ---------- คีย์ลัด (ไม่แย่งตอนพิมพ์) ---------- */
+addEventListener('keydown',e=>{const typing=e.target.closest?.('input:not([type=range]):not([type=checkbox]):not([type=file]),textarea,select,[contenteditable="true"]');
+ if((e.ctrlKey||e.metaKey)&&!typing){const k=e.key.toLowerCase();if(k==='z'&&!e.shiftKey){e.preventDefault();undo();return}if(k==='y'||(k==='z'&&e.shiftKey)){e.preventDefault();redo();return}}
+ if(typing||e.ctrlKey||e.metaKey||e.altKey)return;
+ if(e.code==='Space'){spaceDown=true;cv.style.cursor='grab';e.preventDefault();return}
+ const map={Digit1:()=>selectView(0),Digit2:()=>selectView(1),Digit3:()=>selectView(2),Digit4:()=>selectView(3),KeyQ:()=>setTool('solid'),KeyW:()=>setTool('front'),KeyE:()=>setTool('behind'),KeyR:()=>setTool('place'),KeyX:()=>setTool('erase'),Digit0:fitView,
+  BracketLeft:()=>{brush=Math.max(1,brush-1);$('brush').value=brush;draw();showStatus()},BracketRight:()=>{brush=Math.min(4,brush+1);$('brush').value=brush;draw();showStatus()}};
+ if(map[e.code]){e.preventDefault();map[e.code]()}});
+addEventListener('keyup',e=>{if(e.code==='Space'){spaceDown=false;cv.style.cursor=''}});
+
+/* ---------- เริ่มต้น: โหลดงานเดิม + นำเข้าจากไฟล์เกมและชุดทดลองหินโพรง ---------- */
+loadAll();
+function cellMap(list,val,step=.5){const m={};for(const c of list||[])if(Array.isArray(c))m[keyc(Math.round(+c[0]/step)*step,Math.round(+c[1]/step)*step)]=val;return m}
+function importGameDefs(){let n=0;const D=typeof SPRITE_DECOR_DEFS==='object'&&SPRITE_DECOR_DEFS?SPRITE_DECOR_DEFS:{};
+ for(const [key,d] of Object.entries(D)){if(!KEY_RE.test(key)||!Array.isArray(d.frames)||d.frames.length!==4)continue;
+  // กริดที่คำนวณใหม่ในไฟล์เกม (gridSource เปลี่ยน) แทนงานร่างเดิม — เก็บงานร่างเดิมไว้ที่ decor4-backup:<key>
+  if(items[key]){if(!d.gridSource||items[key].gridSource===d.gridSource)continue;try{localStorage.setItem('decor4-backup:'+key,JSON.stringify(items[key]))}catch(_){}}
+  const o=blankItem(key);o.name=d.name||key;o.cat=d.cat||o.cat;o.priceCm=+d.priceCm||null;o.uniform=false;o.frontW=+d.frames[0].wCm||28;
+  o.cell=[.1,.2].includes(d.cell)?d.cell:.5;o.views=d.frames.map(f=>cleanView({src:f.src,wCm:f.wCm,hCm:f.hCm,shearCm:f.shearCm,anchor:f.anchor,place:cellMap(f.place,1,o.cell),state:Object.assign({},cellMap(f.behind,2,o.cell),cellMap(f.front,3,o.cell),cellMap(f.solid,1,o.cell))}));if(d.gridSource)o.gridSource=d.gridSource;
+  items[key]=o;persistSoon(key);n++}return n}
+/* ชุดทดลอง "หินโพรง" จาก tools/decor-shelter-preset.js เดิม เก็บค่าไว้ใน localStorage แยกทีละทิศ → รวมเป็นชิ้นเดียว */
+function importShelterStudy(){const key='sprite_tidal_shelter';if(items[key])return 0;const base='assets/decor-studies/tidal-shelter-original/',files=['front-0','right-90','back-180','left-270'];
+ const saved=files.map(f=>{try{return JSON.parse(localStorage.getItem('decor_'+base+f+'-v3.png')||'null')}catch(_){return null}});if(!saved.some(Boolean))return 0;
+ const o=blankItem(key);o.name='หินโพรงและพืช';o.uniform=false;o.frontW=saved[0]?.wCm||28;
+ o.views=files.map((f,i)=>cleanView({src:base+f+'-v3.png',wCm:saved[i]?.wCm??28,anchor:{x:.5,y:saved[i]?.ancY??.99},state:saved[i]?.state,place:saved[i]?.place}));items[key]=o;persistSoon(key);return 1}
+const imported=importGameDefs()+importShelterStudy();
+{let n=0;for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('decor_')&&!k.includes('decor-studies/tidal-shelter-original/'))n++}if(n)$('legacyN').textContent=' · ในเบราว์เซอร์นี้มีงานแบบเก่า '+n+' ชิ้น (ไม่ถูกลบ)'}
+cur=(()=>{let k=null;try{k=localStorage.getItem(LAST)}catch(_){}return items[k]?k:Object.keys(items).sort()[0]})();
+if(!cur){cur='sprite_new';items[cur]=blankItem(cur);persistSoon(cur)}
+for(const item of Object.values(items))for(const v of item.views)imageFor(v.src);
+selectItem(cur);if(imported)toast('นำเข้า '+imported+' ชิ้นจากไฟล์เกม/งานทดลองเดิม');
+</script><script src="js/decor-grid-editor.js?v=image-controls-9"></script><script src="js/decor-grid-color.js?v=5"></script><script src="js/decor-grid-examples.js?v=1"></script></body></html>

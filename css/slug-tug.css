@@ -7,8 +7,7 @@ body.tug-in-tank{overflow:hidden}
 .tug-in-tank #ov .ov-title{font-size:15px!important}
 .tug-in-tank #ov .ov-body{padding:0!important;overflow:hidden}
 .tug-in-tank #ovBack,.tug-in-tank #ov .ov-top .stat,.tug-in-tank #ov .tank-side,.tug-in-tank #ov .ov-decor,
-.tug-in-tank #ov .mobileTankBar,.tug-in-tank #ov .mobileTankZoom,.tug-in-tank #tankDecorDock,.tug-in-tank #newSlugTray,
-.tug-in-tank #decorGLBStatus,.tug-in-tank #decorOrbit{display:none!important}
+.tug-in-tank #ov .mobileTankBar,.tug-in-tank #ov .mobileTankZoom,.tug-in-tank #tankDecorDock,.tug-in-tank #newSlugTray{display:none!important}
 .tug-in-tank #tankCv{pointer-events:none;touch-action:none}
 
 #tugTankHUD{position:absolute;inset:0;z-index:15;pointer-events:none;overflow:hidden}

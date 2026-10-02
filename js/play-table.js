@@ -235,13 +235,13 @@ const PlayTable=(()=>{
   if(!slug)return;const genes=foodGenes(slug),resolution=Math.min(640,Math.max(360,Math.round(Math.min(w*.46,h*.56)*Math.min(2,devicePixelRatio||1)))),key=JSON.stringify(genes)+'|'+resolution;if(key===spriteKey&&sprites)return;
   releaseSprites();const parts=SlugEngine.slugParts(genes,resolution),bw=Math.ceil(parts.w+24),bh=Math.ceil(parts.h+24),old=SlugEngine.ANIM;
   animatedParts=parts;
-  const eyes=SlugEngine.FACE.eyes,ex=eyes.reduce((v,e)=>v+e.u,0)/eyes.length,ey=eyes.reduce((v,e)=>v+e.v,0)/eyes.length;
+  const eyes=(parts.face||SlugEngine.FACE).eyes,ex=eyes.reduce((v,e)=>v+e.u,0)/eyes.length,ey=eyes.reduce((v,e)=>v+e.v,0)/eyes.length;
   headOffset={x:(ex*parts.bw-(parts.L+parts.R)/2)*parts.s/bw,y:(ey*parts.bh-(parts.T+parts.B)/2)*parts.s/bh};
   try{SlugEngine.ANIM=false;sprites={};for(const happy of [false,true]){
    const c=document.createElement('canvas');c.width=bw;c.height=bh;const cx=c.getContext('2d');
    SlugEngine.drawSlug(cx,parts,bw/2,bh/2,false,0,1,true,false,{noBob:true,noEyes:happy});
    if(happy){cx.save();cx.translate(bw/2,bh/2);cx.scale(parts.s,parts.s);cx.translate(-(parts.L+parts.R)/2,-(parts.T+parts.B)/2);cx.strokeStyle='#172326';cx.lineWidth=Math.max(2,parts.bh*.018);cx.lineCap='round';cx.lineJoin='round';
-    SlugEngine.FACE.eyes.forEach((e,i)=>{const ex=e.u*parts.bw,ey=e.v*parts.bh,r=e.hR*parts.bh*.42,side=i===0?-1:1;cx.beginPath();cx.moveTo(ex-side*r*.65,ey-r);cx.lineTo(ex+side*r*.65,ey);cx.lineTo(ex-side*r*.65,ey+r);cx.stroke();});cx.restore();
+    (parts.face||SlugEngine.FACE).eyes.forEach((e,i)=>{const ex=e.u*parts.bw,ey=e.v*parts.bh,r=e.hR*parts.bh*.42,side=i===0?-1:1;cx.beginPath();cx.moveTo(ex-side*r*.65,ey-r);cx.lineTo(ex+side*r*.65,ey);cx.lineTo(ex-side*r*.65,ey+r);cx.stroke();});cx.restore();
    }sprites[happy?'happy':'normal']=c;
   }spriteKey=key;metrics.spriteBuilds++;
   }finally{SlugEngine.ANIM=old;}
@@ -266,7 +266,7 @@ const PlayTable=(()=>{
    // Reuse engine parts and their textures; animate only the selected visible slug.
    const oldAnim=SlugEngine.ANIM;SlugEngine.ANIM=true;
    try{SlugEngine.drawSlug(x,animatedParts,0,0,session.flip,0,d.width/sprites.normal.width,true,session.walking,{noBob:true,noEyes:happy,creepT:session.creep,startle:Math.sin(Math.PI*session.poke/.45)*.3,look:session.petTouch>0?.7:.15});}finally{SlugEngine.ANIM=oldAnim;}
-   if(happy){const parts=animatedParts,scale=d.width/sprites.normal.width;x.save();x.scale((session.flip?-1:1)*parts.s*scale,parts.s*scale);x.translate(-(parts.L+parts.R)/2,-(parts.T+parts.B)/2);x.strokeStyle='#172326';x.lineWidth=Math.max(2,parts.bh*.018);x.lineCap='round';x.lineJoin='round';SlugEngine.FACE.eyes.forEach((e,i)=>{const ex=e.u*parts.bw,ey=e.v*parts.bh,r=e.hR*parts.bh*.42,side=i===0?-1:1;x.beginPath();x.moveTo(ex-side*r*.65,ey-r);x.lineTo(ex+side*r*.65,ey);x.lineTo(ex-side*r*.65,ey+r);x.stroke();});x.restore();}
+   if(happy){const parts=animatedParts,scale=d.width/sprites.normal.width;x.save();x.scale((session.flip?-1:1)*parts.s*scale,parts.s*scale);x.translate(-(parts.L+parts.R)/2,-(parts.T+parts.B)/2);x.strokeStyle='#172326';x.lineWidth=Math.max(2,parts.bh*.018);x.lineCap='round';x.lineJoin='round';(parts.face||SlugEngine.FACE).eyes.forEach((e,i)=>{const ex=e.u*parts.bw,ey=e.v*parts.bh,r=e.hR*parts.bh*.42,side=i===0?-1:1;x.beginPath();x.moveTo(ex-side*r*.65,ey-r);x.lineTo(ex+side*r*.65,ey);x.lineTo(ex-side*r*.65,ey+r);x.stroke();});x.restore();}
    x.restore();
    if(session.happy>0){x.fillStyle='#f19eb3';x.font='28px sans-serif';x.textAlign='center';x.fillText('♥',session.x*w,session.y*h-d.height*.48-(2.5-session.happy)*15);x.fillText('♥',session.x*w+d.width*.15,session.y*h-d.height*.45-(2.5-session.happy)*20);}
   }

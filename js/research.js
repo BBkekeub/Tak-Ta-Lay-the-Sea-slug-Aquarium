@@ -58,6 +58,7 @@ const Research=(()=>{
   const r=G.research&&typeof G.research==='object'?G.research:(G.research={});
   r.cap=clampTier(r.cap);r.price=clampTier(r.price);
   if(!r.dep||typeof r.dep!=='object')r.dep={};
+  if(!r.species||typeof r.species!=='object')r.species={};
   return r;
  }
  /* ---------- ทากที่ "ส่งเข้าไปก่อน" ----------
@@ -207,6 +208,12 @@ const Research=(()=>{
  #researchView header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 22px;background:#1c3639;border-bottom:1px solid #d8bd7a38}
  #researchView h2{margin:0;font-size:21px;font-weight:600}#researchView header small{display:block;color:#c2ac80;font-size:11px}
  #researchView .rsBody{padding:14px 22px 22px;overflow:auto;max-height:calc(92dvh - 64px)}
+ #researchView .rsSpecies{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px}
+ #researchView .rsSp{display:flex;gap:12px;align-items:center;background:#1b3134;border:1px solid #4d6360;border-radius:12px;padding:10px 12px;min-width:min(100%,320px)}
+ #researchView .rsSp.done{border-color:#6fd0a8}
+ #researchView .rsSp canvas{width:96px;height:60px;flex:none}
+ #researchView .rsSp div{display:grid;gap:3px;flex:1}
+ #researchView .rsSp small{color:#b9c6c0}
  #researchView .rsNow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
  #researchView .rsNow b{background:#20383a;border:1px solid #4d6360;border-radius:999px;padding:5px 13px;font-size:12px;font-weight:500;color:#e9d7a6}
  #researchView .rsMap{position:relative;overflow-x:auto;overflow-y:hidden;border:1px solid #3c5553;border-radius:14px;
@@ -305,6 +312,7 @@ const Research=(()=>{
 
 
  let sel=null;                           // {id,i} = สถานีที่เลือกดูอยู่
+ let spConfirm=null;                     // key ของสายพันธุ์ที่กดจ่ายไปครั้งแรก รอกดยืนยัน
  let picking=null;                       // {id,k,chosen:Set} = กำลังเลือกทากส่งเข้ากลุ่มโจทย์ k
 
  function dot(name,gill){
@@ -491,13 +499,48 @@ const Research=(()=>{
   return shade;
  }
 
+ /* ---------- สายพันธุ์ใหม่: จ่ายเหรียญครั้งเดียว → สั่งกล่องสุ่มพันธุ์นั้นได้ที่คอมร้าน ----------
+    ผู้เล่นกำหนด 2026-09-26: "จ่าย 500 ในโต๊ะวิจัย" · ผสมข้ามพันธุ์ไม่ได้ (breeding.js) · กดสองครั้ง = ยืนยันจ่าย */
+ const spIcons=new Map();
+ function speciesIcon(key){
+  if(spIcons.has(key))return spIcons.get(key);
+  const c=document.createElement('canvas');c.width=192;c.height=120;
+  try{const E=SlugEngine,g={bodyDepth:45,gillDepth:45,mainC:350,accC:250,len:50,girth:50,gillLen:55,tentLen:50,vigor:60,gillN:100,spotN:100,sp:key},old=E.ANIM;E.ANIM=false;
+   E.drawSlug(c.getContext('2d'),E.slugParts(g,110),96,64,false,0,1,false,false,{noBob:true});E.ANIM=old;}catch(e){}
+  spIcons.set(key,c);return c;
+ }
+ function unlockSpecies(key){
+  const r=st();if(r.species[key])return true;
+  if(!(SlugEngine.hasSpecies&&SlugEngine.hasSpecies(key)))return false;
+  if(G.coin<SPECIES_UNLOCK_PRICE){toast('เหรียญไม่พอ (ต้องใช้ '+SPECIES_UNLOCK_PRICE+')','bad');return false;}
+  addCoin(-SPECIES_UNLOCK_PRICE);r.species[key]=true;
+  if(typeof saveGame==='function')saveGame();if(typeof syncHUD==='function')syncHUD();if(typeof refreshSlugShop==='function')refreshSlugShop();
+  toast('ปลดล็อกสายพันธุ์'+SlugEngine.speciesName(key)+' แล้ว — สั่งกล่องสุ่มพันธุ์นี้ได้ที่คอมร้าน','good');return true;
+ }
+ function speciesSection(body){
+  const list=(SlugEngine.species?SlugEngine.species():[]).filter(o=>o.key!=='legacy');
+  if(!list.length)return;
+  const wrap=el('div','rsSpecies');
+  for(const o of list){
+   const done=!!st().species[o.key],card=el('div','rsSp'+(done?' done':'')),info=el('div');
+   const icon=document.createElement('canvas');icon.width=192;icon.height=120;icon.getContext('2d').drawImage(speciesIcon(o.key),0,0);
+   info.append(el('small',null,'🧬 สายพันธุ์ใหม่'),el('b',null,o.th),el('small',null,done?'ปลดล็อกแล้ว · เลือกพันธุ์นี้ได้ตอนสั่งกล่องสุ่มที่คอมร้าน · ผสมได้เฉพาะพันธุ์เดียวกัน':'จ่ายครั้งเดียว แล้วสั่งกล่องสุ่มพันธุ์นี้ได้ · ผสมข้ามพันธุ์ไม่ได้'));
+   card.append(icon,info);
+   if(!done){const ask=spConfirm===o.key,b=el('button',ask?'warn':null,ask?'ยืนยันจ่าย '+SPECIES_UNLOCK_PRICE+' เหรียญ':'ปลดล็อก · '+SPECIES_UNLOCK_PRICE+' เหรียญ');b.type='button';b.className=(ask?'warn ':'')+'tbtn';
+    b.disabled=G.coin<SPECIES_UNLOCK_PRICE;b.title=b.disabled?'เหรียญไม่พอ':'';
+    b.onclick=()=>{if(spConfirm!==o.key){spConfirm=o.key;render();return;}spConfirm=null;unlockSpecies(o.key);render();};card.append(b);}
+   wrap.append(card);
+  }
+  body.append(wrap);
+ }
+
  function render(scrollToSel=false){
   if(!dialog.open)return;
   if(!sel||!lineOf(sel.id))sel=defaultSel();
   const keepX=dialog.querySelector('.rsMap')?.scrollLeft||0,keepY=dialog.querySelector('.rsBody')?.scrollTop||0;
   dialog.replaceChildren();
   const head=document.createElement('header');
-  head.innerHTML='<div><small>ปลดล็อกด้วยทาก ไม่ใช้เหรียญ</small><h2>🔬 แผนที่วิจัย</h2></div>';
+  head.innerHTML='<div><small>ปลดล็อกด้วยทาก · สายพันธุ์ใหม่จ่ายเหรียญ</small><h2>🔬 แผนที่วิจัย</h2></div>';
   const close=el('button','tbtn','กลับหน้าร้าน');close.onclick=()=>hide();
   head.append(close);dialog.append(head);
 
@@ -508,6 +551,7 @@ const Research=(()=>{
                      'ส่วนลดตู้เพาะพันธุ์ '+Math.round(breederDiscount()*100)+'%',
                      'ส่วนลดของทุกอย่าง '+Math.round(shopDiscount()*100)+'%'])now.append(el('b',null,text));
   body.append(now);
+  speciesSection(body);
 
   /* plan() ไล่ทากทั้งร้าน — คิดครั้งเดียวต่อสายต่อการวาด ใช้ร่วมกันทั้งแผนที่และการ์ดรายละเอียด */
   const plans={};for(const l of LINES){const t=nextTier(l.id);if(t)plans[l.id]=plan(t);}
@@ -523,7 +567,7 @@ const Research=(()=>{
   else{map.scrollLeft=keepX;body.scrollTop=keepY;}
  }
 
- function hide(){if(!dialog.open)return;picking=null;tip.hidden=true;dialog.close();if(typeof cv!=='undefined'&&cv.focus)cv.focus();}
+ function hide(){if(!dialog.open)return;picking=null;spConfirm=null;tip.hidden=true;dialog.close();if(typeof cv!=='undefined'&&cv.focus)cv.focus();}
  function open(o){
   if(o&&!(G.objs||[]).includes(o))return;
   if(dialog.open)return;
@@ -548,6 +592,6 @@ const Research=(()=>{
  dialog.addEventListener('scroll',()=>{tip.hidden=true;},true);
 
  return {LINES,open,close:hide,isOpen:()=>dialog.open,render,
-         capBonus,breederDiscount,shopDiscount,priceMul,plan,pool,nextTier,doneCount,state:st};
+         unlockSpecies,capBonus,breederDiscount,shopDiscount,priceMul,plan,pool,nextTier,doneCount,state:st};
 })();
 function openResearchTable(o){Research.open(o);}

@@ -45,6 +45,8 @@
   // กันสแปมลงขาย: ทุกครั้งที่ "วางขาย" สำเร็จ ราคากลางของตัวถัดไป (ในเทรนเดียวกัน) เหลือ 90% ของเดิม
   // ทบไปเรื่อย ๆ จนกว่าเทรนจะเปลี่ยน (ทุก REFRESH_MS) แล้วรีเซ็ตกลับเป็น 100% ใหม่
   const LIST_PENALTY_STEP = 0.9;
+  // เทรนแต่ละรอบระบุสายพันธุ์ด้วย (ผู้เล่นเลือก 2026-10-03) — สุ่มจากพันธุ์ที่ปลดล็อกแล้ว · พันธุ์อื่นลงขายได้แต่ราคากลาง × ค่านี้
+  const SP_MISMATCH = 0.5;
   /* ===================== */
 
   const GENE_KEYS  = Object.keys(GENE_BASE);
@@ -176,11 +178,26 @@
     delete L._disp; delete L.price; delete L.score; delete L.sellAt;   // ค้างจากระบบเก่า/แคชรูป
     return true;
   }
+  /* ---------- สายพันธุ์ของเทรน ---------- */
+  function unlockedSpecies() {
+    const all = (typeof SlugEngine !== 'undefined' && SlugEngine.species) ? SlugEngine.species().map(o => o.key) : ['legacy'];
+    return all.filter(k => k === 'legacy' || (SlugEngine.hasSpecies && SlugEngine.hasSpecies(k) && typeof speciesUnlocked === 'function' && speciesUnlocked(k)));
+  }
+  // เทรนเก่าที่เซฟไว้ก่อนมีพันธุ์ = ตัวเดิม (ราคาเท่าเดิมจนกว่าเทรนจะเปลี่ยน) · พันธุ์ที่ไม่มีข้อมูลในเครื่องนี้ก็ตกกลับเป็นตัวเดิม
+  function trendSp(m) {
+    const sp = m.trend && m.trend.sp;
+    return (sp === 'legacy' || (sp && SlugEngine.hasSpecies && SlugEngine.hasSpecies(sp))) ? sp : 'legacy';
+  }
+  const speciesOf = genes => (typeof slugSpecies === 'function') ? slugSpecies(genes) : ((genes && genes.sp) || 'legacy');
+  const spName = k => (typeof SlugEngine !== 'undefined' && SlugEngine.speciesName) ? SlugEngine.speciesName(k) : k;
+  const spMul = (m, genes) => speciesOf(genes) === trendSp(m) ? 1 : SP_MISMATCH;
+
   // ตัวอย่าง 3 ระดับฝีมือเพาะ: แม่นมาก / กลาง / พอใช้ (คลาดจากเป้าไม่เกินกี่ % ของช่วงยีน)
   const SHOWCASE_SPREAD = [0.02, 0.06, 0.12];
-  function genShowcase(target) {
+  function genShowcase(target, sp) {
     return SHOWCASE_SPREAD.map(e => {
       const g = {};
+      if (sp && sp !== 'legacy') g.sp = sp;   // ตัวอย่างวาดเป็นพันธุ์ของเทรน
       for (const k of GENE_KEYS)
         g[k] = clamp(Math.round(target[k] + (Math.random() * 2 - 1) * e * GENE_RANGE[k]), 0, GENE_RANGE[k]);
       return { genes: g, value: valueOf(g, target) };
@@ -188,18 +205,19 @@
   }
   let _showcase = null, _showcaseFor = -1;
   function getShowcase(m) {
-    if (!_showcase || _showcaseFor !== m.trend.refreshAt) { _showcase = genShowcase(m.trend.target); _showcaseFor = m.trend.refreshAt; }
+    if (!_showcase || _showcaseFor !== m.trend.refreshAt) { _showcase = genShowcase(m.trend.target, trendSp(m)); _showcaseFor = m.trend.refreshAt; }
     return _showcase;
   }
   function refreshTrend(m) {
     if (m.trend && m.trend.refreshAt > now()) return false;
     const target = trendTarget();
-    m.trend = { target, refreshAt: now() + REFRESH_MS, listPenalty: 1 };  // เทรนใหม่ = เพนัลตี้จากการลงขายถี่ ๆ กลับมาเต็ม
+    const sps = unlockedSpecies();
+    m.trend = { target, sp: sps[Math.floor(Math.random() * sps.length)] || 'legacy', refreshAt: now() + REFRESH_MS, listPenalty: 1 };  // เทรนใหม่ = เพนัลตี้จากการลงขายถี่ ๆ กลับมาเต็ม
     return true;
   }
   // ราคากลางที่ "ใช้จริง" ตอนนี้ = ราคากลางดิบ × เพนัลตี้สแปมของเทรนปัจจุบัน
   function effectiveValue(m, genes) {
-    return Math.max(MIN_VALUE, Math.round(valueOf(genes, m.trend.target) * (m.trend.listPenalty || 1)));
+    return Math.max(MIN_VALUE, Math.round(valueOf(genes, m.trend.target) * (m.trend.listPenalty || 1) * spMul(m, genes)));
   }
 
   /* ---------- ทากที่ลงขายได้ ---------- */
@@ -306,11 +324,17 @@
 
   /* ---------- display helpers ---------- */
   const dispCache = new Map();
+  /* ยีนสำหรับวาดรูป — ต้องพกสายพันธุ์ (sp) ไปด้วย ไม่งั้นโอรีโอที่ลงขายถูกวาดเป็นทากตัวเดิม */
+  function displayGenes(genes) {
+    const g = {}; for (const k of GENE_KEYS) g[k] = clamp(+genes[k] || 0, 0, GENE_RANGE[k]);
+    if (typeof genes.sp === 'string' && /^[a-z][a-z0-9_]{1,23}$/.test(genes.sp) && genes.sp !== 'legacy') g.sp = genes.sp;
+    return g;
+  }
   function dispSlug(key, genes) {
     if (dispCache.has(key)) return dispCache.get(key);
     let d = null;
     try {
-      const g = {}; for (const k of GENE_KEYS) g[k] = clamp(+genes[k] || 0, 0, GENE_RANGE[k]);
+      const g = displayGenes(genes);
       d = { id: 'wm-' + key, genes: g, traits: typeof slugTraits === 'function' ? slugTraits(g) : {} };
     } catch (e) { d = null; }
     dispCache.set(key, d);
@@ -351,17 +375,22 @@
     try { SlugEngine.drawSlug(ctx, P, w / 2, h / 2 + h * 0.06, false, phase, scale, false, true, slug); } catch (e) {}
     SlugEngine.ANIM = prev;
   }
-  const zoom = document.createElement('div');
+  /* ⚠️ 2026-10-03 หน้าตลาดเปิดด้วย showModal() = อยู่ใน top layer ของเบราว์เซอร์ div ที่ z-index สูงแค่ไหนก็โผล่ใต้หน้าตลาด
+     ภาพขยายจึงเป็น <dialog> แล้ว showModal() ซ้อนอีกชั้น — เปิดทีหลัง = อยู่บนสุดเสมอ · Esc ปิดเฉพาะภาพขยาย */
+  const zoom = document.createElement('dialog');
   zoom.id = 'wmZoom';
-  zoom.style.cssText = 'position:fixed;inset:0;background:rgba(8,14,16,.85);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:100000;cursor:zoom-out';
+  zoom.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;background:rgba(8,14,16,.85);align-items:center;justify-content:center;flex-direction:column;gap:12px;cursor:zoom-out;color-scheme:dark';
+  { const st = document.createElement('style'); st.textContent = '#wmZoom[open]{display:flex}#wmZoom::backdrop{background:transparent}'; document.head.append(st); }
   /* ⚠️ 2026-09-18 css/style.css มีกฎรวม canvas{width:100%;height:100%} ภาพซูมเลยโดนยืดเต็มจอจนสัดส่วนเพี้ยน
      (ผู้เล่นทัก: "ถูกดึงออกข้างจนดูค่าไม่ออก") · สั่ง width/height:auto ทับในสไตล์อินไลน์ แล้วคุมขนาดด้วย max-* อย่างเดียว
      เบราว์เซอร์จะย่อโดยรักษาอัตราส่วนเดิมให้เอง · ความละเอียดแคนวาสคูณสองให้ภาพคมตอนย่อ */
   zoom.innerHTML = '<canvas id="wmZoomCv" width="1040" height="760" style="width:auto;height:auto;max-width:min(88vw,620px);max-height:66vh;background:#0f1e22;border-radius:16px;border:1px solid #b59859"></canvas><div id="wmZoomLabel" style="color:#e5dcc4;font-size:15px;font-weight:600"></div><div style="color:#9fbfb5;opacity:.6;font-size:12px">แตะที่ไหนก็ได้เพื่อปิด</div>';
   document.body.append(zoom);
   let _zoomGenes = null;
-  zoom.onclick = () => { zoom.style.display = 'none'; _zoomGenes = null; };
-  function openZoom(genes, value) { _zoomGenes = genes; const lb = document.getElementById('wmZoomLabel'); if (lb) lb.textContent = 'ราคากลาง ' + coin(value); zoom.style.display = 'flex'; startAnim(); }
+  zoom.onclick = () => zoom.close();
+  zoom.addEventListener('close', () => { _zoomGenes = null; });
+  zoom.addEventListener('keydown', e => e.stopPropagation(), true);   // Esc/ปุ่มลัดไม่ทะลุไปปิดหน้าตลาดหรือสั่งเกม
+  function openZoom(genes, value) { _zoomGenes = genes; const lb = document.getElementById('wmZoomLabel'); if (lb) lb.textContent = 'ราคากลาง ' + coin(value); if (!zoom.open) zoom.showModal(); startAnim(); }
   let _animRAF = 0;
   function animLoop(ts) {
     _animRAF = 0;
@@ -370,11 +399,11 @@
       const m = market(), sc = getShowcase(m), key = m.trend.refreshAt;
       sc.forEach((c, i) => drawAnimPortrait(marketDialog.querySelector(`[data-mk-show="${i}"]`), dispSlug('show' + i + key, c.genes), phase + i * 1.1));
     }
-    if (_zoomGenes && zoom.style.display !== 'none') {
-      const g = {}; for (const k of GENE_KEYS) g[k] = clamp(+_zoomGenes[k] || 0, 0, GENE_RANGE[k]);
+    if (_zoomGenes && zoom.open) {
+      const g = displayGenes(_zoomGenes);
       drawAnimPortrait(document.getElementById('wmZoomCv'), { id: 'wm-zoom', genes: g, traits: typeof slugTraits === 'function' ? slugTraits(g) : {} }, phase);
     }
-    if (marketDialog.open || (_zoomGenes && zoom.style.display !== 'none')) _animRAF = requestAnimationFrame(animLoop);
+    if (marketDialog.open || (_zoomGenes && zoom.open)) _animRAF = requestAnimationFrame(animLoop);
   }
   function startAnim() { if (!_animRAF) _animRAF = requestAnimationFrame(animLoop); }
 
@@ -439,7 +468,7 @@
     return `<div style="padding:8px;border-bottom:1px solid #202b2b">
       <div style="display:flex;align-items:center;gap:8px">
         <canvas data-mk-avail="${i}" width="80" height="54" style="width:56px;height:auto;background:#0f1e22;border-radius:6px"></canvas>
-        <div style="flex:1;min-width:0;font-size:12px">${esc(SlugBrowser.name(e.slug))}<br>ราคากลาง <b>${coin(e.value)}</b> <span style="opacity:.6">(${Math.round(e.value / FULL_VALUE * 100)}% ของเต็ม)</span></div>
+        <div style="flex:1;min-width:0;font-size:12px">${esc(SlugBrowser.name(e.slug))}<br>ราคากลาง <b>${coin(e.value)}</b> <span style="opacity:.6">(${Math.round(e.value / FULL_VALUE * 100)}% ของเต็ม)</span>${e.spOk ? '' : `<br><span style="color:#e0b07a">พันธุ์${esc(spName(speciesOf(e.slug.genes)))} ไม่ตรงเทรน — ราคากลาง ×${SP_MISMATCH}</span>`}</div>
         <label style="font-size:11px;opacity:.8">ตั้งราคา<br>
           <input data-ask="${i}" type="number" min="1" step="10" value="${Math.round(draft)}" style="width:96px;background:#0f1e22;color:#e5dcc4;border:1px solid #47605f;border-radius:6px;padding:5px"></label>
         <button class="tbtn" data-list="${i}">ลงขาย</button>
@@ -470,7 +499,7 @@
     const m = market(), t = m.trend, showcase = getShowcase(m);
     if (!full && marketDialog.querySelector('[data-mk-listings]')) return refreshLive();
 
-    let _all = availableSlugs().map(e => ({ ...e, target: t.target, value: effectiveValue(m, e.slug.genes) }))
+    let _all = availableSlugs().map(e => ({ ...e, target: t.target, value: effectiveValue(m, e.slug.genes), spOk: spMul(m, e.slug.genes) === 1 }))
                              .sort((a, b) => b.value - a.value);
     const _q = _availFilter.trim().toLowerCase();
     if (_q) _all = _all.filter(e => (String(e.slug.id)+' '+SlugBrowser.name(e.slug)).toLowerCase().includes(_q));
@@ -485,7 +514,8 @@
       เทรนเปลี่ยนใน <b data-mk-refresh>${fmtLeft(t.refreshAt - now())}</b></p>
       ${(t.listPenalty || 1) < 0.999 ? `<p style="font-size:12px;color:#e0b07a;margin:0 0 10px">⚠️ ลงขายถี่ไปหน่อย — ราคากลางตอนนี้เหลือ <b>${Math.round((t.listPenalty || 1) * 100)}%</b> ของปกติ (กันสแปม) จะกลับมาเต็มเมื่อเทรนเปลี่ยน</p>` : ''}
 
-      <h3 style="margin:14px 0 6px">ทากตัวอย่างที่ตลาดต้องการตอนนี้</h3>
+      <h3 style="margin:14px 0 6px">ทากตัวอย่างที่ตลาดต้องการตอนนี้ · พันธุ์<span style="color:#f1cc75">${esc(spName(trendSp(m)))}</span></h3>
+      <p style="font-size:12px;opacity:.8;margin:0 0 8px">รอบนี้ตลาดต้องการพันธุ์${esc(spName(trendSp(m)))} — พันธุ์อื่นลงขายได้ แต่ราคากลางเหลือ ×${SP_MISMATCH}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">${showcase.map((c, i) =>
         `<div style="flex:1;min-width:120px;padding:8px;border:1px solid #47605f;border-radius:8px;text-align:center">
           <canvas data-mk-show="${i}" width="240" height="168" style="width:100%;height:auto;background:#0f1e22;border-radius:6px;cursor:zoom-in"></canvas>

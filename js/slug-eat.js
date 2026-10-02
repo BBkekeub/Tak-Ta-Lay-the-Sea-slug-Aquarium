@@ -664,15 +664,11 @@
    }
    return p;
  }
- const glSlugs=()=>!!(engineReady&&window.DecorGLB?.ready&&window.Slug3D?.ready&&Slug3D.enabled);
  function drawSlug(s,e,hop,m){
-   s.fx=e.x;s.fy=e.y;s.wall=null;s.climbZ=hop;s._motionHeading=s.dir=s.turn=e.dir;
-   s._breedScale=m.size;                         // บัฟตัวใหญ่: ตัววาด 3D/2D อ่านสเกลนี้อยู่แล้ว (ช่องเดียวกับตู้เพาะ)
+   s.fx=e.x;s.fy=e.y;s.wall=null;s.climbZ=hop;s.dir=s.turn=e.dir;
+   s._breedScale=m.size;                         // บัฟตัวใหญ่: ตัววาดอ่านสเกลนี้อยู่แล้ว (ช่องเดียวกับตู้เพาะ)
    s.flip=Math.cos(e.dir)*CELLW+Math.sin(e.dir)*DEPX>0;
-   if(glSlugs()&&DecorGLB.drawSlug(s))return;
    const len=TANK_SLUG_VIEW_SCALE*slugCm(s.genes)*m.size*depthPxPerCm(),p=S(e.x,e.y,SAND_CELLS+hop);
-   const dir={x:CELLW*Math.cos(e.dir)+DEPX*Math.sin(e.dir),y:-DEPY*Math.sin(e.dir)};
-   if(engineReady&&window.Slug3D?.draw(tctx,s,p.x,p.y,len,false,dir))return;
    const P=slugPartsOf(s);if(!P)return;
    const scale=len/(P.bw*P.s),h=P.h*scale;
    drawTankSlug(s,P,scale,p.x-((P.L+P.R)/2-P.bw/2)*P.s*scale,p.y-h*.44,false);
@@ -727,7 +723,7 @@
    if(it.part==='slug'){
      const e=a.entrants[it.i],s=sprites[it.i];if(!s)return;
      const now=performance.now(),chewing=now-(e.chewAt||0)<260,m=mods(e);
-     const hop=0;                                 // แดชติดพื้น ไม่ยกตัว (ท่า 'dash' ของโมเดลเป็นท่ากระโดด จึงใช้ท่าเดินแทน)
+     const hop=0;                                 // แดชติดพื้น ไม่ยกตัว
      s.state=chewing?'eat':e._moved>.001?'walk':'rest';
      if(e._moved)s.creepT=(s.creepT||0)+e._moved*CM_PER_CELL/(CREEP_BODY_PER_CYCLE*slugCm(e.genes)*m.size)*Math.PI*2;
      s.ph=(s.ph||0)+.02;

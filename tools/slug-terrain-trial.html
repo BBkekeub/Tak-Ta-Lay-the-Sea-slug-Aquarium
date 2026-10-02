@@ -1,0 +1,46 @@
+<!doctype html><meta charset="utf-8"><title>ทาก 8 กระดูก · ทดลองพื้นโค้ง</title>
+<style>body{margin:0;background:#102d35;color:#e8efea;font:16px system-ui}header{padding:20px;display:flex;gap:20px;align-items:center;flex-wrap:wrap}button,select{padding:10px}input{width:240px}canvas{width:100%;max-width:1200px;display:block;margin:auto;background:#bed4d1}p{padding:0 20px}</style>
+<header><b>ทาก 2D · 8 กระดูก · ทางลาดโค้ง</b><button id="play">เริ่มเดินช้า</button><button id="step">ดูทีละเฟรม</button><label>ความเร็ว <select id="speed"><option value="0.5">ช้ามาก</option><option value="1" selected>ช้า</option><option value="2">ปานกลาง</option></select></label><span id="phaseLabel">กดเริ่มเดิน หรือดูทีละเฟรม</span><label>ตำแหน่ง <input id="pos" type="range" min="180" max="1020" value="470"></label><label>ความสูงพื้น <input id="height" type="range" min="0" max="100" value="65"></label><label><input style="width:auto" id="bones" type="checkbox">แสดงกระดูก</label></header><canvas id="trial" width="1200" height="600"></canvas><p>สนามทดลอง · อบ 64 ภาพแล้วเล่นวน 24 เฟรม/วินาที · ลากตำแหน่งเพื่อดูหัว กลางตัว และหางสัมผัสพื้น · ยังไม่เชื่อม AI ขอนไม้</p>
+<script src="../js/slug-species-data.js"></script><script src="../js/slug-engine.js?v=spine2d-cute-10"></script><script>
+(async()=>{await SlugEngine.ready;const E=SlugEngine,c=document.getElementById('trial'),ctx=c.getContext('2d'),pos=document.getElementById('pos'),height=document.getElementById('height'),bones=document.getElementById('bones'),play=document.getElementById('play');
+const g=E.randGene();g.sp='legacy';const P=E.slugParts(g,160),scale=1/P.s*.40,k=.40;let crawlPhase=0,running=false,last=0,raf=0,frames=[],bakeId=0,baking=false;const status=document.createElement("span");play.after(status);
+const floor=x=>430-Number(height.value)*Math.exp(-Math.pow((x-620)/210,4));
+// Bind spine follows the body centre; underside contacts remain separate.
+const bottom=Array.from(P.rig.bottom),restY=P.rig.restY;
+const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
+const pulse=(t,a,b)=>t<=a||t>=b?0:Math.sin(Math.PI*(t-a)/(b-a))**2;
+function render(){ctx.clearRect(0,0,1200,600);ctx.fillStyle='#886b47';ctx.beginPath();ctx.moveTo(0,600);for(let x=0;x<=1200;x+=3)ctx.lineTo(x,floor(x));ctx.lineTo(1200,600);ctx.fill();ctx.strokeStyle='#89aa65';ctx.lineWidth=7;ctx.beginPath();for(let x=0;x<=1200;x+=3)x?ctx.lineTo(x,floor(x)):ctx.moveTo(x,floor(x));ctx.stroke();
+// Reach first, gather the rear, then settle. Pulses have zero velocity at each end.
+const cycle=((crawlPhase/(Math.PI*2))%1+1)%1,reach=pulse(cycle,.02,.62),gather=pulse(cycle,.35,.92),settle=pulse(cycle,.75,1);
+const center=+pos.value,points=Array(9),lengths=Array.from(P.rig.lengths,(n,i)=>{const head=1-i/7;return n*k*(1+.22*reach*head-.22*gather*(.35+.65*(1-head)));});
+const lift=i=>Math.sin(Math.PI*i/8)**2*(12*gather+3*reach)+Math.max(0,1-i/2)*4*reach;
+const joint=(x,i)=>({x,y:floor(x)-(bottom[i]-restY[i])*k-lift(i)});points[4]=joint(center,4);
+for(const sign of [-1,1])for(let j=1;j<=4;j++){const i=4+sign*j,prev=points[i-sign],len=lengths[Math.min(i,i-sign)];let lo=0,hi=len;for(let n=0;n<24;n++){const d=(lo+hi)/2,p=joint(prev.x+sign*d,i);if(Math.hypot(p.x-prev.x,p.y-prev.y)>len)hi=d;else lo=d;}points[i]=joint(prev.x+sign*(lo+hi)/2,i);}
+const base=points[4].y,local=points.map(p=>({x:(p.x-center)/k+P.bw/2,y:(p.y-base)/k+restY[4]}));
+const cx=center+((P.L+P.R)/2-P.bw/2)*k,cy=base+((P.T+P.B)/2-restY[4])*k;
+E.drawSlug(ctx,P,cx,cy,false,0,scale,false,false,{noBob:true,spinePoints:local,animTime:cycle*2800});
+if(bones.checked){ctx.strokeStyle='#ffce59';ctx.lineWidth=2;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();for(const p of points){ctx.beginPath();ctx.arc(p.x,p.y,4,0,7);ctx.fillStyle='#fff';ctx.fill();}}
+if(bones.checked){ctx.fillStyle='#4fe4dd';for(let i=0;i<9;i++){ctx.beginPath();ctx.arc(points[i].x,floor(points[i].x),3,0,7);ctx.fill();}}
+window.trialState={points,bottom,lifts:points.map((p,i)=>lift(i)),crawlPhase,scale:k,lengths,restY:Array.from(restY),floor:points.map(p=>floor(p.x))};}
+const background=document.createElement('canvas');background.width=1200;background.height=600;
+function drawBackground(){const x=background.getContext('2d');x.clearRect(0,0,1200,600);x.fillStyle='#886b47';x.beginPath();x.moveTo(0,600);for(let i=0;i<=1200;i+=3)x.lineTo(i,floor(i));x.lineTo(1200,600);x.fill();x.strokeStyle='#89aa65';x.lineWidth=7;x.beginPath();for(let i=0;i<=1200;i+=3)i?x.lineTo(i,floor(i)):x.moveTo(i,floor(i));x.stroke();}
+function clearFrames(){for(const f of frames){f.c.width=1;f.c.height=1;}frames=[];}
+async function bake(){const ticket=++bakeId;baking=true;clearFrames();drawBackground();const saved=pos.value;play.disabled=true;document.getElementById('step').disabled=true;
+ for(let i=0;i<64;i++){if(ticket!==bakeId)return;const progress=(63-i)/16,part=progress%1;pos.value=1020-840*(Math.floor(progress)+smooth((part-.12)/.76))/4;crawlPhase=progress*Math.PI*2;render();const pts=trialState.points;
+  const left=Math.max(0,Math.floor(Math.min(...pts.map(p=>p.x))-P.bw*k*.12)),right=Math.min(1200,Math.ceil(Math.max(...pts.map(p=>p.x))+P.bw*k*.12));
+  const top=Math.max(0,Math.floor(Math.min(...pts.map(p=>p.y))-(P.B-P.T)*k*1.3)),bottomY=Math.min(600,Math.ceil(Math.max(...pts.map(p=>p.y))+P.bh*k));
+  const tile=document.createElement('canvas');tile.width=right-left;tile.height=bottomY-top;tile.getContext('2d').drawImage(c,left,top,tile.width,tile.height,0,0,tile.width,tile.height);frames.push({c:tile,x:left,y:top});status.textContent='อบภาพ '+(i+1)+'/64';
+  await new Promise(requestAnimationFrame);
+ }
+ if(ticket!==bakeId)return;pos.value=saved;baking=false;play.disabled=false;document.getElementById('step').disabled=false;status.textContent='พร้อม · กระดึ๊บ 4 รอบ / 64 ภาพ · '+(frames.reduce((n,f)=>n+f.c.width*f.c.height*4,0)/1048576).toFixed(1)+' MB';showFrame();
+}
+function showFrame(){const index=Math.max(0,Math.min(63,Math.round((+pos.value-180)/840*63))),f=frames[index];document.getElementById('phaseLabel').textContent='จังหวะกระดึ๊บ '+((63-index)%16+1)+'/16 · '+['หัวค่อย ๆ ยื่นนำ','เหยียดตัว เกาะด้านหน้า','โก่งท้อง ดึงหางตาม','วางท้อง พักนิดนึง'][Math.floor(((63-index)%16)/4)];if(!f)return;ctx.clearRect(0,0,1200,600);ctx.drawImage(background,0,0);ctx.drawImage(f.c,f.x,f.y);}
+function tick(t){raf=0;if(!running||document.hidden||baking)return;if(!last||t-last>=1000/24){if(last)pos.value=180+((+pos.value-180-(t-last)*.07*Number(document.getElementById('speed').value)+840)%840);last=t;showFrame();}raf=requestAnimationFrame(tick);}
+play.onclick=async()=>{running=!running;play.textContent=running?'หยุด':'เริ่มเดินช้า';last=0;if(running){if(!frames.length)await bake();if(running&&!raf)raf=requestAnimationFrame(tick);}else{cancelAnimationFrame(raf);raf=0;}};
+document.getElementById('step').onclick=async()=>{running=false;play.textContent='เริ่มเดินช้า';cancelAnimationFrame(raf);raf=0;last=0;if(!frames.length)await bake();const index=Math.round((+pos.value-180)/840*63);pos.value=180+((index+63)%64)*840/63;showFrame();};
+pos.oninput=()=>{if(!baking){if(frames.length)showFrame();else render();}};
+for(const e of [height,bones])e.oninput=()=>{running=false;play.textContent='เริ่มเดิน';cancelAnimationFrame(raf);raf=0;++bakeId;baking=false;play.disabled=false;clearFrames();status.textContent='ปรับแล้ว · กดเริ่มเดินเพื่ออบใหม่';render();};
+document.addEventListener('visibilitychange',()=>{cancelAnimationFrame(raf);raf=0;last=0;if(!document.hidden&&running&&!baking)raf=requestAnimationFrame(tick);});
+window.trialBakeInfo=()=>({frames:frames.length,baking,bytes:frames.reduce((n,f)=>n+f.c.width*f.c.height*4,0)});
+render();window.trialReady=true;
+})();</script>

@@ -19,7 +19,7 @@ echo [2/3] commit...
 git commit -m "%MSG%"
 if errorlevel 1 echo        ^(ไม่มีอะไรใหม่ให้ commit - ข้ามไปขั้นต่อไป^)
 
-echo [3/3] push... ^(ครั้งแรกอาจนานหน่อย ไฟล์โมเดล 3D ใหญ่^)
+echo [3/3] push...
 git push origin main
 if errorlevel 1 goto fail
 

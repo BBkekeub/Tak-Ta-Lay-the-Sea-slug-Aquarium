@@ -34,14 +34,14 @@
  `;document.head.append(style);
  const header=document.createElement('div');header.className='decorTrayHead';header.innerHTML='<div class="decorTabs" role="tablist" aria-label="หมวดของตกแต่ง"></div>';tray.prepend(header);
  let activeCategory='Pumice';
- /* ชุดใหม่ ๆ ใส่ cat มาในนิยามเลย (decor3d-defs.js) · ของเดิมยังใช้กฎจากชื่อคีย์เหมือนเดิม */
+ /* ชุดใหม่ ๆ ใส่ cat มาในนิยามเลย (เช่น sprite-decor-defs.js) · ของเดิมยังใช้กฎจากชื่อคีย์เหมือนเดิม */
  const category=key=>(TANK_DECOR[key]&&TANK_DECOR[key].cat)||(/^pumice/i.test(key)?'Pumice':'อื่น ๆ');
  function selectCategory(name){activeCategory=name;for(const b of header.querySelectorAll('[role="tab"]')){const on=b.textContent===name;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;}for(const b of pal.querySelectorAll('.dbtn'))b.hidden=category(b.dataset.key)!==name;}
  function syncTabs(){const names=[...new Set(Object.keys(TANK_DECOR).map(category))];for(const name of names){if([...header.querySelectorAll('[role="tab"]')].some(b=>b.textContent===name))continue;const b=document.createElement('button');b.type='button';b.textContent=name;b.setAttribute('role','tab');b.setAttribute('aria-controls','dpal');b.onclick=()=>{selectCategory(name);pal.scrollLeft=0;};b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const tabs=[...header.querySelectorAll('[role="tab"]')],i=tabs.indexOf(b),next=tabs[(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length];next.click();next.focus();};header.firstChild.append(b);}selectCategory(names.includes(activeCategory)?activeCategory:names[0]);}
  pal.setAttribute('role','tabpanel');pal.setAttribute('aria-label','ของตกแต่ง');
  
  const actions=document.createElement('div');actions.className='decorSelection';const selection=document.createElement('span');actions.append(selection);header.append(actions);
- actions.append(document.getElementById('dFlip'),document.getElementById('dRemove'));
+ actions.append(document.getElementById('dFlip'),document.getElementById('dRemove'),document.getElementById('dSell'));
  const cancel=document.createElement('button');cancel.className='tbtn';cancel.textContent='ยกเลิกเลือก';actions.append(cancel);cancel.onclick=()=>{selDecorKey=null;selDecor=null;decorHover=null;dragGhost=null;syncDecorBar();};
  const oldBuild=buildDecorBar;buildDecorBar=function(){oldBuild();for(const button of pal.querySelectorAll('.dbtn:not([data-preview-ready])')){
   button.dataset.previewReady='1';const key=button.dataset.key,d=TANK_DECOR[key];button.replaceChildren();
@@ -49,10 +49,8 @@
      เปิดแถบทีเดียว 31 ปุ่ม ≈ 86 MB ที่ต้องถอดรหัส เครื่องค้างเป็นวินาที
      ตอนนี้ชี้ไปที่ thumbs/<ชื่อเดิม> (264×130 ≈ 0.13 MB/ใบ · รวมทั้งชุด 623 KB) แล้วค่อยตกกลับไป
      ภาพเต็มถ้าไม่มีไฟล์ย่อ — ของที่ทำใหม่ทีหลังจึงไม่ต้องแก้โค้ดตรงนี้ แค่วางไฟล์ใน thumbs/ */
-  const realGLB=!!d.model;
-  const image=document.createElement(realGLB?'span':'img');
-  if(realGLB){image.className='decorGLBPreview';image.dataset.modelKey=key;image.setAttribute('aria-label',d.name+' โมเดล 3D');}
-  else {image.alt=d.name;image.loading='lazy';image.decoding='async';
+  const image=document.createElement('img');
+  {image.alt=d.name;image.loading='lazy';image.decoding='async';
   const full=d.src, small=full&&full.replace(/([^/]+)$/,'thumbs/$1');
   image.src=small||full;
   image.onerror=()=>{ if(full&&image.getAttribute('src')!==full){image.src=full;} else image.alt='ไม่พบภาพ'; };
@@ -66,7 +64,7 @@
  const oldSync=syncDecorBar;syncDecorBar=function(){oldSync();if(dockOpen!==tankBuildMode){const oldHeight=tankCv.getBoundingClientRect().height;dockOpen=tankBuildMode;body.classList.toggle('decor-open',dockOpen);resizeTank();tankCam.oy+=(TCH-oldHeight)/2;}toggle.textContent=tankBuildMode?'✓ เสร็จสิ้น':'✦ ตกแต่งตู้';toggle.setAttribute('aria-expanded',String(tankBuildMode));toggle.setAttribute('aria-controls','ovDecor');
   if(!tankBuildMode)return;syncTabs();
   {const _cr=G.decorCredit||{};for(const b of pal.querySelectorAll('.dbtn')){const n=_cr[b.dataset.key]||0;let bd=b.querySelector('.decorCreditBadge');if(n>0){if(!bd){bd=document.createElement('span');bd.className='decorCreditBadge';b.appendChild(bd);}bd.textContent='🎟️'+n;}else if(bd)bd.remove();}}
-  const key=selDecorKey||selDecor?.key;selection.textContent=key?TANK_DECOR[key].name:'';cancel.hidden=!key;document.getElementById('dRemove').hidden=!selDecor;document.getElementById('dFlip').hidden=!key;
+  const key=selDecorKey||selDecor?.key;selection.textContent=key?TANK_DECOR[key].name:'';cancel.hidden=!key;document.getElementById('dRemove').hidden=!selDecor;document.getElementById('dSell').hidden=!selDecor;document.getElementById('dFlip').hidden=!key;
  };
  const oldEnter=enterTank;enterTank=function(...args){const result=oldEnter(...args);syncDecorBar();return result;};
  syncDecorBar();

@@ -38,18 +38,23 @@ function grantOnce(key,fn){
 function slugDeliveryReady(d){return Date.now()>=d.readyAt;}
 function slugDeliveryReadyCount(){return slugDeliveries().filter(slugDeliveryReady).length;}
 function slugDeliveryWaitText(d){const ms=d.readyAt-Date.now();if(ms<=0)return 'ถึงแล้ว — เปิดได้';const s=Math.ceil(ms/1000);return 'ส่งถึงในอีก '+s+' วินาที';}
-function rollBoxGenes(box){const g={};for(const gene of SlugEngine.GENES){const color=gene.k==='mainC'||gene.k==='accC',t=color?(1-Math.cos(Math.PI*Math.random()))/2:Math.random();g[gene.k]=Math.round((color?box.colorLo:box.lo)+t*((color?box.colorHi:box.hi)-(color?box.colorLo:box.lo)));}return g;}
+function rollBoxGenes(box,sp){const g={};if(sp&&sp!=='legacy')g.sp=sp;for(const gene of SlugEngine.GENES){const color=gene.k==='mainC'||gene.k==='accC',t=color?(1-Math.cos(Math.PI*Math.random()))/2:Math.random();g[gene.k]=Math.round((color?box.colorLo:box.lo)+t*((color?box.colorHi:box.hi)-(color?box.colorLo:box.lo)));}return g;}
 
+/* สายพันธุ์ของกล่องที่จะสั่ง — เลือกได้เฉพาะพันธุ์ที่ปลดล็อกที่โต๊ะวิจัยแล้ว และเกมมีข้อมูลพันธุ์นั้น */
+let boxSpecies='legacy';
+function boxSpeciesChoices(){return (SlugEngine.species?SlugEngine.species():[{key:'legacy',th:'ตัวเดิม'}]).filter(o=>speciesUnlocked(o.key));}
 function orderSlugBox(i){
  const box=SLUG_BOXES[i];if(!box)return false;
+ if(!boxSpeciesChoices().some(o=>o.key===boxSpecies))boxSpecies='legacy';
+ const spName=boxSpecies==='legacy'?'':' · '+slugSpeciesName({sp:boxSpecies});
  const s=slugBoxStock();
  if(s.n<1){toast('กล่องหมดสต็อก · '+slugBoxWaitText(),'bad');return false;}
  if(G.coin<box.price){toast('เหรียญไม่พอ','bad');return false;}
  if(s.n>=SLUG_BOX_MAX)s.at=Date.now();
  s.n-=1;addCoin(-box.price);
- slugDeliveries().push({id:'d'+Date.now()+'_'+Math.floor(Math.random()*10000),boxIndex:i,name:box.name,readyAt:Date.now()+SLUG_DELIVERY_MS,genes:rollBoxGenes(box),alerted:false});
+ slugDeliveries().push({id:'d'+Date.now()+'_'+Math.floor(Math.random()*10000),boxIndex:i,name:box.name+spName,readyAt:Date.now()+SLUG_DELIVERY_MS,genes:rollBoxGenes(box,boxSpecies),alerted:false});
  if(typeof saveGame==='function')saveGame();if(typeof syncHUD==='function')syncHUD();
- toast('สั่งกล่อง'+box.name+' · จะส่งถึงเคาน์เตอร์ในอีก ~1 นาที','good');
+ toast('สั่งกล่อง'+box.name+spName+' · จะส่งถึงเคาน์เตอร์ในอีก ~1 นาที','good');
  refreshSlugShop();return true;
 }
 function openSlugDelivery(id){
@@ -75,11 +80,16 @@ function renderSlugShop(){
  if(!slugShopDialog.querySelector('[data-deliveries]')){
   slugShopDialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><b>สั่งซื้อกล่องสุ่มทาก</b><button class="tbtn" data-close>✕</button></div>'
    +'<p style="font-size:12px">สต็อกร้าน <b data-stock></b> กล่อง · เข้าใหม่ชั่วโมงละ 1 · <span data-stock-wait></span><br>สั่งแล้วส่งถึงเคาน์เตอร์ในอีก ~1 นาที มาเป็นกล่องของขวัญให้กดเปิด</p>'
+   +'<div data-species style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;margin:4px 0 2px"></div>'
    +SLUG_BOXES.map((b,i)=>'<section style="padding:12px 0;border-bottom:1px solid #ffffff22"><b>'+b.name+'</b> · สี '+b.colorLo+'–'+b.colorHi+' · ยีนอื่น '+b.lo+'–'+b.hi+'<br><button class="tbtn" data-order="'+i+'">สั่งซื้อ · '+b.price+' เหรียญ</button></section>').join('')
    +'<h3 style="margin-top:16px">พัสดุ</h3><p data-empty style="font-size:12px">ยังไม่มีพัสดุกำลังส่ง</p><div data-deliveries></div>';
   slugShopDialog.querySelectorAll('[data-order]').forEach(b=>b.onclick=()=>orderSlugBox(+b.dataset.order));
   slugShopDialog.querySelector('[data-close]').onclick=()=>slugShopDialog.close();
  }
+ {const host=slugShopDialog.querySelector('[data-species]'),ch=boxSpeciesChoices();if(!ch.some(o=>o.key===boxSpecies))boxSpecies='legacy';
+  const sig=ch.map(o=>o.key).join()+'|'+boxSpecies;host.hidden=ch.length<2;
+  if(host.dataset.sig!==sig){host.dataset.sig=sig;host.replaceChildren(Object.assign(document.createElement('span'),{textContent:'สายพันธุ์ในกล่อง:'}));
+   for(const o of ch){const b=document.createElement('button');b.className='tbtn';b.type='button';b.textContent=(o.key===boxSpecies?'✓ ':'')+o.th;b.setAttribute('aria-pressed',String(o.key===boxSpecies));b.style.fontWeight=o.key===boxSpecies?'bold':'';b.onclick=()=>{boxSpecies=o.key;renderSlugShop();};host.append(b);}}}
  text(slugShopDialog.querySelector('[data-stock]'),s.n+' / '+SLUG_BOX_MAX);
  text(slugShopDialog.querySelector('[data-stock-wait]'),slugBoxWaitText());
  slugShopDialog.querySelectorAll('[data-order]').forEach(b=>{b.disabled=s.n<1||G.coin<SLUG_BOXES[+b.dataset.order].price;});

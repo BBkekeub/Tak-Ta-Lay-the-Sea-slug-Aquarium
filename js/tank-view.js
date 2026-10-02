@@ -457,7 +457,7 @@ function sandFill(ctx, ox, oy, zoom, cw, dx, dy){        // คืน pattern �
   const pat=sandPattern(ctx);
   if(!pat || !pat.setTransform || typeof DOMMatrix==='undefined') return null;
   const T=_sandImg.naturalWidth/(SAND_TEX_CM/CM_PER_CELL);   // px เท็กซ์เจอร์ ต่อ 1 ช่องเล็ก
-  if(window.DecorGLB?.ready&&tankMode&&curTank){
+  if(tankMode&&curTank){                                        // ในตู้: วางแนวด้วย S() ตัวเดียวกับที่วาดพื้น
     const o=S(0,0,SAND_CELLS),x=S(1,0,SAND_CELLS),y=S(0,1,SAND_CELLS);
     pat.setTransform(new DOMMatrix([(x.x-o.x)/T,(x.y-o.y)/T,(y.x-o.x)/T,(y.y-o.y)/T,o.x,o.y]));
   }else pat.setTransform(new DOMMatrix([cw*zoom/T, 0, dx*zoom/T, -dy*zoom/T, ox, oy]));
@@ -500,7 +500,7 @@ function causticPat(ctx, sc, dx, dy, zTop){
   if(!pat || !pat.setTransform || typeof DOMMatrix==='undefined') return null;
   const z=tankCam.zoom, T=(src.width/(CAUSTIC_CM/CM_PER_CELL))*sc;
   const o=S(0,0,zTop);
-  if(window.DecorGLB?.ready&&tankMode){
+  if(tankMode){
     const a=S(1,0,zTop),b=S(0,1,zTop),ux=a.x-o.x,uy=a.y-o.y,vx=b.x-o.x,vy=b.y-o.y;
     pat.setTransform(new DOMMatrix([ux/T,uy/T,vx/T,vy/T,o.x+dx*ux+dy*vx,o.y+dx*uy+dy*vy]));return pat;
   }
@@ -622,7 +622,7 @@ function cancelHold(){ if(holdT){ clearTimeout(holdT); holdT=null; } }
 function drawHeldFace(P, cx, cy, flip, k, base){
   const sgn=flip?-1:1, ox=(P.L+P.R)/2, oy=(P.T+P.B)/2;
   tctx.save(); tctx.lineCap='round'; tctx.lineJoin='round';
-  (SlugEngine.FACE.eyes||[]).forEach((E,i)=>{
+  (((P&&P.face)||SlugEngine.FACE).eyes||[]).forEach((E,i)=>{
     const localX=E.u*P.bw;
     const u=Math.max(0,Math.min(1,(localX-P.L)/(P.R-P.L)));
     const eyeSag=k*(P.B-P.T)*0.105*Math.pow(Math.abs(u*2-1),2.15);
@@ -640,7 +640,7 @@ function drawHeldFace(P, cx, cy, flip, k, base){
 function drawSleepFace(P, cx, cy, flip, k, base){
   const sgn=flip?-1:1, ox=(P.L+P.R)/2, oy=(P.T+P.B)/2;
   tctx.save(); tctx.lineCap='round'; tctx.lineJoin='round';
-  (SlugEngine.FACE.eyes||[]).forEach(E=>{
+  (((P&&P.face)||SlugEngine.FACE).eyes||[]).forEach(E=>{
     const x=cx+sgn*k*(E.u*P.bw-ox), y=cy+k*(E.v*P.bh-oy);
     const r=k*P.bh*E.hR*0.5, rw=r*(E.ar||0.68);
     
@@ -656,7 +656,7 @@ function drawDashFace(P, cx, cy, flip, k, base, charge, big=1){   // big = ข�
   const sgn=flip?-1:1, ox=(P.L+P.R)/2, oy=(P.T+P.B)/2;
   const rise=(charge||0)*0.06;                              // หดชาร์จ = ยกตาขึ้นนิดหน่อย (ตาอยู่กับหน้าเสมอ ไม่หลุด)
   tctx.save(); tctx.lineCap='round'; tctx.lineJoin='round';
-  (SlugEngine.FACE.eyes||[]).forEach((E,i)=>{
+  (((P&&P.face)||SlugEngine.FACE).eyes||[]).forEach((E,i)=>{
     const localX=E.u*P.bw;
     const x=cx+sgn*k*(localX-ox), y=cy+k*(E.v*P.bh-oy)-k*P.bh*rise, r=k*P.bh*E.hR*0.5*big;
     
@@ -671,7 +671,7 @@ function drawDashFace(P, cx, cy, flip, k, base, charge, big=1){   // big = ข�
 function drawSmileFace(P, cx, cy, flip, k, base){
   const sgn=flip?-1:1, ox=(P.L+P.R)/2, oy=(P.T+P.B)/2;
   tctx.save(); tctx.lineCap='round'; tctx.lineJoin='round';
-  (SlugEngine.FACE.eyes||[]).forEach(E=>{
+  (((P&&P.face)||SlugEngine.FACE).eyes||[]).forEach(E=>{
     const x=cx+sgn*k*(E.u*P.bw-ox), y=cy+k*(E.v*P.bh-oy);
     const r=k*P.bh*E.hR*0.5, rw=r*(E.ar||0.68);
     
@@ -690,7 +690,7 @@ function drawDefaultEyes(P, cx, cy, flip, k){
   const img=(typeof SlugEngine!=='undefined')?SlugEngine.eyeImage:null;
   const ready=img && img.complete && img.naturalWidth>0;
   tctx.save(); tctx.lineCap='round'; tctx.lineJoin='round';
-  (SlugEngine.FACE.eyes||[]).forEach(E=>{
+  (((P&&P.face)||SlugEngine.FACE).eyes||[]).forEach(E=>{
     const x=cx+sgn*k*(E.u*P.bw-ox), y=cy+k*(E.v*P.bh-oy);
     const d=k*P.bh*E.hR, ew=d*(E.ar||1);
     if(ready){
@@ -742,7 +742,7 @@ function drawSlugMood(s,p,bodyLen,P,cy,sa){
   // eye metrics are unavailable or a projected size is temporarily invalid.
   if(!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) ||
      !Number.isFinite(bodyLen) || bodyLen<=0) return;
-  const eyes=(SlugEngine.FACE?.eyes||[]).filter(e=>e &&
+  const eyes=(((P&&P.face)||SlugEngine.FACE)?.eyes||[]).filter(e=>e &&
     Number.isFinite(e.u) && Number.isFinite(e.v) && Number.isFinite(e.hR));
   const phase=Number.isFinite(s.ph)?s.ph:0;
   const bob=Math.sin(performance.now()/420+phase)*bodyLen*0.018;
@@ -787,6 +787,7 @@ function dropHeldSlug(){
   const mg=slugCm(s.genes)/CM_PER_CELL*0.55+0.2;
   const g=freeSpotNear(s.fx, s.fy, SOLID, isBreeder(curTank)?20:curTank.def.w, curTank.def.h, mg);
   s.fx=g.fx; s.fy=g.fy;                    // ปล่อยลงหิน → เด้งไปที่ว่างใกล้สุด
+  leaveDeck(s);                            // ยกออกจากขอนไม้ = วางลงทราย
   s.state='rest'; s.stt=0.8+Math.random()*1.2;
 }
 /* ---- สไปรต์ย่อของของตกแต่ง ----
@@ -827,10 +828,44 @@ function drawDecorAt(key, fx, fy, alpha, flip){
   return { x: (flip & 1)? p.x-(w-ax) : p.x-ax, y:p.y-ay, w, h };
 }
 /* ระบายเซ็ตช่องพื้น (คีย์ "ix,iy") — ใช้โชว์พื้นที่ที่ถูกจอง / โกสต์ */
-function paintCellSet(set, fill, stroke, lw){
-  const z=SAND_CELLS+0.012;
-  for(const k of set){ const c=k.split(','), x=+c[0]*DCELL, y=+c[1]*DCELL;
-    fillQuad(S(x,y,z),S(x+DCELL,y,z),S(x+DCELL,y+DCELL,z),S(x,y+DCELL,z), fill, stroke, lw||1); }
+/* ช่อง 0.5 ซม. ทำให้ขอนไม้ชิ้นเดียวมี ~1,700 ช่อง — วาดทีละช่อง+เส้นขอบทุกเฟรมทำให้โหมดจัดของกระตุก
+   รวมช่องติดกันในแถวเป็นแถบเดียว และเก็บเฉพาะขอบนอก (แคชต่อ Set ซึ่ง cellSet คืนตัวเดิมเมื่อชิ้น/ตำแหน่งเดิม)
+   แต่ละเฟรมแค่ฉายมุมแถบ แล้ว fill หนึ่งครั้ง stroke หนึ่งครั้ง · พื้นเป็นระนาบ ขอบตรงยังตรงหลังฉาย */
+const cellSetShapeCache=new WeakMap();
+let takenFootprintCache=null;                    // พื้นที่จองรวมของทุกชิ้นตอนถือของ — มีแค่ก้อนเดียว ทับเมื่อชุดเปลี่ยน
+function cellSetShape(set){
+  let sh=cellSetShapeCache.get(set); if(sh) return sh;
+  const rows=new Map(), has=(x,y)=>set.has(x+','+y);
+  for(const k of set){ const [x,y]=k.split(',').map(Number); let r=rows.get(y); if(!r) rows.set(y,r=[]); r.push(x); }
+  const runs=[], edges=[];
+  for(const [y,xs] of rows){ xs.sort((a,b)=>a-b);
+    for(let i=0;i<xs.length;){ let j=i; while(j+1<xs.length&&xs[j+1]===xs[j]+1) j++;
+      runs.push([xs[i],y,xs[j]+1]); edges.push([xs[i],y,xs[i],y+1],[xs[j]+1,y,xs[j]+1,y+1]); i=j+1; }   // ขอบซ้าย/ขวาของแถบ
+    for(const dy of [-1,1]){ const ly=y+(dy>0?1:0); let seg=null;   // ขอบบน/ล่าง: ช่วงที่แถวข้าง ๆ ว่าง
+      for(const x of xs){
+        if(has(x,y+dy)){ seg=null; continue; }
+        if(seg&&seg[2]===x) seg[2]=x+1; else edges.push(seg=[x,ly,x+1,ly]); } }
+  }
+  sh={ runs, edges };
+  cellSetShapeCache.set(set,sh); return sh;
+}
+function paintCellSet(set, fill, stroke, lw, ox=0, oy=0){      // ox,oy = เลื่อนทั้งรูปเป็นจำนวนช่อง
+  if(!set.size) return;
+  const z=SAND_CELLS+0.012, d=DCELL, sh=cellSetShape(set), P=(x,y)=>S((x+ox)*d,(y+oy)*d,z);
+  tctx.beginPath();
+  for(const [x0,y,x1] of sh.runs){ const a=P(x0,y),b=P(x1,y),c=P(x1,y+1),e=P(x0,y+1);
+    tctx.moveTo(a.x,a.y);tctx.lineTo(b.x,b.y);tctx.lineTo(c.x,c.y);tctx.lineTo(e.x,e.y);tctx.closePath(); }
+  if(fill){ tctx.fillStyle=fill; tctx.fill(); }
+  if(!stroke) return;
+  tctx.beginPath();
+  for(const [x0,y0,x1,y1] of sh.edges){ const a=P(x0,y0),b=P(x1,y1); tctx.moveTo(a.x,a.y); tctx.lineTo(b.x,b.y); }
+  tctx.strokeStyle=stroke; tctx.lineWidth=lw||1; tctx.stroke();
+}
+/* มาสก์ของชิ้นเดียว: ตำแหน่งตรงกริด = ใช้รูปทรงที่จุด (0,0) แล้วเลื่อน — ลากโกสต์ข้ามช่องจึงไม่สร้างรูปใหม่ทุกก้าว */
+function paintDecorFootprint(key, fx, fy, flip, fill, stroke, lw){
+  const sx=fx/DCELL, sy=fy/DCELL;
+  if(Math.abs(sx-Math.round(sx))>1e-6||Math.abs(sy-Math.round(sy))>1e-6) return paintCellSet(decorFootprint(key,fx,fy,flip),fill,stroke,lw);
+  paintCellSet(decorFootprint(key,0,0,flip),fill,stroke,lw,Math.round(sx),Math.round(sy));
 }
 function drawDecor(d){
   const box=drawDecorAt(d.key, d.fx, d.fy, d===dragDecor? 0.22 : null, d.flip);   // ตัวที่กำลังลาก จางไว้ โกสต์เป็นตัวนำ
@@ -856,11 +891,16 @@ function decorAt(mx,my){                                  // ของหน้�
 }
 
 /* ---- มาสก์ช่องของหิน (solid/หน้า/หลัง) หน่วยช่อง 0.5 ---- */
-const DCELL=0.5;
+// 0.5 cm is the common subdivision of authored 1 cm and legacy 2.5 cm
+// masks. Keep the original resolution when no fine-grid asset is present.
+const DCELL=Object.values(TANK_DECOR).some(d=>d.cell===.2||d.cell===.1)?0.1:0.5;
 const isCellList = arr => arr && arr.length && Array.isArray(arr[0]);
 /* พลิกซ้าย-ขวารอบแกนตั้งที่ anchor — ช่องกิน [cx, cx+0.5] เมื่อพลิกจึงกลายเป็น [-cx-0.5, -cx]
    ต้อง -DCELL ด้วย ไม่งั้นมาสก์เลื่อนไปครึ่งช่องเวลาพลิก */
-const fcx = (cx, flip) => (flip & 1) ? -cx-DCELL : cx;
+const fcx = (cx, flip) => (flip & 1) ? -cx-0.5 : cx;
+function addDecorMaskCell(set,x,y,size=.5){
+ for(let ix=Math.round(x/DCELL);ix<Math.round((x+size)/DCELL);ix++)for(let iy=Math.round(y/DCELL);iy<Math.round((y+size)/DCELL);iy++)set.add(ix+','+iy);
+}
 /* flip เป็นบิต: 1 = กลับซ้าย-ขวา · 2 = กลับบน-ล่าง (บน-ล่างเป็นการกลับ "ภาพ" ในกรอบเดิม
    ฐานยังแตะพื้นที่เดิม มาสก์จึงไม่เปลี่ยน มีแต่บิต 1 เท่านั้นที่ขยับมาสก์) */
 function flipOptions(key){                      // ท่าที่ชิ้นนี้อนุญาต ตามที่ตั้งไว้ใน Dec grid
@@ -882,7 +922,7 @@ function decorCellSet(o,listName){
   if(old&&old.arr===arr&&old.shape===shape&&old.key===o.key&&old.x===o.fx&&old.y===o.fy&&old.flip===o.flip)return old.set;
   const set=new Set();
   if(cells){
-    for(const [cx,cy] of arr)set.add(Math.round((o.fx+fcx(cx,o.flip))/DCELL)+','+Math.round((o.fy+cy)/DCELL));
+    for(const [cx,cy] of arr)addDecorMaskCell(set,o.fx+fcx(cx,o.flip),o.fy+cy);
   }else if(listName==='solid'&&arr){
     const [w,h]=arr;
     for(let dx=-w/2;dx<w/2-1e-6;dx+=DCELL)for(let dy=-h/2;dy<h/2-1e-6;dy+=DCELL)
@@ -901,6 +941,83 @@ function decorSolidSet(decor){
   decorSolidCache.set(decor,{parts,set});return set;
 }
 function ptKey(x,y){ return Math.floor(x/DCELL)+','+Math.floor(y/DCELL); }
+/* ---- คลานบนขอนไม้: เส้นทางตามสันกิ่ง (frame.path จาก tools/analyze-decor-grid.cjs) ----
+   n = [x, y (ช่อง นับจากจุดฐาน), z (ซม.), รัศมีกิ่ง (ซม.)] · e = จุดที่ต่อกัน · in = จุดที่ปีนขึ้น/ลงจากทรายได้
+   ทรายตรงที่ไม้วางแตะพื้นเป็นช่อง solid — ขึ้นไม้ได้ทางจุดปีนเท่านั้น แล้วคลานตามเส้นทาง
+   กราฟพิกัดตู้แคชต่อชิ้น (ตำแหน่ง/ทิศเดิม = ใช้ของเดิม) ไม่คำนวณใหม่ทุกเฟรม */
+const decorPathCache=new WeakMap();
+function decorPathGraph(o){
+  const f=typeof SpriteDecor!=='undefined'&&SpriteDecor.is(o.key)?SpriteDecor.frame(o.key,o.flip):null,src=f?.path;
+  if(!src?.n?.length||!src.in?.length)return null;
+  const old=decorPathCache.get(o);
+  if(old&&old.src===src&&old.fx===o.fx&&old.fy===o.fy)return old;
+  const n=src.n.map(([x,y,z,r])=>({x:o.fx+x,y:o.fy+y,z:z/CM_PER_CELL,r:r/CM_PER_CELL})),adj=n.map(()=>[]);
+  for(const [a,b] of src.e){adj[a].push(b);adj[b].push(a);}
+  const hops=n.map(()=>Infinity),q=[...src.in];for(const i of q)hops[i]=0;   // ก้าวถึงจุดปีนที่ใกล้สุด — ตัวที่อยากลงเดินไปทางนั้น
+  for(let k=0;k<q.length;k++)for(const b of adj[q[k]])if(hops[b]===Infinity){hops[b]=hops[q[k]]+1;q.push(b);}
+  const g={src,fx:o.fx,fy:o.fy,n,adj,hops,entries:src.in};decorPathCache.set(o,g);return g;
+}
+/* จุดยืนบนทรายข้างจุดปีน: ตั้งฉากกับแนวกิ่ง ห่างแกนกิ่ง = รัศมีกิ่ง + ครึ่งตัวทาก · ok = ยืนตรงนั้นได้ (ไม่ชน solid/ขอบตู้) */
+function deckGroundPoint(g,i,rad,ok,near){
+  const a=g.n[i],b=g.n[g.adj[i][0]]||a;let tx=b.x-a.x,ty=b.y-a.y;const L=Math.hypot(tx,ty)||1;tx/=L;ty/=L;
+  const d=a.r+rad+0.08;let best=null;
+  for(const side of [1,-1]){const x=a.x-ty*d*side,y=a.y+tx*d*side;if(!ok(x,y))continue;
+    const far=near?Math.hypot(x-near.x,y-near.y):Math.random();if(!best||far<best.far)best={x,y,far};}
+  return best;
+}
+function nextDeckNode(g,a,prev,toExit){
+  let opts=g.adj[a].filter(b=>b!==prev);
+  if(!opts.length)return prev>=0?prev:a;                          // ปลายกิ่ง = กลับทางเดิม
+  if(toExit){const best=Math.min(...opts.map(b=>g.hops[b]));opts=opts.filter(b=>g.hops[b]===best);}
+  return opts[Math.floor(Math.random()*opts.length)];
+}
+function startDeck(s,o,g,i,rad){
+  const A=g.n[i];
+  s.deck={o,g,a:i,b:i,t:0,phase:'up',from:{x:s.fx,y:s.fy,z:0},to:{x:A.x,y:A.y,z:A.z},time:0,stay:25+Math.random()*50,rad,wait:0};
+  s.state='walk';delete s.intentX;delete s.intentY;
+}
+function leaveDeck(s){ s.deck=null; s._deckZ=0; s._deckTilt=0; }
+/* ก้าวหนึ่งเฟรมของตัวที่อยู่บนขอนไม้ — ปีนขึ้น → คลานตามกิ่ง (พักบ้าง) → อยู่ครบเวลาแล้วเดินหาจุดปีนลง
+   ความเร็วชุดเดียวกับเดินบนพื้น · หันหน้า/จังหวะคืบคิดท้ายเฟรมจากที่ขยับจริง (slugFaceAndCreep) */
+function stepDeckSlug(s,dt,obstacles,ok){
+  const d=s.deck,g=obstacles&&obstacles.includes(d.o)?decorPathGraph(d.o):null;
+  if(!g||g!==d.g){leaveDeck(s);s.state='rest';s.stt=REST_MIN;return;}   // ของถูกย้าย/หมุน/เก็บ → ลงพื้น (บล็อก solid เฟรมหน้าดันออกให้)
+  slugPoseTimers(s,dt);
+  const x0=s.fx,y0=s.fy,z0=s._deckZ||0;
+  let v=SLUG_SPEED*dt*slugPace(s);d.time+=dt;
+  if(d.phase==='rest'){d.wait-=dt;if(d.wait<=0)d.phase='walk';}
+  else if(d.phase==='up'||d.phase==='down'){
+    const A=d.from,B=d.to,len=Math.hypot(B.x-A.x,B.y-A.y,B.z-A.z)||1e-6;
+    d.t=Math.min(1,d.t+v/(len*1.2));v=0;                           // ปีนขึ้น/ลงช้ากว่าคลานนิดหน่อย
+    s.fx=A.x+(B.x-A.x)*d.t;s.fy=A.y+(B.y-A.y)*d.t;s._deckZ=A.z+(B.z-A.z)*d.t;
+    if(d.t>=1){
+      if(d.phase==='down'){leaveDeck(s);s.state='walk';s.stt=WALK_MIN+Math.random()*(WALK_MAX-WALK_MIN);s.dir=s.turn=Math.atan2(B.y-A.y,B.x-A.x);return;}
+      d.phase='walk';d.t=0;d.b=nextDeckNode(g,d.a,-1,false);
+    }
+  }
+  if(d.phase==='walk'){
+    for(let guard=0;v>0&&guard<8;guard++){
+      const A=g.n[d.a],B=g.n[d.b],len=Math.hypot(B.x-A.x,B.y-A.y,B.z-A.z)||1e-6,left=(1-d.t)*len;
+      if(v<left){d.t+=v/len;break;}
+      v-=left;const prev=d.a;d.a=d.b;d.t=0;
+      const leaving=d.time>d.stay;
+      if(leaving&&g.hops[d.a]===0){const p=deckGroundPoint(g,d.a,d.rad,ok,null),N=g.n[d.a];
+        if(p){d.phase='down';d.from={x:N.x,y:N.y,z:N.z};d.to={x:p.x,y:p.y,z:0};d.t=0;break;}}
+      d.b=nextDeckNode(g,d.a,prev,leaving);
+      if(!leaving&&Math.random()<0.1){d.phase='rest';d.wait=REST_MIN+Math.random()*(REST_MAX-REST_MIN);break;}
+    }
+    if(d.phase!=='down'){const A=g.n[d.a],B=g.n[d.b];s.fx=A.x+(B.x-A.x)*d.t;s.fy=A.y+(B.y-A.y)*d.t;s._deckZ=A.z+(B.z-A.z)*d.t;}
+  }
+  s.state=d.phase==='rest'?'rest':'walk';
+  /* เอียงตัวตาม "ความชันจริง" ของกิ่ง (ขึ้นเนินหัวเชิด ลงเนินหัวทิ่ม) — ไม่ใช้มุมบนจอ
+     เดินเข้า-ออกจอบนกิ่งที่ราบต้องไม่เอียง เหมือนเดินบนทราย · หันซ้าย/ขวาตามที่ขยับบนจอ (ชุดเดียวกับ s.flip) · จำกัด ±50° */
+  const dx=s.fx-x0,dy=s.fy-y0,dz=(s._deckZ||0)-z0,run=Math.hypot(dx,dy),sx=dx*CELLW+dy*DEPX;
+  if(run+Math.abs(dz)>1e-6){if(run>1e-6)s.dir=s.turn=Math.atan2(dy,dx);
+    const slope=Math.max(-.87,Math.min(.87,Math.atan2(dz,run))),right=Math.abs(sx)>1e-6?sx>0:!!s.flip;
+    const want=right?-slope:slope;
+    s._deckTilt=(s._deckTilt||0)+(want-(s._deckTilt||0))*Math.min(1,dt*6);}
+  s.ph+=dt*(0.8+((s.traits&&s.traits.energy)||0.5)*0.5)*(s.state==='walk'?1.45:0.62);
+}
 
 /* ที่ว่างใกล้สุดที่ไม่ใช่ช่อง solid — วนเป็นวงกลมออกไปทีละครึ่งช่อง
    ใช้ตอนสปอน / ตอนปล่อยทากลงหิน / ตอนวางหินทับทาก */
@@ -925,6 +1042,7 @@ function nudgeSlugsOutOfSolid(slugs, fw, fh, decor){
   const SOLID=decorSolidSet(decor); if(!SOLID.size) return;
   slugs.forEach(s=>{
     if(s.fx===undefined || !SOLID.has(ptKey(s.fx,s.fy))) return;
+    if(s.deck){ if(decor&&decor.includes(s.deck.o)&&decorPathGraph(s.deck.o)===s.deck.g) return; leaveDeck(s); }   // ยังคลานบนขอนไม้เดิม = ไม่ต้องดัน
     const g=freeSpotNear(s.fx, s.fy, SOLID, fw, fh, slugCm(s.genes)/CM_PER_CELL*0.55+0.2);
     s.fx=g.fx; s.fy=g.fy;
   });
@@ -936,7 +1054,7 @@ function decorFootprint(key, fx, fy, flip){
   const def=TANK_DECOR[key], set=new Set(); if(!def) return set;
   const arr = (def.place && def.place.length) ? def.place : def.solid;   // ยังไม่ได้ระบายเหลือง → ใช้ solid แทน
   if(!arr || !arr.length) return set;
-  if(isCellList(arr)){ for(const [cx,cy] of arr) set.add(Math.round((fx+fcx(cx,flip))/DCELL)+','+Math.round((fy+cy)/DCELL)); }
+  if(isCellList(arr)){ for(const [cx,cy] of arr) addDecorMaskCell(set,fx+fcx(cx,flip),fy+cy); }
   else { const w=arr[0],h=arr[1];                      // rect เก่า
     for(let dx=-w/2; dx<w/2-1e-6; dx+=DCELL) for(let dy=-h/2; dy<h/2-1e-6; dy+=DCELL)
       set.add(Math.round((fx+dx)/DCELL)+','+Math.round((fy+dy)/DCELL)); }
@@ -950,7 +1068,7 @@ function decorRequiredBounds(key,fx,fy,flip){
  const def=TANK_DECOR[key];if(!def||!Number.isFinite(fx)||!Number.isFinite(fy))return null;
  const cells=def.place?.length?def.place:def.solid;if(!cells?.length)return null;
  let rectangles;
- if(isCellList(cells))rectangles=cells.map(([x,y])=>[fx+fcx(x,flip),fy+y,fx+fcx(x,flip)+DCELL,fy+y+DCELL]);
+ if(isCellList(cells))rectangles=cells.map(([x,y])=>[fx+fcx(x,flip),fy+y,fx+fcx(x,flip)+.5,fy+y+.5]);
  else {const [w,h]=cells;rectangles=[[fx-w/2,fy-h/2,fx+w/2,fy+h/2]];}
  if(rectangles.some(r=>r.some(n=>!Number.isFinite(n))))return null;
  return {left:Math.min(...rectangles.map(r=>r[0])),top:Math.min(...rectangles.map(r=>r[1])),right:Math.max(...rectangles.map(r=>r[2])),bottom:Math.max(...rectangles.map(r=>r[3]))};
@@ -1008,6 +1126,34 @@ function decorPlaceIssue(key, fx, fy, flip, ignore){
 function canPlaceDecor(key, fx, fy, flip, ignore){
   return !decorPlaceIssue(key, fx, fy, flip, ignore);
 }
+/* ของที่วางไว้ก่อนแก้พื้นที่วางใน Dec Grid อาจล้นผนังตู้ตามมาสก์ใหม่ (ขึ้นแดงทับภาพทั้งชิ้นตอนจัดของ)
+   เข้าตู้ = ย้ายชิ้นนั้นไปจุดว่างที่ใกล้ที่สุด ท่าเดิมก่อน · ไม่มีที่ลงเลย = คืนเป็นเครดิต ไม่มีอะไรหาย
+   ต้องเรียกหลังตั้ง curTank (decorPlaceIssue อ่านตู้ปัจจุบัน) · คืนจำนวนชิ้นที่ขยับ/คืน */
+function fixStrayDecor(tank){
+  let moved=0,returned=0;
+  for(const d of [...(tank.decor||[])]){
+    if(decorFitsTankWalls(d.key,d.fx,d.fy,d.flip,tank)) continue;
+    const spots=[];
+    for(let x=0;x<=tank.def.w;x+=.5) for(let y=0;y<=tank.def.h;y+=.5) spots.push([x,y,(x-d.fx)**2+(y-d.fy)**2]);
+    spots.sort((a,b)=>a[2]-b[2]);
+    const taken=new Set();                         // ช่องที่ชิ้นอื่นจองไว้ — สร้างครั้งเดียว แล้วเลื่อนมาสก์ชิ้นนี้ทับเช็กแบบหยุดเร็ว
+    for(const o of tank.decor) if(o!==d) for(const k of decorFootprint(o.key,o.fx,o.fy,o.flip)) taken.add(k);
+    let hit=null;
+    for(const f of [d.flip,...flipOptions(d.key).filter(f=>f!==d.flip)]){
+      const base=[...decorFootprint(d.key,0,0,f)].map(k=>k.split(',').map(Number));
+      for(const [x,y] of spots){
+        if(!decorFitsTankWalls(d.key,x,y,f,tank)) continue;
+        const sx=Math.round(x/DCELL),sy=Math.round(y/DCELL);
+        if(base.some(([ix,iy])=>taken.has((ix+sx)+','+(iy+sy)))) continue;
+        if(!decorPlaceIssue(d.key,x,y,f,d)){ hit={x,y,f}; break; }
+      }
+      if(hit) break;
+    }
+    if(hit){ d.fx=hit.x; d.fy=hit.y; d.flip=hit.f; moved++; }
+    else { tank.decor.splice(tank.decor.indexOf(d),1); G.decorCredit=G.decorCredit||{}; G.decorCredit[d.key]=(G.decorCredit[d.key]||0)+1; returned++; }
+  }
+  return moved+returned ? {moved,returned} : null;
+}
 /* ป้ายเหตุผลใต้เงาพรีวิวในตู้ — ขนาดคงที่บนจอ (ไม่โตตามซูม) หนีบไม่ให้หลุดขอบแคนวาส */
 function decorWhyLabel(text,fx,fy){
   const p=S(fx,fy,SAND_CELLS);
@@ -1022,7 +1168,7 @@ function decorWhyLabel(text,fx,fy){
 }
 
 /* กรอบจอของแคนวาสตู้ — แคชไว้ อ่านใหม่เฉพาะตอนขนาดเปลี่ยน (ResizeObserver / resize / เข้าตู้)
-   ⚠️ 2026-09-16 เดิมอ่าน getBoundingClientRect ทุกเฟรม 3 ครั้ง (resizeTank + decor-glb beginTank/endTank)
+   ⚠️ 2026-09-16 เดิมอ่าน getBoundingClientRect หลายครั้งทุกเฟรม
       คั่นด้วย HUD/สไตล์ที่เพิ่งแก้ในเฟรมเดียวกัน = บังคับคำนวณ layout ซ้ำกลางเฟรม วัดได้ 20–60ms/วิ ในโหมดตู้ */
 let tankRectCache=null;
 function tankCvRect(){ return tankRectCache||(tankRectCache=tankCv.getBoundingClientRect()); }
@@ -1093,11 +1239,17 @@ function fitTankZoom(){ tankCam.zoom = tankFitZoom(); }
 function enterTank(o, focus){
   if(typeof exitModes==='function') exitModes('tank');
   curTank=o; tankMode=true; selSlug=null; tankBuildMode=false; ov.classList.add('on'); tankRectCache=null;
+  _lay.key='';                                   // เข้าตู้ = อบชั้นตัวตู้/กระจกใหม่ (ตู้ขนาดเท่ากันแต่คนละใบ สีกระจก/ฐานต่างกันได้)
   document.getElementById('ovBuild').textContent='🔧 จัดของ: ปิด';
   document.getElementById('ovTitle').textContent=o.def.name+' · '+(o.def.w*CM_PER_CELL)+'×'+(o.def.h*CM_PER_CELL)+'×'+tankGlassCm(o.def)+' ซม. · จุได้ '+tankCap(o.def)+' ตัว';
   resizeTank();
   o.slugs.forEach(s=> placeOnFloor(s,o));      // กระจายทากบนพื้น (ยังไม่รู้จักหิน)
   o.decor = o.decor || [];                     // รายการของตกแต่งในตู้
+  const stray=fixStrayDecor(o);
+  if(stray){
+    if(typeof saveGame==='function') saveGame();
+    toast((stray.moved?'ขยับของที่ล้นขอบตู้เข้ามา '+stray.moved+' ชิ้น':'')+(stray.moved&&stray.returned?' · ':'')+(stray.returned?'คืนของที่ไม่มีที่วาง '+stray.returned+' ชิ้นเป็นเครดิต':''),'good');
+  }
   nudgeSlugsOutOfSolid(o.slugs, o.def.w, o.def.h, o.decor);   // ตัวที่สุ่มลงกลางหิน ดันออกมาก่อน
   selDecor=null; selDecorKey=null; syncDecorBar();
   tankFocus = focus || null;                   // จุดที่กด (interior fx,fy) เพื่อโฟกัส
@@ -1120,7 +1272,7 @@ document.getElementById('ovBuild').onclick=()=>{
   document.getElementById('ovBuild').textContent='🔧 จัดของ: '+(tankBuildMode?'เปิด':'ปิด');
   if(tankBuildMode){
     selDecorKey=null;                                  // ยังไม่เลือกของ = ยังไม่โชว์กริดวาง (เหลือง)
-    toast('โหมดจัดของ: เลือกของจากแถบล่างเพื่อวาง · ลากของที่มีอยู่เพื่อย้าย · คลิกของแล้วกดลบ','good');
+    toast('โหมดจัดของ: เลือกของจากแถบล่างเพื่อวาง · ลากของที่มีอยู่เพื่อย้าย · คลิกของแล้วกด ขาย (ได้เงินคืน) หรือ เก็บ (วางคืนได้ฟรี)','good');
   } else { selDecorKey=null; selDecor=null; decorHover=null; dragGhost=null; }
   syncDecorBar();
 };
@@ -1147,11 +1299,24 @@ function buildDecorBar(){
       /* เครดิตผูกกับ "ของชิ้นนี้ชนิดนี้" เท่านั้น ห้ามเป็นตั๋วฟรีใช้กับของชนิดไหนก็ได้
          (เดิมเป็นตัวเลขเดียวรวมทุกชนิด — เก็บของถูกแล้วเอาไปวางของแพงฟรีได้ เป็นช่องโหว่) */
       G.decorCredit=G.decorCredit||{}; G.decorCredit[key]=(G.decorCredit[key]||0)+1;
-      toast('เก็บ'+TANK_DECOR[key].name+' · วาง'+TANK_DECOR[key].name+'ฟรีได้อีก 1 ชิ้น','good');
+      toast('เก็บ'+TANK_DECOR[key].name+'ไว้แล้ว · กดการ์ด 🎟️ แล้ววางคืนได้ฟรี','good');
       if(typeof syncHUD==='function')syncHUD(); if(typeof saveGame==='function')saveGame(); if(typeof syncDecorBar==='function')syncDecorBar(); }
     selDecor=null; syncDecorBar();
   };
+  /* ขาย = เอาออกถาวร ได้เงินคืนครึ่งราคาปัจจุบัน (DECO_REFUND เดียวกับของบนพื้นร้าน) ไม่ได้เครดิต */
+  const sell=document.getElementById('dSell');
+  if(sell) sell.onclick=()=>{
+    if(!curTank || !selDecor){ toast('เลือกของในตู้ก่อน (คลิกที่ของ)','bad'); return; }
+    const i=curTank.decor.indexOf(selDecor);
+    if(i>=0){ const key=selDecor.key, back=decorSellValue(key); curTank.decor.splice(i,1);
+      addCoin(back);
+      toast('ขาย'+TANK_DECOR[key].name+'แล้ว +'+back.toLocaleString()+' เหรียญ','good');
+      nudgeSlugsOutOfSolid(curTank.slugs, curTank.def.w, curTank.def.h, curTank.decor);
+      if(typeof syncHUD==='function')syncHUD(); if(typeof saveGame==='function')saveGame(); }
+    selDecor=null; syncDecorBar();
+  };
 }
+function decorSellValue(key){ return Math.round(decorPrice(key)*DECO_REFUND); }
 /* พลิกซ้าย-ขวา: ถ้าเลือกของในตู้อยู่ = พลิกชิ้นนั้น · ถ้าไม่ได้เลือก = พลิกทิศของชิ้นที่กำลังจะวาง */
 const FLIP_NAME=['ด้านปกติ','กลับซ้าย-ขวา','กลับบน-ล่าง','กลับทั้งสองแกน'];
 const FLIP_SYM =['·','↔','↕','⤢'];   // สัญลักษณ์กว้างเท่ากันทุกตัว ปุ่มจึงไม่ยืด-หด
@@ -1171,6 +1336,7 @@ function flipDecor(){
     if(why){ toast('พลิกไม่ได้: '+why+' — ย้ายที่ก่อน','bad'); return; }
     selDecor.flip=f;
     nudgeSlugsOutOfSolid(curTank.slugs, curTank.def.w, curTank.def.h, curTank.decor);
+    if(typeof saveGame==='function')saveGame();
     toast(typeof decorRotationName==='function'?decorRotationName(key,f):FLIP_NAME[f],'good');
   } else {
     placeFlip=nextFlip(selDecorKey, placeFlip);
@@ -1193,6 +1359,8 @@ function syncDecorBar(){
   bar.hidden = !tankBuildMode;
   bar.querySelectorAll('.dbtn').forEach(b=> b.classList.toggle('on', b.dataset.key===selDecorKey));
   const rm=document.getElementById('dRemove'); if(rm) rm.disabled = !selDecor;
+  const sl=document.getElementById('dSell');
+  if(sl){ sl.disabled=!selDecor; sl.textContent=selDecor?'💰 ขาย +'+decorSellValue(selDecor.key).toLocaleString():'💰 ขาย'; }
   const fl=document.getElementById('dFlip');
   if(fl){
     const key = selDecorKey || (selDecor && selDecor.key);      // ถืออยู่มาก่อน
@@ -1202,7 +1370,7 @@ function syncDecorBar(){
     fl.classList.toggle('on', can && cur!==0);
     /* ความยาวข้อความต้องคงที่เป๊ะ — ถ้ายาว-สั้นสลับกัน แถบล่างจะจัดบรรทัดใหม่
        ความสูงแถบเปลี่ยน → แคนวาสเปลี่ยนขนาด → resizeTank() จัดกล้องใหม่ = ภาพกระตุกทุกครั้งที่กด R */
-    fl.textContent = (typeof TidalDecor!=='undefined'&&TidalDecor.is(key))?'🔄 หมุน (R) '+cur*90+'°':'🔄 พลิก (R) ' + (can ? FLIP_SYM[cur] : '–');
+    fl.textContent = (typeof SpriteDecor!=='undefined'&&SpriteDecor.is(key))?'🔄 หมุน (R) '+cur*90+'°':'🔄 พลิก (R) ' + (can ? FLIP_SYM[cur] : '–');
   }
 }
 document.getElementById('ovAdd').onclick=()=>{
@@ -1320,21 +1488,6 @@ function drawWallSlug(s,parts,sa){
   s._hit={x,y,r:Math.max(20,width*.5)};
   return {x, y, hx:pose.hx, hy:pose.hy, len:width};
 }
-/* ทากเกาะกระจกแบบ 3D — ส่ง "แกนบนจอ" ชุดเดียวกับที่สไปรต์ 2D ใช้เข้าไปให้ Slug3D หมุนโมเดลจริง
-   ต่างจาก 2D ตรงที่ไม่ต้องดันตัวออกจากกระจก เพราะจุดกำเนิดของโมเดลอยู่ที่ "ท้อง" อยู่แล้ว
-   ตัวจึงงอกออกจากกระจกเข้าหากลางตู้เอง คืน null = วาดไม่ได้ ให้ตกไปใช้สไปรต์ต่อ */
-function drawWallSlug3D(s,bodyLen){
-  if(!(window.Slug3D&&Slug3D.ready&&Slug3D.enabled))return null;
-  const left=s.wall!=='right', edge=left?0:(curTank.def.breeder?20:curTank.def.w), sgn=left?1:-1;
-  const limits=slugWallLimits(s,curTank.def.w,curTank.def.h,curTank.def);
-  const floor=S(edge,s.fy,SAND_CELLS),water=S(edge,s.fy,limits.water);
-  if(bodyLen>floor.y-water.y-2&&(curTank.def.shopSlugScale||1)===1)return null;   // ตัวยาวเกินช่องน้ำ = ไม่วาด (เกณฑ์เดียวกับ 2D)
-  const c=S(edge,s.fy,SAND_CELLS+limits.half+(s.climbZ||0));
-  const pose=slugWallPose(s,sgn);
-  if(!Slug3D.draw(tctx,s,c.x,c.y,bodyLen,false,null,{hx:pose.hx,hy:pose.hy,dx:pose.dx,dy:pose.dy}))return null;
-  return {x:c.x, y:c.y, hx:pose.hx, hy:pose.hy, rot:pose.rot, len:bodyLen};
-}
-
 function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
   if(tankDef?.breeder){slugs=slugs.filter(s=>{if(s.breedZone){walkBreedingZone(s,dt);return false;}return true;});}
   if(tankDef?.breeder)fw=20;
@@ -1371,6 +1524,9 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
   slugs.forEach(s=>{
     const rad=slugCm(s.genes)/CM_PER_CELL*0.35;
     const blk=(x,y)=>blkAt(x,y,rad);
+    /* ยืนบนทรายตรงนี้ได้ไหม (ใช้หาจุดปีนขึ้น/ลงขอนไม้) — กรอบขอบตู้ชุดเดียวกับบล็อกบีบท้ายเฟรม */
+    const standOk=(x,y)=>{const mg=slugEdgeMargin(s,fw);return x>Math.min(mg,fw/2)&&x<fw-Math.min(mg,fw/2)&&y>Math.min(mg,fh/2)&&y<fh-Math.min(mg,fh/2)&&!blk(x,y);};
+    if(s.deck){stepDeckSlug(s,dt,obstacles,standOk);return;}          // อยู่บนขอนไม้ = เดินตามเส้นทางบนกิ่ง ไม่ใช้ระบบเดินบนพื้น
     /* ⚠️ 2026-09-20 ผู้เล่น: "ทากยังบัคชนรัว ๆ อยู่เลย"
        ตัวหน่วง "ตัดสินใจหลบแล้วยึดไว้แป๊บนึง" — ดูจุดที่ใช้สองแห่งด้านล่าง (ชนตัวอื่น / ชนช่องตัน)
        ทั้งสองจุดเดิมสุ่มทิศหลบใหม่ทุกเฟรม ทำให้ s.turn เด้งไปมา 60 ครั้ง/วินาที
@@ -1462,8 +1618,12 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
         } else if(decor.length && r < (acc+=pDecor)){
           decor.sort((a,b)=>Math.hypot(a.fx-s.fx,a.fy-s.fy)-Math.hypot(b.fx-s.fx,b.fy-s.fy));
           const pick=decor[Math.min(decor.length-1,Math.floor(Math.random()*Math.min(3,decor.length)))];
-          const near=freeSpotNear(pick.fx,pick.fy,SOLID,fw,fh,rad+0.25);
-          s.state='seekDecor'; s.stt=9; s.intentX=near.fx; s.intentY=near.fy;
+          /* ขอนไม้ที่มีเส้นทางบนกิ่ง: ส่วนใหญ่เดินไปที่จุดปีนแล้วขึ้นไปคลานบนไม้ · นอกนั้นแค่ไปส่องเหมือนเดิม */
+          const path=decorPathGraph(pick);let aim=null;delete s._deckGoal;
+          if(path&&Math.random()<0.75){const i=path.entries[Math.floor(Math.random()*path.entries.length)];aim=deckGroundPoint(path,i,rad,standOk,{x:s.fx,y:s.fy});if(aim)s._deckGoal={o:pick,i};}
+          if(aim){s.state='seekDecor';s.intentX=aim.x;s.intentY=aim.y;s.stt=Math.max(9,Math.min(90,Math.hypot(aim.x-s.fx,aim.y-s.fy)/(SLUG_SPEED*0.55)+6));}
+          else{const near=freeSpotNear(pick.fx,pick.fy,SOLID,fw,fh,rad+0.25);
+          s.state='seekDecor'; s.stt=9; s.intentX=near.fx; s.intentY=near.fy;}
         } else {
           s.state='walk'; s.stt=WALK_MIN+Math.random()*(WALK_MAX-WALK_MIN); s.turn=Math.random()*6.283;
         }
@@ -1514,9 +1674,13 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
         delete s.intentX; delete s.intentY; }
     }
     if(s.state==='seekDecor'){
-      const dx=s.intentX-s.fx, dy=s.intentY-s.fy, dist=Math.hypot(dx,dy);
+      const dx=s.intentX-s.fx, dy=s.intentY-s.fy, dist=Math.hypot(dx,dy), goal=s._deckGoal;
       s.turn=Math.atan2(dy,dx);
-      if(dist<1.15){
+      if(goal&&dist<0.25){                             // ถึงจุดปีนแล้ว = ขึ้นขอนไม้
+        delete s._deckGoal;const g=obstacles&&obstacles.includes(goal.o)?decorPathGraph(goal.o):null;
+        if(g&&g.n[goal.i]){startDeck(s,goal.o,g,goal.i,rad);return;}
+      }
+      if(dist<(goal?0.25:1.15)){ delete s._deckGoal;
         s.state='inspect'; s.stt=INSPECT_TIME+Math.random()*1.2;
         delete s.intentX; delete s.intentY;
       }
@@ -1581,7 +1745,7 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
       let mvx=Math.cos(s.dir)*v, mvy=Math.sin(s.dir)*v;
       /* ---- หลบกันก่อนชน (2026-09-17 ผู้เล่น: "ทากกระตุกเวลาเดินชนกัน") ----
          เดิมเดินดันเข้าหากันเต็มก้าว แล้วแรงแยกตัวท้ายเฟรมผลักกลับได้ถึง SEP_PUSH_MAX เท่า
-         → ระยะที่ขยับจริงกลับทิศไปมาทุกเฟรม · _motionHeading (หน้าของโมเดล 3D) พลิก 180° สลับกัน = กระตุก
+         → ระยะที่ขยับจริงกลับทิศไปมาทุกเฟรม = หน้าพลิกสลับกัน กระตุก
          วัดได้: ทาก 10 ตัวเดินเข้ากลาง 20 วิ หน้าพลิก >90° 40 ครั้ง · ถอยหลัง 61 เฟรม
          ตอนนี้: ถ้าก้าวนี้พาเข้าใกล้ตัวที่อยู่ข้างหน้าในระยะชน ตัด "ส่วนที่พุ่งเข้าหา" ทิ้ง เหลือแต่ส่วนที่ไถลเลียบข้าง
          เดินอ้อมไปเองแบบลื่น ๆ · ไถลต่อไม่ได้ (ชนตรง ๆ) ค่อยเลี้ยวหลบทางขวา */
@@ -1642,7 +1806,6 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
       /* ชนช่องตันทุกแกน — ยึดทิศหลบไว้เหมือนกัน ไม่งั้นสุ่มใหม่ทุกเฟรมแล้วสั่นอยู่หน้าหินไม่หลุด */
       else if((s._avoidHold||0)<=0){ s.turn=s.dir+Math.PI*(0.6+Math.random()*0.8); s.stt=Math.min(s.stt,0.5); s._avoidHold=0.7; }
     }
-    /* (ทิศที่โมเดล 3D หัน `s._motionHeading` ย้ายไปตั้งท้ายเฟรมพร้อม s.flip แล้ว — ดูคอมเมนต์ตรงนั้น) */
     s.ph+=dt*(0.8+((s.traits&&s.traits.energy)||0.5)*0.5)*(s.state==='dash'?3.2:s.state==='flee'?2.35:(s.state==='walk'||s.state==='seekDecor'||s.state==='seekNap'||s.state==='seekClimb'||s.state==='follow')?1.45:s.state==='wake'?2.0:0.62);
     /* ค้างในช่อง solid → หาที่ว่างใกล้สุดแล้วย้ายไปเลย
        ⚠️ 2026-09-20 ผู้เล่น: "ทากยังบัคชนรัว ๆ อยู่เลย" — ต้นเหตุจริงอยู่บรรทัดนี้
@@ -1678,7 +1841,7 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
   };
   if(doSep) for(let i=0;i<slugs.length;i++) for(let j=i+1;j<slugs.length;j++){
     const a=slugs[i], b2=slugs[j];
-    if(slugOnWall(a)||slugOnWall(b2))continue;
+    if(slugOnWall(a)||slugOnWall(b2)||a.deck||b2.deck)continue;          // บนกระจก/บนขอนไม้ = ไม่ชนกับตัวบนทราย
     const min=(slugCm(a.genes)+slugCm(b2.genes))/CM_PER_CELL*0.42;
     let ex=a.fx-b2.fx, ey=a.fy-b2.fy, ds=Math.hypot(ex,ey)||0.001;
     if(ds<min){
@@ -1717,8 +1880,10 @@ function stepTankSlugs(slugs, fw, fh, dt, doSep, obstacles, tankDef){
       s.fx=s._lastGoodFx;s.fy=s._lastGoodFy;s.state='rest';s.stt=REST_MIN;s.dir=s.turn=0;
     }
     const mx=Math.min(mg,fw/2),my=Math.min(mg,fh/2);
-    s.fx=Math.max(mx,Math.min(fw-mx,s.fx));
-    s.fy=Math.max(my,Math.min(fh-my,s.fy));
+    if(!s.deck){                                  // บนขอนไม้ตำแหน่งมาจากเส้นทาง ไม่บีบ
+      s.fx=Math.max(mx,Math.min(fw-mx,s.fx));
+      s.fy=Math.max(my,Math.min(fh-my,s.fy));
+    }
     slugFaceAndCreep(s,dt);
     s._lastGoodFx=s.fx;s._lastGoodFy=s.fy;
   });
@@ -1743,8 +1908,8 @@ function slugPoseTimers(s,dt){
    ⚠️ 2026-09-20 ผู้เล่น: "ทากในโซนผสมยังเดินมูนวอล์คได้อยู่ · ตัวเล็กระยะก้าวไกลไปเลยเดินกระตุก"
    ต้นเหตุเดียวกันทั้งคู่: บล็อกนี้เคยอยู่ในลูปท้าย stepTankSlugs ซึ่งทำงานกับ "slugs ที่ถูกกรองแล้ว"
    ทากในโซนผสม (s.breedZone) ถูก filter ออกตั้งแต่ต้นฟังก์ชัน และตัวอ่อนไม่ได้อยู่ใน o.slugs เลย
-   สองกลุ่มนี้จึงไม่เคยได้อัปเดต s.flip / s._motionHeading / s.creepT สักครั้ง
-     → s.flip กับ _motionHeading ค้างค่าเก่า = มูนวอล์คทั้ง 2D และ 3D
+   สองกลุ่มนี้จึงไม่เคยได้อัปเดต s.flip / s.creepT สักครั้ง
+     → s.flip ค้างค่าเก่า = มูนวอล์ค
      → creepT ไม่เดิน = ท่าคืบไม่ขยับตามระยะที่เดินจริง
    แยกออกมาเป็นฟังก์ชันเพื่อให้ walkBreedingZone (breeding.js) เรียกใช้ชุดเดียวกันได้ */
 function slugFaceAndCreep(s,dt){
@@ -1758,23 +1923,6 @@ function slugFaceAndCreep(s,dt){
        ไม่ใช้ตั้งหน้า — ถ้าใช้ ตัวที่อัดกันกลางฝูงจะพลิกหน้าไป-กลับทุกเฟรม (กระตุก) · ขยับไปข้างหน้า/ข้าง ๆ ยังหันตามจริงเหมือนเดิม (กันมูนวอค) */
     const pushedBack=(ndx*Math.cos(s.dir)+ndy*Math.sin(s.dir))<-0.2*Math.hypot(ndx,ndy);
     if(!s.wall && FACE_STATES.includes(s.state) && !pushedBack && Math.abs(sdx)>SLUG_SPEED*dt*0.2*CELLW) s.flip=sdx>0;
-    /* ⚠️ โมเดล 3D ไม่ได้ใช้ s.flip — มันหันตาม s._motionHeading (ดูจุดที่เรียก Slug3D.draw)
-       ซึ่งเดิมตั้งไว้กลางเฟรมจาก "ก้าวเดินของตัวเอง" ก่อนแรงผลักระหว่างตัวและการบีบขอบ
-       3D จึงยังมูนวอคอยู่ 4.6% ของเฟรมเดิน (เห็นชัด 2.7%) ทั้งที่สไปรต์ 2D แก้ไปตั้งแต่ 2026-09-07
-       ตอนนี้วัดจาก ndx/ndy ชุดเดียวกับ s.flip · ต้องมี dead-band ด้วย ของเดิมใช้ 1e-7
-       ซึ่งเล็กกว่าก้าวปกติเป็นหมื่นเท่า = สั่นระดับตามองไม่เห็นก็พลิกหน้าได้
-       ใช้ระยะในโลก (ไม่ใช่แค่แกน x บนจอ) เพราะ 3D หันได้รอบตัว เดินลึกเข้าจอก็ต้องหันตาม */
-    if(FACE_STATES.includes(s.state)){
-      /* โมเดล 3D หันได้รอบตัว หน้าพลิกครั้งเดียวก็เห็นตัวหมุนวืบ (ผู้เล่น: "มีปัญหาโดยเฉพาะกับ 3D")
-         เปลี่ยนทิศเกิน 100° ต้องขยับไปทางใหม่ต่อเนื่อง 0.25 วิก่อน ถึงยอมหันตาม · เลี้ยวปกติ (มุมน้อย) หันตามทันทีเหมือนเดิม */
-      if(!pushedBack && Math.hypot(ndx,ndy)>SLUG_SPEED*dt*0.2){
-        const want=Math.atan2(ndy,ndx),cur=Number.isFinite(s._motionHeading)?s._motionHeading:want;
-        const diff=Math.abs(((want-cur+Math.PI*3)%(Math.PI*2))-Math.PI);
-        if(diff<Math.PI*100/180){s._motionHeading=want;s._flipT=0;}
-        else if((s._flipT=(s._flipT||0)+dt)>0.25){s._motionHeading=want;s._flipT=0;}
-      }
-    } else s._motionHeading=s.dir;                               // eat/greet/inspect ตั้งหน้าเอง
-    if(!Number.isFinite(s._motionHeading)) s._motionHeading=s.dir;
     /* ---- จังหวะคืบผูกกับระยะทางที่เดินได้จริง ----
        เดิมท่าคืบวิ่งด้วยนาฬิกาจริง (sin(performance.now()/700)) รอบละ 4.4 วิเท่ากันหมด
        ตัวเล็กเดินเร็วกว่า จึงไถลไป 0.7 ช่วงตัวต่อการคืบหนึ่งรอบ (ตัวใหญ่ 0.25) = เห็นเป็นไถล/กระตุก */
@@ -1805,12 +1953,10 @@ function drawTank(){
   requestAnimationFrame(()=>{ if(tankMode) drawTank(); else tankLoopOn=false; });
 }
 function drawTankFrame(){
-  if(document.hidden||window.SlugRace?.isOpen()){window.DecorGLB?.hide();return;}
+  if(document.hidden||window.SlugRace?.isOpen())return;
   if(!curTank){return;}
   resizeTank();
   if(tankNeedFit){applyEnterView(tankFocus);tankNeedFit=false;}
-  window.DecorGLB?.beginTank();
-  window.Slug3D?.beginFrame();
   _tankFrame++;
   tctx.setTransform(DPR,0,0,DPR,0,0);
   tctx.clearRect(0,0,TCW,TCH);
@@ -1891,7 +2037,7 @@ function drawTankFrame(){
     SIDES.map(s=>face(s.a,s.b,sandT,wallH)).sort(byFar).slice(2)
          .forEach(f=> qfill(f.p,'rgba(150,205,215,0.05)','rgba(200,235,240,0.24)',1.3));
   };
-  const layKey=[window.DecorGLB?.viewRevision||0,TCW,TCH,DPR,tankCam.zoom.toFixed(4),fw,fh,wallH,!!curTank.def.race,!!curTank.def.tug,!!curTank.def.eat,!!curTank.def.throwing,!!curTank.def.sumo,
+  const layKey=[TCW,TCH,DPR,tankCam.zoom.toFixed(4),fw,fh,wallH,!!curTank.def.race,!!curTank.def.tug,!!curTank.def.eat,!!curTank.def.throwing,!!curTank.def.sumo,
                 (_sandImg&&_sandImg.naturalWidth)?1:0, texOK(woodSrc())?1:0].join('|');
   if(performance.now() >= _zoomBusyT && (_lay.key!==layKey || !layCovers())){
     const box=layBox();
@@ -1930,18 +2076,19 @@ function drawTankFrame(){
       tctx.beginPath();tctx.moveTo(p.x,p.y);tctx.lineTo(q.x,q.y);tctx.stroke(); }
     /* พื้นที่ที่ถูกจองไว้แล้ว — โชว์เฉพาะตอน "กำลังจะวาง/กำลังลาก" เท่านั้น */
     if(selDecorKey || dragDecor){
-      const taken=new Set();
-      (curTank.decor||[]).forEach(o=>{ if(o===dragDecor) return;
-        decorFootprint(o.key,o.fx,o.fy,o.flip).forEach(k=>taken.add(k)); });
-      paintCellSet(taken,'rgba(240,190,60,0.22)','rgba(240,190,60,0.5)',1);
+      // รวมช่องใหม่เฉพาะเมื่อชุดมาสก์เปลี่ยน (ย้าย/หมุน/ลบ/เปลี่ยนชิ้นที่ลาก) — Set เดิม = รูปทรงแคชเดิมใน paintCellSet
+      const parts=(curTank.decor||[]).filter(o=>o!==dragDecor).map(o=>decorFootprint(o.key,o.fx,o.fy,o.flip));
+      let tk=takenFootprintCache;
+      if(!tk||tk.parts.length!==parts.length||parts.some((p,i)=>p!==tk.parts[i])){
+        const taken=new Set(); for(const p of parts) for(const k of p) taken.add(k);
+        tk=takenFootprintCache={parts,taken};
+      }
+      paintCellSet(tk.taken,'rgba(240,190,60,0.22)','rgba(240,190,60,0.5)',1);
     }
   }
 
-  /* ชักเย่อ: เชือก+ผ้าแดงต้องอยู่ "ใต้" ทาก 3D ซึ่งวาดบนแคนวาส WebGL ที่ซ้อนอยู่เหนือชั้นพื้นหลังนี้ */
-  if(window.SlugTug?.isPulling(curTank))SlugTug.drawUnder();
-  /* สายไข่ตู้เพาะ: ต้องวาดก่อนแยกชั้น ไม่งั้นไปอยู่บนแคนวาสชั้นหน้าแล้วทับตัวทาก 3D (breeding.js) */
+  /* สายไข่ตู้เพาะ: วาดบนพื้นก่อนทาก ตัวทากจึงทับสายไข่ (breeding.js) */
   if(typeof drawBreederEggs==='function')drawBreederEggs(curTank);
-  window.DecorGLB?.splitTankBackground();
   // --- delta time + พฤติกรรม ---
   const now=performance.now(); let dt=(now-(tankLastT||now))/1000; tankLastT=now; if(dt>0.05) dt=0.05;
   const racing=window.SlugRace?.isRacing(curTank);
@@ -1975,7 +2122,8 @@ function drawTankFrame(){
   if(typeof foodGhostItem==='function'){const _g=foodGhostItem();if(_g)items.push({sortY:_g.fy,kind:'food',f:_g});}
   (curTank.decor||[]).forEach(d=> items.push({sortY:d.fy, kind:'decor', d}));
   [...slugs,...breederVisualSlugs(curTank)].forEach(s=>{ let sy=s.fy; const k=ptKey(s.fx,s.fy);   // อยู่หลังหิน→วาดก่อน(ไกล) · อยู่หน้า→วาดหลัง(ใกล้)
-    for(const m of masks){ if(m.behind.has(k)){ sy=m.d.fy+0.05; break; } if(m.front.has(k)){ sy=m.d.fy-0.05; break; } }
+    if(s.deck) sy=s.deck.o.fy-0.05;                          // คลานบนขอนไม้ = วาดหน้าชิ้นนั้น
+    else for(const m of masks){ if(m.behind.has(k)){ sy=m.d.fy+0.05; break; } if(m.front.has(k)){ sy=m.d.fy-0.05; break; } }
     if(s===heldSlug) sy=-1e9;                                 // ตัวที่ยกอยู่ = หน้าสุดเสมอ
     items.push({sortY:sy, kind:'slug', s}); });
   if(racing)items.push(...SlugRace.racingItems());
@@ -1996,9 +2144,8 @@ function drawTankFrame(){
     if(it.kind==='food'){drawFood(it.f);return;}
     if(it.kind==='decor'){ drawDecor(it.d); return; }
     const s=it.s;
-    if(window.DecorGLB?.drawSlug(s)){return;}
     const bodyLen=TANK_SLUG_VIEW_SCALE*(curTank.def.shopSlugScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*depthPxPerCm(s.fx,s.fy)*(s._breedScale||1);
-    const p=S(s.fx,s.fy,sandT+(s.climbZ||0));          // เกาะกระจก/หิน = ยกความสูง z ขึ้น
+    const p=S(s.fx,s.fy,sandT+(s.climbZ||0)+(s.wall?0:(s._deckZ||0)));   // เกาะกระจก/ยืนบนของ = ยกความสูง z ขึ้น
     const lifted = (s===heldSlug);
     if(lifted){                                        // เงาบนพื้นใต้ตัว (ตัวเองลอยอยู่ที่เคอร์เซอร์)
       const rx=bodyLen*0.34, ry=Math.max(2.5,bodyLen*0.10), gy=p.y+15*tankCam.zoom;
@@ -2006,22 +2153,6 @@ function drawTankFrame(){
       const sg=tctx.createRadialGradient(0,0,0,0,0,rx);
       sg.addColorStop(0,'rgba(0,0,0,0.34)'); sg.addColorStop(0.6,'rgba(0,0,0,0.15)'); sg.addColorStop(1,'rgba(0,0,0,0)');
       tctx.fillStyle=sg; tctx.beginPath(); tctx.arc(0,0,rx,0,6.283); tctx.fill(); tctx.restore();
-    }
-    /* เกาะกระจกแบบ 3D — มาก่อนเส้นทางพื้น เพราะจุดยึด/ท่าหันคนละชุดกัน
-       ตัวที่ถูกอุ้มอยู่ (lifted) ไม่นับว่าเกาะกระจก ใช้เส้นทางปกติเหมือนเดิม */
-    if(engineReady&&!lifted&&slugOnWall(s)){
-      const w3=drawWallSlug3D(s,bodyLen);
-      if(w3){
-        if(s.state==='sneeze')drawSneezeBubbles(s,{x:w3.x-w3.hx*w3.len*0.20, y:w3.y-w3.hy*w3.len*0.20},bodyLen,w3.hx,w3.hy);
-        if(s===selSlug){tctx.save();tctx.strokeStyle='#9fffdc';tctx.lineWidth=2;tctx.beginPath();tctx.ellipse(w3.x,w3.y,bodyLen*.5,bodyLen*.12,w3.rot,0,Math.PI*2);tctx.stroke();tctx.restore();}   // วงเลือกหมุนตามลำตัว ไม่ใช่วงบนพื้น
-        return;
-      }
-    }
-    if(engineReady&&!slugOnWall(s)&&window.Slug3D?.draw(tctx,s,p.x,lifted?p.y-6*tankCam.zoom:p.y,bodyLen,lifted,{x:CELLW*Math.cos(s._motionHeading??s.dir??0)+DEPX*Math.sin(s._motionHeading??s.dir??0),y:-DEPY*Math.sin(s._motionHeading??s.dir??0)})){
-      if(s.state==='sneeze')drawSneezeBubbles(s,p,bodyLen);
-      if(!lifted)drawSlugMood(s,p,bodyLen,null,p.y,1);
-      if(s===selSlug){tctx.save();tctx.strokeStyle='#9fffdc';tctx.lineWidth=2;tctx.beginPath();tctx.ellipse(p.x,p.y,bodyLen*.5,bodyLen*.12,0,0,Math.PI*2);tctx.stroke();tctx.restore();}
-      return;
     }
     if(engineReady){
       const P=slugPartsOf(s);
@@ -2039,11 +2170,14 @@ function drawTankFrame(){
       const _smiling=(s.state==='rest'||s.state==='greet'||s.state==='wake'||s.state==='stretch') && smileNow(s);
       /* ท่าปกติ = อบตาเข้าสไปรต์ (ขยับตาม creep ที่ตัวยืด/หด) · ท่าพิเศษ = วาดหน้าทับแบบเดิม */
       s._bakeEyes = !lifted && !(s.state==='sleep'||s.state==='dashCharge'||s.state==='dash'||_smiling);
+      const tilt=!lifted&&s.deck?(s._deckTilt||0):0;   // คลานบนกิ่ง = เอียงทั้งตัวรอบจุดแตะผิวไม้ ตามความชันบนจอ
+      if(tilt){tctx.save();tctx.translate(p.x,p.y);tctx.rotate(tilt);tctx.translate(-p.x,-p.y);}
       drawTankSlug(s, P, sa, p.x, cy, lifted);
       if(lifted) drawHeldFace(P, p.x, cy, s.flip, P.s*sa, slugBaseHex(s.genes));
       else if(s.state==='sleep') drawSleepFace(P, p.x, cy, s.flip, P.s*sa, slugBaseHex(s.genes));
       else if(s.state==='dashCharge'||s.state==='dash') drawDashFace(P,p.x,cy,s.flip,P.s*sa,slugBaseHex(s.genes),s.charge);
       else if(_smiling) drawSmileFace(P,p.x,cy,s.flip,P.s*sa,slugBaseHex(s.genes));
+      if(tilt)tctx.restore();
       // ท่าปกติ: ตาอยู่ในสไปรต์แล้ว (ขยับตาม creep) ไม่ต้องวาดทับ
       if(s.state==='sneeze') drawSneezeBubbles(s,p,bodyLen);
       if(!lifted) drawSlugMood(s,p,bodyLen,P,cy,sa);
@@ -2055,13 +2189,13 @@ function drawTankFrame(){
       s._hit={ x:p.x, y:ey, r:Math.max(20,bodyLen*0.5) };
     }
   });
-  if(tankBuildMode)for(const d of curTank.decor||[]){if(!decorFitsTankWalls(d.key,d.fx,d.fy,d.flip,curTank))paintCellSet(decorFootprint(d.key,d.fx,d.fy,d.flip),'rgba(232,86,86,.26)','rgba(255,130,130,.95)',2);}
+  if(tankBuildMode)for(const d of curTank.decor||[]){if(!decorFitsTankWalls(d.key,d.fx,d.fy,d.flip,curTank))paintDecorFootprint(d.key,d.fx,d.fy,d.flip,'rgba(232,86,86,.26)','rgba(255,130,130,.95)',2);}
   /* โกสต์: โชว์ก่อนกด ว่าจะลงตรงไหน เขียว=วางได้ แดง=วางไม่ได้ */
   let ghWhy='';
   if(ghKey && ghPos){
     ghWhy = decorPlaceIssue(ghKey, ghPos.fx, ghPos.fy, ghFlip, dragDecor||null);
     const ok=!ghWhy;
-    paintCellSet(decorFootprint(ghKey, ghPos.fx, ghPos.fy, ghFlip),
+    paintDecorFootprint(ghKey, ghPos.fx, ghPos.fy, ghFlip,
       ok?'rgba(90,210,130,0.34)':'rgba(232,86,86,0.38)',
       ok?'rgba(150,255,190,0.95)':'rgba(255,130,130,0.95)', 2);
     drawDecorAt(ghKey, ghPos.fx, ghPos.fy, ok?0.62:0.4, ghFlip);
@@ -2082,7 +2216,6 @@ function drawTankFrame(){
   /* ป้ายบอกเหตุผลตอนวางไม่ได้ — วาดนอก clip ของกล่องแก้ว ไม่งั้นป้ายโดนตัดตอนเงาอยู่ริมตู้ */
   if(ghWhy && ghPos) decorWhyLabel(ghWhy, ghPos.fx, ghPos.fy);
   if(selSlug) drawGeneCard(selSlug, 12, 12);
-  window.DecorGLB?.endTank();
 }
 
 /* ---- การ์ดยีน (ยกเครื่อง 2026-09-14) ----

@@ -4,7 +4,7 @@ import fs from 'node:fs';import path from 'node:path';import http from 'node:htt
 import {fileURLToPath} from 'node:url';import {createRequire} from 'node:module';import assert from 'node:assert/strict';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),out=path.join(root,'tools/qa/tug-tournament');fs.mkdirSync(out,{recursive:true});
 const {chromium}=createRequire(import.meta.url)('C:/Users/ACER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
-const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://local').pathname,f=path.resolve(root,'.'+(p==='/'?'/index.html':decodeURIComponent(p)));if(!f.startsWith(root+path.sep)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404).end();return;}res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.json':'application/json','.glb':'model/gltf-binary','.svg':'image/svg+xml'})[path.extname(f)]||'application/octet-stream');fs.createReadStream(f).pipe(res);});
+const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://local').pathname,f=path.resolve(root,'.'+(p==='/'?'/index.html':decodeURIComponent(p)));if(!f.startsWith(root+path.sep)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404).end();return;}res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.json':'application/json','.svg':'image/svg+xml'})[path.extname(f)]||'application/octet-stream');fs.createReadStream(f).pipe(res);});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;const errors=[],report={};
 const shot=async(page,name,sel)=>{if(sel){const b=await page.locator(sel).boundingBox();if(b){await page.screenshot({path:path.join(out,name+'.png'),clip:{x:Math.max(0,b.x-6),y:Math.max(0,b.y-6),width:b.width+12,height:Math.min(900-Math.max(0,b.y-6),b.height+12)}});return;}}await page.screenshot({path:path.join(out,name+'.png')});};
 try{
@@ -12,7 +12,7 @@ try{
  const page=await (await browser.newContext({viewport:{width:1280,height:900}})).newPage();page.setDefaultTimeout(30000);
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto(`http://127.0.0.1:${server.address().port}/`,{waitUntil:'load'});
- await page.waitForFunction(()=>!window.BOOTING&&window.DecorGLB?.ready&&window.Slug3D?.ready,null,{timeout:90000});
+ await page.waitForFunction(()=>!window.BOOTING&&typeof engineReady!=='undefined'&&engineReady,null,{timeout:90000});
  await page.evaluate(()=>{
   document.getElementById('questCard')?.remove();
   const t=G.objs.find(o=>o.type==='tank');t.def=CATALOG.tank_tug;t._key='tank_tug';t.decor=[];t.foods=[];

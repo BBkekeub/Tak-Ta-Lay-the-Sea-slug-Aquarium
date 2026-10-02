@@ -293,7 +293,7 @@ SlugEngine.ready.then(()=>{ engineReady = true; });
 function slugPartsOf(s){
   // Aura is derived from vigor; there is no separate aura gene.
   const displayGenes=typeof foodGenes==='function'?foodGenes(s):s.genes;
-  const key=SlugEngine.GENES.map(g=>displayGenes[g.k]).join('|');
+  const key=(displayGenes.sp||'')+'|'+SlugEngine.GENES.map(g=>displayGenes[g.k]).join('|');   // สายพันธุ์อยู่ในคีย์ด้วย (เหมือน sprKey ในเอนจิน) — sp เปลี่ยน = วาดใหม่
   if(s._partsKey!==key){ s._parts=null; s._sprite=null; s._auC=null; s._ts=null; s._partsKey=key; }
   if(!s._parts && engineReady) s._parts = SlugEngine.slugParts(displayGenes, 100);
   return s._parts;
@@ -327,21 +327,21 @@ const TANK_DECOR_LEGACY = {};
 /* decor-defs.js ทับของเก่าเสมอ — คีย์ซ้ำ ให้ไฟล์จากเครื่องมือชนะ */
 const TANK_DECOR = Object.assign({}, TANK_DECOR_LEGACY,
   (typeof DECOR_DEFS !== 'undefined' ? DECOR_DEFS : {}),
-  /* ชุด 3 มิติที่อบเป็น PNG แล้ว (js/decor3d-defs.js) — ใช้ฟอร์แมตเดียวกับ Dec grid ทุกอย่าง
-     ต่างแค่ src ชี้ไป assets/decor3d/png/ และมี cat/priceCm/sizeCm เพิ่ม */
-  (typeof DECOR3D_DEFS !== 'undefined' ? DECOR3D_DEFS : {}));
+  /* ของตกแต่ง 2D หลายมุม (js/sprite-decor-defs.js) — มี cat/priceCm/frames เพิ่ม · ⛔ ของตกแต่ง 3D เลิกใช้แล้ว 2026-09-26 */
+  (typeof SPRITE_DECOR_DEFS !== 'undefined' ? SPRITE_DECOR_DEFS : {}));
+/* ⛔ 2026-10-03 ผู้เล่นสั่งเอาแท็บ "ขอนไม้ Blender" ออกจากเกม — นิยามยังอยู่ใน Dec Grid (ไม่ลบงานในเครื่องมือ)
+   ตัดออกจากเกมตรงนี้ที่เดียว · ชิ้นที่วางไว้/เครดิตคืนเงินเต็มราคาใน save.js (REMOVED_3D_DECOR_CM) */
+for(const k of ['sprite_driftwood_talawa_sweep','sprite_driftwood_talawa_fork','sprite_driftwood_spider_lean','sprite_driftwood_mopani_bend','sprite_driftwood_river_fan']) delete TANK_DECOR[k];
 
 /* ราคาของตกแต่งในตู้ — คิดจากความกว้างจริงของชิ้นนั้น */
-/* ราคาคิดจากความกว้าง "จริง" ของชิ้นงาน — ของชุด 3 มิติ wCm เป็นความกว้างบนจอ (รวมการเยื้อง
-   ของแกนลึกในภาพเฉียง) ซึ่งกว้างกว่าก้อนจริงราว 1.5 เท่า ถ้าใช้ wCm จะแพงเกินจริงทั้งชุด */
+/* ราคาคิดจากความกว้าง "จริง" ของชิ้นงาน — ชิ้นที่มี priceCm ใช้ค่านั้น (wCm เป็นความกว้างบนจอ
+   ที่รวมการเยื้องของแกนลึกในภาพเฉียง จะแพงเกินจริง) */
 /* ของตกแต่งในตู้ก็โดนส่วนลดจากสายวิจัย "ลดราคาของทุกอย่าง" ด้วย (research.js) */
 function decorPrice(key){ const d=TANK_DECOR[key], mul=(typeof Research!=='undefined'?Research.priceMul('shop'):1);
  return Math.max(1, Math.round(Math.max(20, Math.round(((d&&(d.priceCm||d.wCm))||20)*DECOR_COST_PER_CM))*mul)); }
 
 const _decorImg = {};
 function decorImg(key){
-  // GLB props never enter the legacy PNG cache, including during save preload.
-  if(TANK_DECOR[key]?.model) return {img:null,ok:false};
   let e=_decorImg[key];
   if(!e){ e={img:new Image(), ok:false}; e.img.onload=()=>{ e.ok=true; };
     e.img.onerror=()=>{ console.warn('[decor] โหลดรูปไม่ได้:', key, '→', TANK_DECOR[key].src,
@@ -360,6 +360,11 @@ function slugBaseHex(g){ return SlugEngine.hex(SlugEngine.derived(g).base); }  /
 function slugAccHex(g){  return SlugEngine.hex(SlugEngine.derived(g).acc);  }  // สีหงอนเหงือกจริง
 function gillCount(g){   return SlugEngine.derived(g).nGill; }                 // จำนวนหงอนจริง
 function spotCount(g){   return SlugEngine.derived(g).nSpot; }                 // จำนวนลายจริง
+/* สายพันธุ์ของทาก (ยีน sp · ไม่มี = 'legacy' ตัวเดิม) — ผสมได้เฉพาะพันธุ์เดียวกัน */
+function slugSpecies(s){ const g=s&&(s.genes||s); return (g&&typeof g.sp==='string'&&g.sp)||'legacy'; }
+function slugSpeciesName(s){ return SlugEngine.speciesName?SlugEngine.speciesName(slugSpecies(s)):'ตัวเดิม'; }
+const SPECIES_UNLOCK_PRICE=500;   // ปลดล็อกสายพันธุ์ใหม่ที่โต๊ะวิจัย (research.js) → ซื้อกล่องสุ่มพันธุ์นั้นได้
+function speciesUnlocked(k){ return k==='legacy'||!!(G.research&&G.research.species&&G.research.species[k]); }
 
 /* ============================================================
    นิสัยประจำตัว (เอกลักษณ์) — บางส่วนมาจากยีน บางส่วนสุ่มติดตัว

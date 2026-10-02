@@ -4,14 +4,16 @@ import fs from 'node:fs';import path from 'node:path';import http from 'node:htt
 import {fileURLToPath} from 'node:url';import {createRequire} from 'node:module';import assert from 'node:assert/strict';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),out=path.join(root,'tools/qa/race-tournament');fs.mkdirSync(out,{recursive:true});
 const {chromium}=createRequire(import.meta.url)('C:/Users/ACER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
-const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://local').pathname,f=path.resolve(root,'.'+(p==='/'?'/index.html':decodeURIComponent(p)));if(!f.startsWith(root+path.sep)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404).end();return;}res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.json':'application/json','.glb':'model/gltf-binary','.svg':'image/svg+xml'})[path.extname(f)]||'application/octet-stream');fs.createReadStream(f).pipe(res);});
+const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://local').pathname,f=path.resolve(root,'.'+(p==='/'?'/index.html':decodeURIComponent(p)));if(!f.startsWith(root+path.sep)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404).end();return;}res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.json':'application/json','.svg':'image/svg+xml'})[path.extname(f)]||'application/octet-stream');fs.createReadStream(f).pipe(res);});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;const errors=[],report={};
 const shot=async(page,name,sel)=>{if(sel){const b=await page.locator(sel).boundingBox();if(b){await page.screenshot({path:path.join(out,name+'.png'),clip:{x:Math.max(0,b.x-6),y:Math.max(0,b.y-6),width:b.width+12,height:Math.min(900-Math.max(0,b.y-6),b.height+12)}});return;}}await page.screenshot({path:path.join(out,name+'.png')});};
+/* กด A/D สลับจนตัวเราเข้าเส้นจริง — บอทอาจใช้พลังกำแพงใส่เรา (ติด 2 วิ) กดครั้งเดียวจึงไม่พอ */
+const finishUs=async page=>{for(let k=0;k<50;k++){if(await page.evaluate(()=>G.racing.active?.entrants[0].finished!=null))return;await page.keyboard.press(k%2?'KeyD':'KeyA');await page.waitForTimeout(120);}throw Error('our slug never crossed the finish');};
 const boot=async()=>{
  const page=await (await browser.newContext({viewport:{width:1280,height:900}})).newPage();page.setDefaultTimeout(30000);
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto(`http://127.0.0.1:${server.address().port}/`,{waitUntil:'load'});
- await page.waitForFunction(()=>!window.BOOTING&&window.DecorGLB?.ready&&window.Slug3D?.ready,null,{timeout:90000});
+ await page.waitForFunction(()=>!window.BOOTING&&typeof engineReady!=='undefined'&&engineReady,null,{timeout:90000});
  await page.evaluate(()=>{
   document.getElementById('questCard')?.remove();
   const key=Object.keys(CATALOG).find(k=>CATALOG[k].race),t=G.objs.find(o=>o.type==='tank');t.def=CATALOG[key];t._key=key;t.decor=[];t.foods=[];
@@ -27,15 +29,16 @@ try{
  {
   const page=await boot();
   await page.evaluate(()=>{const t=G.objs.find(o=>o.def.race),s=t.slugs[0];
-   const rivals=[{name:'ก',genes:SlugEngine.randGene(),pace:6},{name:'ข',genes:SlugEngine.randGene(),pace:6}];
+   const fast={...SlugEngine.randGene(),len:90,vigor:90,girth:10,gillLen:10};   /* ยีนคงที่ ก้าวยาวพอวิ่งไป-กลับทันเวลารอ (สุ่มแล้วบางตัวก้าวละครึ่งเซนติเมตร) */
+   const rivals=[{name:'ก',genes:{...fast},pace:6},{name:'ข',genes:{...fast},pace:6}];
    G.racing.active={tankId:t.id,wager:0,elapsed:0,countdown:0,lastKey:null,settled:false,rank:0,
     entrants:[{name:'เรา',genes:{...s.genes},id:s.id},...rivals].map((r,i)=>({...r,...SlugRace.stride(r.genes),head:20,finished:null,next:i?1/r.pace:0}))};});
   await page.waitForFunction(()=>document.getElementById('raceTankHUD'));await page.waitForTimeout(600);
-  await page.evaluate(()=>{const r=G.racing.active.entrants[0];r.head=179.99;});
-  await page.keyboard.press('KeyA');await page.keyboard.press('KeyD');await page.waitForTimeout(700);
+  await page.evaluate(()=>{const r=G.racing.active.entrants[0];r.head=SlugRace.GOAL-.01;   /* สนามไป-กลับ: เส้นชัย = SlugRace.GOAL */});
+  await finishUs(page);await page.waitForTimeout(300);
   report.normalAfterWeFinish=await page.evaluate(()=>({meFinished:G.racing.active.entrants[0].finished!=null,botsFinished:G.racing.active.entrants.slice(1).filter(r=>r.finished!=null).length,settled:G.racing.active.settled,resultOpen:!!document.querySelector('#raceResult[open]'),status:document.querySelector('.race-count')?.textContent}));
   assert.ok(report.normalAfterWeFinish.meFinished&&!report.normalAfterWeFinish.settled&&!report.normalAfterWeFinish.resultOpen,'must wait for others');
-  await page.waitForSelector('#raceResult[open]',{timeout:40000});
+  await page.waitForSelector('#raceResult[open]',{timeout:60000});
   report.normalEnd=await page.evaluate(()=>({all:G.racing.active.entrants.every(r=>r.finished!=null&&r.finished!==Infinity),rank:G.racing.active.rank}));
   assert.ok(report.normalEnd.all,'everyone crossed before result');assert.equal(report.normalEnd.rank,1);
   await page.context().close();
@@ -70,12 +73,12 @@ try{
    for(let i=0;i<6;i++)await page.keyboard.press(i%2?'KeyD':'KeyA');
    const id=await page.evaluate(()=>G.racing.active.entrants[0].id);
    if(!heatsPlayed)await shot(page,'5-our-heat');
-   await page.evaluate(()=>{const a=G.racing.active;a.entrants[0].head=179.99;a.entrants[1].head=20;});
-   await page.keyboard.press('KeyA');await page.keyboard.press('KeyD');
+   await page.evaluate(()=>{const a=G.racing.active;a.entrants[0].head=SlugRace.GOAL-.01;a.entrants[1].head=20;});
+   await finishUs(page);
    // บอทยังไม่ถึง → ต้องไม่ขึ้นผลเที่ยว ให้บอทเข้าเส้นแบบเร็ว
    await page.waitForTimeout(400);
    report.heatWait=report.heatWait??await page.evaluate(()=>({settled:G.racing.active?.settled,status:document.querySelector('.race-count')?.textContent}));
-   await page.evaluate(()=>{const b=G.racing.active?.entrants[1];if(b)b.head=179.9;});
+   await page.evaluate(()=>{const b=G.racing.active?.entrants[1];if(b)b.head=SlugRace.GOAL-.1;});
    await page.waitForFunction(()=>!document.getElementById('raceTankHUD'),null,{timeout:20000});
    report.fatigue=report.fatigue??await page.evaluate(id=>{const s=G.objs.find(o=>o.def.race).slugs.find(x=>x.id===id);return{buffs:s.foodBuffs.filter(b=>b.type==='raceFatigue').length,vigorNow:foodGenes(s).vigor,vigorBase:s.genes.vigor};},id);
    heatsPlayed++;

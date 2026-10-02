@@ -1,0 +1,132 @@
+{
+  "sizeCm": [
+    20,
+    5,
+    6
+  ],
+  "visualHeightCm": 6.9,
+  "pixelsPerCm": 32,
+  "woodGeometryHash": "3bc00dca45b6972edb1c769bd8abd67cb5f1f54b65cb76c665cc09b91589f4af",
+  "geometryHash": "c29eddd0197a99923a0163482f1b0daa29b4f753ff03afed3572380836e02e70",
+  "woodVertices": 25671,
+  "woodTriangles": 50176,
+  "mossTufts": 1196,
+  "vertices": 118348,
+  "triangles": 141680,
+  "frames": [
+    {
+      "src": "assets/decor/driftwood/consistent-v2/tank-0.png",
+      "wCm": 22.625,
+      "hCm": 8.0625,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.8217054263565892
+      },
+      "pixelSize": [
+        724,
+        258
+      ],
+      "projection": "tank"
+    },
+    {
+      "src": "assets/decor/driftwood/consistent-v2/tank-90.png",
+      "wCm": 14.75,
+      "hCm": 15.9375,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.6627450980392157
+      },
+      "pixelSize": [
+        472,
+        510
+      ],
+      "projection": "tank"
+    },
+    {
+      "src": "assets/decor/driftwood/consistent-v2/tank-180.png",
+      "wCm": 22.625,
+      "hCm": 8.0625,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.8217054263565892
+      },
+      "pixelSize": [
+        724,
+        258
+      ],
+      "projection": "tank"
+    },
+    {
+      "src": "assets/decor/driftwood/consistent-v2/tank-270.png",
+      "wCm": 14.75,
+      "hCm": 15.9375,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.6627450980392157
+      },
+      "pixelSize": [
+        472,
+        510
+      ],
+      "projection": "tank"
+    }
+  ],
+  "shopFrames": [
+    {
+      "src": "assets/decor/driftwood/consistent-v2/shop-0.png",
+      "wCm": 25.25,
+      "hCm": 19.65625,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.6756756756756757
+      },
+      "pixelSize": [
+        808,
+        629
+      ],
+      "projection": "shop"
+    },
+    {
+      "src": "assets/decor/driftwood/consistent-v2/shop-90.png",
+      "wCm": 25.25,
+      "hCm": 19.65625,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.6756756756756757
+      },
+      "pixelSize": [
+        808,
+        629
+      ],
+      "projection": "shop"
+    },
+    {
+      "src": "assets/decor/driftwood/consistent-v2/shop-180.png",
+      "wCm": 25.25,
+      "hCm": 19.65625,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.6756756756756757
+      },
+      "pixelSize": [
+        808,
+        629
+      ],
+      "projection": "shop"
+    },
+    {
+      "src": "assets/decor/driftwood/consistent-v2/shop-270.png",
+      "wCm": 25.25,
+      "hCm": 19.65625,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.6756756756756757
+      },
+      "pixelSize": [
+        808,
+        629
+      ],
+      "projection": "shop"
+    }
+  ]
+}

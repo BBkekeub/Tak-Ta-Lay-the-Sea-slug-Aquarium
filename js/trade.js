@@ -345,3 +345,33 @@ function notifyTradeArrival(offer){
  if(!offer.arrived||offer.soundNotified)return;
  if(playNotificationSound(offer.sell||offer.wholesale?'seller':'buyer'))offer.soundNotified=true;
 }
+/* ---- คลิกตัวพ่อค้าเร่/คนรับเหมา/นักสะสมบนพื้นร้าน = เปิดแผงข้อเสนอที่การ์ดของคนนั้น (ผู้เล่นขอ 2026-10-03) ----
+   ทดสอบจากตัวคนจริง (personHitTest — ใช้ร่างที่แคชไว้แล้ว ไม่เพิ่มงานต่อเฟรม) ทำงานเฉพาะตอนกดเท่านั้น
+   ต้องมีข้อเสนอค้างอยู่ใน TRADE_OFFERS (ระหว่างเดินมาก็มีการ์ดแล้ว) · ลากแพนกล้องไม่นับเป็นคลิก */
+function traderOfferAt(e){
+  if(tankMode||appMode!=='view'||moving||buyKey||typeof PEOPLE==='undefined')return null;
+  const {sx,sy}=screenXY(e);
+  const p=PEOPLE.find(q=>isTrader(q)&&q.tradeOffer&&TRADE_OFFERS.includes(q.tradeOffer)&&personOnScreen(q)&&personHitTest(q,sx,sy));
+  return p?p.tradeOffer:null;
+}
+function openTradeOffer(offer){
+  const nav=document.getElementById('navOffers');
+  if(nav&&nav.getAttribute('aria-expanded')!=='true')nav.click();
+  renderTradeOffers(true);
+  const card=document.querySelector('#tradeOffers details.trade-offer[data-offer="'+offer.id+'"]');
+  if(!card)return;
+  card.open=true;card.scrollIntoView({block:'nearest'});
+  card.classList.remove('trade-offer-focus');void card.offsetWidth;card.classList.add('trade-offer-focus');
+  clearTimeout(card._focusT);card._focusT=setTimeout(()=>card.classList.remove('trade-offer-focus'),1400);
+}
+{
+  let pressed=null;
+  cv.addEventListener('pointerdown',e=>{const offer=e.button===0?traderOfferAt(e):null;pressed=offer?{offer,id:e.pointerId,x:e.clientX,y:e.clientY}:null;},true);
+  cv.addEventListener('pointerup',e=>{
+    const down=pressed;pressed=null;
+    if(!down||e.pointerId!==down.id||dragMoved||Math.hypot(e.clientX-down.x,e.clientY-down.y)>DRAG_TH||traderOfferAt(e)!==down.offer)return;
+    dragging=false;cv.classList.remove('panning','placing');e.preventDefault();e.stopImmediatePropagation();openTradeOffer(down.offer);
+  },true);
+  cv.addEventListener('pointercancel',()=>{pressed=null;},true);
+  cv.addEventListener('lostpointercapture',()=>{pressed=null;},true);
+}

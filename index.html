@@ -10,13 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Trirong:wght@500;600&display=swap">
-<link rel="stylesheet" href="css/style.css?v=queue1"><link rel="stylesheet" href="css/context-ui.css?v=offer1">
-<!-- ต้องมาก่อน importmap: สลับ fetch → XHR ตอนเปิดแบบ file:// (ดู js/file-mode.js) -->
-<script src="js/file-mode.js?v=filemode1"></script>
-<!-- three โหลดจาก CDN เหมือนเดิม — ห้ามเปลี่ยนไปชี้ vendor/ ในเครื่อง เพราะถ้า vendor/
-     ไม่ได้ถูก push ขึ้นไปด้วย เบราว์เซอร์จะ resolve "three" ไม่ได้ → slug-3d.js ตายเงียบ
-     → ทากกลายเป็น 2D ทั้งเว็บ (ทดสอบแล้ว: เปิดจากไฟล์ผ่าน PLAY.bat ก็ดึง CDN ได้ปกติ) -->
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
+<link rel="stylesheet" href="css/style.css?v=queue1-sell1-click1"><link rel="stylesheet" href="css/context-ui.css?v=offer1">
 </head>
 <body>
 <!-- หน้าโหลด: อยู่บนสุด ปิดทับจนกว่า boot.js จะอบสไปรต์ทากเสร็จ (ดู js/boot.js) -->
@@ -44,7 +38,6 @@
     <button class="tbtn" id="bMusic">🎵 เพลง: ปิด</button>
     <button class="tbtn" id="bAnim">🌊 ขยับ: เปิด</button>
     <button class="tbtn" id="bPeople">👥 ลูกค้า: เปิด</button>
-    <button class="tbtn" id="bSlug3D" title="สลับทากระหว่างโมเดล 3D กับสไปรต์ 2D">🐌 ทาก: 3D</button>
     <button class="tbtn" id="bFit">จัดกล้องให้พอดี</button>
   </div>
 
@@ -69,7 +62,8 @@
           <span class="dlabel">วางของ:</span>
           <div class="dpal" id="dpal"></div>
           <button class="tbtn" id="dFlip">🔄 พลิก (R) ·</button>
-          <button class="tbtn danger" id="dRemove" disabled>🗑 ลบที่เลือก</button>
+          <button class="tbtn" id="dRemove" disabled title="เอาออกจากตู้ไปเก็บไว้ · กดการ์ดชิ้นนี้แล้ววางคืนได้ฟรี">📦 เก็บไว้ก่อน</button>
+          <button class="tbtn danger" id="dSell" disabled title="ขายทิ้งถาวร ได้เงินคืนครึ่งราคา">💰 ขาย</button>
           <span class="hint">เลือกของจากแถบ = <b>ถือไว้</b> คลิกวางได้เรื่อย ๆ · <b>R</b> พลิกของในมือ · <b>Esc</b> วางมือ · ไม่ถืออะไร: คลิกของเพื่อเลือก ลากเพื่อย้าย</span>
         </div>
         <div class="ov-bottom">
@@ -134,39 +128,40 @@
 </div>
 
 <!-- โหลดตามลำดับ: เอนจิน → ค่าปรับ → หน้าร้าน → ในตู้ → เริ่มเกม -->
-<script src="js/slug-engine.js?v=lean2-throwpose1"></script>
-<script src="js/decor-defs.js"></script><script src="js/decor3d-defs.js?v=d3off"></script>
-<script src="js/reviewed-decor-defs.js?v=dragon-base1"></script>
-<!-- ⏸ 2026-09-17 ปิดของตกแต่ง 3D ทั้งหมด (ยังไม่พร้อมให้ผู้เล่นเห็น) — ไม่โหลดนิยามชุด 3D เลย
-     tidal-decor-defs.js · reference-decor-defs.js · mobile-pumice-defs.js ยังอยู่ในเครื่อง (อยู่ใน .gitignore ไม่ขึ้น GitHub)
-     เปิดกลับ: ใส่สามบรรทัด <script src="js/…-defs.js"> คืนตรงนี้ แล้วเอาออกจาก .gitignore
-     ของ 3D ที่ผู้เล่นวางไว้ในเซฟเก่าถูกเก็บเป็นเครดิตตอนโหลด (save.js _loadObj) ไม่หาย ไม่ค้าง
-     tidal-decor-runtime.js / decor-glb.js ยังต้องโหลด — decor-glb.js เป็นตัวเรนเดอร์ทาก 3D ในตู้/หน้าร้านด้วย -->
-<script src="js/config.js?v=tugfront1-eat1-breed5-map64-rate1-sched1-throw1-sched2-cap20-access1-sumo1"></script><script src="js/fireworks.js?v=fw2"></script><script src="js/coin-guard.js?v=coin2-hud"></script><script src="js/cost-pop.js?v=pop2"></script><script src="js/materials.js?v=white1-cost1"></script><script src="js/modes.js"></script><script src="js/floor-grid.js?v=coin2-seam1"></script>
+<script src="js/slug-species-data.js?v=sp4"></script>
+<script src="js/slug-engine.js?v=spine2d-center-9"></script>
+<script src="js/decor-defs.js"></script>
+<!-- Four-view sprite study withheld pending original-design review. (js/sprite-decor-defs.js — เปิดเมื่อผ่านรีวิว ใส่ <script> ตรงนี้) -->
+<script src="js/driftwood-decor-defs.js?v=wood2-fixed-geometry"></script>
+<script src="js/driftwood-variants-defs.js?v=wood-five-1"></script>
+<script src="js/driftwood-complex-defs.js?v=wood-complex-branch-2"></script>
+<script src="js/driftwood-natural-defs.js?v=grid-ready-1"></script>
+<script src="js/decor-grid-overrides.js?v=85557e9b6cf7"></script>
+<!-- ⛔ 2026-09-26 เลิกใช้ของตกแต่ง 3D ถาวร — ลบไฟล์ชุด 3D ออกแล้ว ของ 3D ในเซฟเก่าคืนเงินตอนโหลด (save.js) -->
+<script src="js/config.js?v=sp1-tugfront1-eat1-breed5-map64-rate1-sched1-throw1-sched2-cap20-access1-sumo1-sp2-noblender1"></script><script src="js/fireworks.js?v=fw2"></script><script src="js/coin-guard.js?v=coin2-hud"></script><script src="js/cost-pop.js?v=pop2"></script><script src="js/materials.js?v=white1-cost1"></script><script src="js/modes.js"></script><script src="js/floor-grid.js?v=coin2-seam1"></script>
 <script src="js/pinch-zoom.js?v=pinch2"></script>
-<script src="js/shop-floor.js?v=tuglane1-eat1-breed5-map64-badge1-throw1-access1-keepbuild1-pinch1-white1-pop1-seam1-ghost1-why1-perf1-anim1-cap2-cghost1"></script>
-<script src="js/tank-view.js?v=eyes2-tugunder1-rect1-idle1-buff1-avoid8-pinch1-white1-eat2-throw1-egg1-blit1-loopfix1-throwlane1-sumo1-why1-shadow1-maskcache1-cap1-larvaframe1-throwpose1"></script>
-<script src="js/tidal-decor-runtime.js?v=tidal1"></script>
-<script type="module" src="js/decor-glb.js?v=eyes1-pastel20260916v1-mobile1-rect1-preload2-glass3-mode3dsig1-pplver2-throw1"></script>
+<script src="js/shop-floor.js?v=sprite1-tuglane1-eat1-breed5-map64-badge1-throw1-access1-keepbuild1-pinch1-white1-pop1-seam1-ghost1-why1-perf1-anim1-cap2-cghost1-path1"></script>
+<script src="js/tank-view.js?v=sp1-eyes2-tugunder1-rect1-idle1-buff1-avoid8-pinch1-white1-eat2-throw1-egg1-blit1-loopfix1-throwlane1-sumo1-why1-shadow1-maskcache1-cap1-larvaframe1-throwpose1-grid1cm-path1-stray1-cellrun2-sell2"></script>
+<script src="js/sprite-decor-runtime.js?v=sprite4-perspective-path1"></script>
 <script src="js/feeding.js?v=tugfront1-eatface1-eatarena1-pick1-throwlane1-ghost1-sumo1-routecache1"></script><script src="js/slug-browser.js?v=filter3-units1"></script><script src="js/slug-hover.js?v=multi1"></script><script src="js/dialog-dismiss.js?v=dismiss1"></script>
 <script src="js/people-model.js"></script><script src="js/people-bags.js?v=fit2"></script><script src="js/people.js?v=carry-grip2-mesh-hit1-door1-tour3-refit2-eat1-throw1-pplcap1-busy2-geocache1-dial1-cap4-band1-unstick1-nofastfwd1-band2-fee1-away1-pose1-collector1-posefair1-shirtseam1-bagfit2-posevbo5-gait3-kidarms1-hatfit1-space1-shuffle1-detour2-narrow1-look6"></script>
-<script src="js/trade.js?v=coin1-access1-unlock1-fav1-collector1"></script>
+<script src="js/trade.js?v=coin1-access1-unlock1-fav1-collector1-click1"></script>
 <script src="js/entrance.js?v=walk2-multidoor1"></script>
-<script src="js/breeding-genes.js"></script><script src="js/breeding.js?v=egg1-zonestuck1-zonewalk4-grownfull1-grownlog1-face1-unlock1-larvaframe1"></script><script src="js/main.js"></script>
-<script src="js/save.js?v=coin1-d3off1-eat1-throw1-codex1-doors1-rsdep1"></script>
+<script src="js/breeding-genes.js?v=sp1"></script><script src="js/breeding.js?v=sp1-egg1-zonestuck1-zonewalk4-grownfull1-grownlog1-face1-unlock1-larvaframe1"></script><script src="js/main.js"></script>
+<script src="js/save.js?v=sp1-coin1-d3off1-eat1-throw1-codex1-doors1-rsdep1-noblender1-sp256-ordersp1"></script>
 <script src="js/music.js"></script>
 <!-- ท้ายสุดเสมอ — ต้องเห็นเซฟที่ save.js โหลดกลับมาแล้ว ถึงจะรู้ว่าต้องอบทากกี่ตัว -->
-<script src="js/boot.js"></script><script src="js/context-ui.js?v=offer1-settings1"></script><script src="js/expansion-ui.js?v=map64"></script><script src="js/slug-box-shop.js?v=coin1"></script><script src="js/slug-transfer.js?v=hover1-filter1-unlock1"></script>
-<script src="js/breeding-picker.js?v=hover1-filter2-unlock1"></script><script src="js/tank-sidebar.js?v=gene2"></script><script src="js/tank-hygiene.js"></script><script src="js/econ-stats.js"></script><script src="js/cat-seller.js?v=geocache1-codex2"></script><script src="js/quests.js?v=coin1-peddler14-keepprogress2-order7-ch3-algae1-dock1"></script><script src="js/play-table.js?v=hover1"></script><script src="js/research-table.js?v=rs2"></script><script src="js/research.js?v=rs3-map1-slugicon2-deposit1-popup1"></script><script src="js/tile-paint.js?v=edge2"></script><script src="js/tank-decor-ui.js?v=d3v3-expand2-access1-white1-hold1"></script><script src="js/rival-mail.js"></script>
-<script src="js/world-market.js?v=hover1-zoom1-filter2"></script>
+<script src="js/boot.js"></script><script src="js/context-ui.js?v=offer1-settings1-sp1"></script><script src="js/expansion-ui.js?v=map64"></script><script src="js/slug-box-shop.js?v=sp1-coin1"></script><script src="js/slug-transfer.js?v=hover1-filter1-unlock1"></script>
+<script src="js/breeding-picker.js?v=sp1-hover1-filter2-unlock1"></script><script src="js/tank-sidebar.js?v=gene2"></script><script src="js/tank-hygiene.js"></script><script src="js/econ-stats.js"></script><script src="js/cat-seller.js?v=geocache1-codex2"></script><script src="js/quests.js?v=coin1-peddler14-keepprogress2-order7-ch3-algae1-dock1"></script><script src="js/play-table.js?v=sp1-hover1"></script><script src="js/research-table.js?v=rs2"></script><script src="js/research.js?v=sp1-rs3-map1-slugicon2-deposit1-popup1"></script><script src="js/tile-paint.js?v=edge2"></script><script src="js/tank-decor-ui.js?v=d3v3-expand2-access1-white1-hold1-sell1"></script><script src="js/rival-mail.js"></script>
+<script src="js/world-market.js?v=hover1-zoom1-filter2-sp1-toplayer1-trendsp1"></script>
 <script src="js/wall-shelf.js"></script>
 <script src="js/breed-news.js?v=grownlog1"></script>
-<script src="js/online-order.js?v=hover1"></script>
-<script src="js/slug-peddler.js?v=coin1-cap1"></script>
+<script src="js/online-order.js?v=hover1-sp1"></script>
+<script src="js/slug-peddler.js?v=coin1-cap1-sp1"></script>
 <script src="js/slug-collector.js?v=hat1"></script>
-<script src="js/slug-wholesaler.js?v=hover1-cap1-fav1"></script>
+<script src="js/slug-wholesaler.js?v=hover1-cap1-fav1-keepscroll1"></script>
 <script src="js/mobile-ui.js"></script>
-<script src="js/slug-race.js?v=racetour4-power2-sched1-slow2-mail2-prac2-wallgauge1-cap20-room1-questwin1"></script>
+<script src="js/slug-race.js?v=racetour4-power2-sched1-slow2-mail2-prac2-wallgauge1-cap20-room1-questwin1-goal1"></script>
 <script src="js/slug-tug.js?v=tour7bias-sched1-mail2-prac2-cap20-room1-questwin1-nofee1"></script>
 <script src="js/slug-practice.js?v=prac3"></script>
 <script src="js/slug-eat.js?v=eat11-steal1-cap20-room1-questwin1"></script>
@@ -174,7 +169,7 @@
 <script src="js/slug-sumo.js?v=sumo1"></script>
 <script src="js/frame-cap.js?v=cap2"></script>
 <script src="js/fps-meter.js?v=fps4-queue1"></script>
-<script src="js/slug-codex.js?v=codex8-anchor1-hi1"></script>
+<script src="js/slug-codex.js?v=codex8-anchor1-hi1-sp1"></script>
 <script src="js/access-ui.js?v=access1"></script>
 <link rel="stylesheet" href="css/access-ui.css?v=access1">
 <link rel="stylesheet" href="css/slug-race.css?v=racetour2-power1">
@@ -183,9 +178,7 @@
 <link rel="stylesheet" href="css/slug-throw.css?v=throw2-pitch1-aimarrow1-waveband2">
 <link rel="stylesheet" href="css/slug-sumo.css?v=sumo1">
 <link rel="stylesheet" href="css/new-slug-notices.css">
-<script src="js/new-slug-notices.js?v=fw1"></script>
-<script type="module" src="js/slug-3d.js?v=eyes2-glass3-glass1-throw1"></script>
-<script src="js/slug-3d-toggle.js?v=toggle1"></script>
+<script src="js/new-slug-notices.js?v=fw1-sp1"></script>
 <script src="tools/runtime-profile.js"></script>
 </body>
 </html>

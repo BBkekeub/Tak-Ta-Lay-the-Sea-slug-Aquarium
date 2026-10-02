@@ -417,8 +417,6 @@ function drawFloor(){
   /* แคนวาสกว้าง/สูง 0 = หน้ายังไม่ได้ layout (เปิดมาในแท็บพื้นหลัง · หน้าต่างย่อ · กำลังหมุนจอ)
      วาดต่อไปจะโยน InvalidStateError ตอน blit ชั้นที่แคชไว้ ทุกเฟรม = คอนโซลท่วมและเฟรมตก */
   if(!(CW>0&&CH>0))return;
-  window.DecorGLB?.beginShop();
-  window.Slug3D?.beginFrame();
   // อนิเมชันหน้าร้าน (เปิด/ปิดได้) — เปิด = ทากเดินในตู้
   if(engineReady){
     SlugEngine.ANIM = shopAnim;
@@ -438,7 +436,7 @@ function drawFloor(){
     } else { floorLastT=0; _floorSimDebt=0; }
   }
   if(typeof stepPeople==='function') stepPeople();     // ลูกค้าเดินดูตู้ (มีตัวจับเวลาของตัวเอง)
-  if(typeof PlayTable!=='undefined'&&PlayTable.isOpen()){window.DecorGLB?.hide();return;}
+  if(typeof PlayTable!=='undefined'&&PlayTable.isOpen())return;
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.clearRect(0,0,CW,CH);
   /* ---- ชั้นห้อง+พื้น: เปลี่ยนเฉพาะตอนกล้องขยับ/ร้านโต จึงแคชเป็นภาพไว้ แล้วแปะทีเดียว ----
      ก่อนหน้านี้เททั้งเท็กซ์เจอร์ผนัง+พื้นแกรนิตใหม่ทุกเฟรม 60 ครั้ง/วิ = ต้นเหตุที่กระตุก
@@ -510,7 +508,6 @@ function drawFloor(){
   /* ตัวเลขเงินลอยตรงจุดที่ทำรายการ — วาดท้ายสุดให้อยู่เหนือของทุกชิ้น (cost-pop.js)
      ลิสต์ว่าง = คืนทันที ไม่มีงานต่อเฟรมเพิ่มตอนเล่นปกติ */
   if(typeof CostPop!=='undefined'){ CostPop.draw(); CostPop.idle(); }
-  window.DecorGLB?.endShop();
 }
 
 function drawBigDiamond(bx0,by0,bw,bh, fill, stroke, dashed){
@@ -649,7 +646,7 @@ function drawObject(o){
   if(d.sumo&&window.SlugSumo)SlugSumo.drawArena(ctx,(x,y)=>{const q=localToFloor(d,R,x,y);return P(cx+q[0],cy+q[1],standH);},o);
   // ทากอยู่ก้นตู้ (ในน้ำ) — clip ให้อยู่ในกรอบตู้ (หัวไม่ทะลุกระจก) · ขนาด = ความยาวลำตัวจริง
   const displaySlugs=[...o.slugs,...breederVisualSlugs(o)];
-  const pxPerCm=TW/CM_PER_CELL, shown=window.Slug3D?.ready&&Slug3D.enabled&&Slug3D.all?displaySlugs.length:Math.min(displaySlugs.length,isBreeder(o)?70:20);   // ระยะแนวนอนต่อ 1 ช่อง (ตรงกับในตู้)
+  const pxPerCm=TW/CM_PER_CELL, shown=Math.min(displaySlugs.length,isBreeder(o)?70:20);   // ระยะแนวนอนต่อ 1 ช่อง (ตรงกับในตู้)
   ctx.save();
   const topZ=tz+30;                                   // เปิดฝา: หินสูงกว่าขอบตู้ให้โผล่พ้นได้ ไม่โดนเฉือน
   const q0=P(cx,cy,topZ),q1=P(cx+w,cy,topZ),q2=P(cx+w,cy,standH),q3=P(cx+w,cy+h,standH),q4=P(cx,cy+h,standH),q5=P(cx,cy+h,topZ);
@@ -668,7 +665,8 @@ function drawObject(o){
   displaySlugs.slice(0,shown).forEach(s=>{
     const sm = s.fx!==undefined ? MAP(s.fx,s.fy) : [w*0.3, h*0.7];
     let key=sm[0]+sm[1];
-    if(s.fx!==undefined && dmask.length){ const ck=ptKey(s.fx,s.fy);
+    if(s.deck&&dpos.has(s.deck.o)){ const dm=dpos.get(s.deck.o); key=dm[0]+dm[1]+0.05; }   // คลานบนขอนไม้ = วาดหน้าชิ้นนั้น
+    else if(s.fx!==undefined && dmask.length){ const ck=ptKey(s.fx,s.fy);
       for(const m of dmask){ const dm=dpos.get(m.dd);
         if(m.behind.has(ck)){ key=dm[0]+dm[1]-0.05; break; }   // หลังหิน = วาดก่อน
         if(m.front.has(ck)){  key=dm[0]+dm[1]+0.05; break; } } }
@@ -683,8 +681,8 @@ function drawObject(o){
       return;
     }
     if(it.dec){                                        // ---- หิน/ของตกแต่ง ----
-      if(typeof TidalDecor!=='undefined' && TidalDecor.is(it.dec.key)){
-        window.DecorGLB?.queueShop(o,it.dec);
+      if(typeof SpriteDecor!=='undefined' && SpriteDecor.is(it.dec.key)){
+        const dm=dpos.get(it.dec),p=P(cx+dm[0],cy+dm[1],standH),rotationSign=TANK_DECOR[it.dec.key].shopRotationSign||1;SpriteDecor.draw(ctx,it.dec.key,((it.dec.flip||0)+rotationSign*(o.rot||0))&3,p,pxPerCm*cam.zoom*(d.decorScale||1),null,true);
         return;
       }
       const dd=it.dec, def=TANK_DECOR[dd.key], e=decorImg(dd.key);
@@ -702,15 +700,10 @@ function drawObject(o){
       return;
     }
     const s=it.s;                                      // ---- ทาก ----
-    if(window.DecorGLB?.queueShopSlug(o,s))return;
     const showcaseScale=d.shopSlugScale||1;
     const a=Math.min(w*.92,Math.max(w*.08,it.sm[0]));
     const b=Math.min(h*.92,Math.max(h*.08,it.sm[1]));
-    const p=P(cx+a, cy+b, standH+1);
-    const headingOrigin=MAP(s.fx||0,s.fy||0),headingTarget=MAP((s.fx||0)+Math.cos(s._motionHeading??s.dir??0),(s.fy||0)+Math.sin(s._motionHeading??s.dir??0));
-    const headingPoint=P(cx+a+headingTarget[0]-headingOrigin[0],cy+b+headingTarget[1]-headingOrigin[1],standH+1);
-    const heading3D={x:headingPoint.x-p.x,y:headingPoint.y-p.y};
-    if(engineReady&&!slugOnWall(s)&&window.Slug3D?.draw(ctx,s,p.x,p.y,Math.min(30*pxPerCm*cam.zoom,showcaseScale*(s._breedScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*pxPerCm*cam.zoom),false,heading3D))return;
+    const p=P(cx+a, cy+b, standH+1+(s.deck?(s._deckZ||0)*ZUNIT:0));   // คลานบนขอนไม้ = ยกตามผิวไม้ (_deckZ หน่วยช่อง → พิกเซลหน้าร้าน)
     if(engineReady){
       const PP=slugPartsOf(s);
       const sa=showcaseScale*(s._breedScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*pxPerCm*cam.zoom/(PP.bw*PP.s), spriteH=PP.h*sa;
@@ -722,7 +715,7 @@ function drawObject(o){
            แก้เป็นยึดจุดจริงบนจอแทน: ก้นตู้ = standH · ผิวน้ำ = standH+tankH*0.88
            แล้วไล่ตำแหน่งจาก "หางแตะทราย" (climbZ=0) ไป "หัวถึงผิวน้ำ" (climbZ=rise) */
         /* กระจกขวาของตู้ผสมพันธุ์คือ "ผนังกั้น" ที่ fx=20 ไม่ใช่ขอบนอก d.w — ซิมจำกัดตัวไว้ใน fw=20 (stepTankSlugs)
-           ต้องใช้กติกาเดียวกับ drawWallSlug/drawWallSlug3D ใน tank-view.js ไม่งั้นทากไปเกาะกระจกนอกห่างตัวจริง 10 ช่อง
+           ต้องใช้กติกาเดียวกับ drawWallSlug ใน tank-view.js ไม่งั้นทากไปเกาะกระจกนอกห่างตัวจริง 10 ช่อง
            และจุด "ด้านใน" ต้องถอยจาก edge จริง (edge-1) ไม่ใช่ d.w-1 — ไม่งั้นหลังจะหันเข้าช่องผสมพันธุ์แทนกลางตู้ */
         const limits=slugWallLimits(s,d.w,d.h,d), edge=s.climbSide==='right'?(d.breeder?20:d.w):0;
         const point=MAP(edge,s.fy), inPt=MAP(edge?edge-1:1, s.fy);
@@ -744,8 +737,6 @@ function drawObject(o){
           const pose=slugWallPoseAxes(Number.isFinite(s.dir)?s.dir:Math.PI/2,
                        along.x-floorPoint.x, along.y-floorPoint.y,
                        upPt.x-floorPoint.x,  upPt.y-floorPoint.y, sgn);
-          /* 3D ใช้แกนชุดเดียวกับสไปรต์ แต่ไม่ต้องดันออกจากกระจก (จุดกำเนิดโมเดล = ท้อง) */
-          if(window.Slug3D?.draw(ctx,s,floorPoint.x,yy,Math.min(30*pxPerCm*cam.zoom,showcaseScale*(s._breedScale||1)*slugCm(typeof foodGenes==='function'?foodGenes(s):s.genes)*pxPerCm*cam.zoom),false,null,{hx:pose.hx,hy:pose.hy,dx:pose.dx,dy:pose.dy}))return;
           ctx.save();
           ctx.translate(floorPoint.x+pose.dx*(sh/2+1), yy);
           ctx.rotate(pose.rot);
@@ -754,7 +745,6 @@ function drawObject(o){
         }
         return;
       }
-      if(window.Slug3D?.draw(ctx,s,p.x,p.y,Math.min(30*pxPerCm*cam.zoom,PP.bw*PP.s*sa),false,heading3D))return;
       const aura=PP.D.aMetal>0.30;
       if(shopAnim && spriteH>=ANIM_MIN_PX && animBudget>0){
         animBudget--;
@@ -1257,7 +1247,6 @@ function loop(){
     tuneAnimBudget(_work);
     window.FrameCap?.noteWork(_work);
   }else{
-    if(document.hidden||window.SlugRace?.isOpen())window.DecorGLB?.hide();
     window.FrameCap?.reset('shop');
   }
   requestAnimationFrame(loop);
@@ -1345,4 +1334,3 @@ function ensureRotateBtn(){
   return b;
 }
 ensureRotateBtn();
-

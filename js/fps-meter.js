@@ -26,7 +26,6 @@
     วัดบนเครื่องผู้เล่นได้ว่า เมนเธรดไม่ว่าง 85–96% แต่ป้ายบอกเกมวาดแค่ ~20 ms จาก 33 ms
     → ต้องแยกยอดให้เห็นว่าก้อนไหนใหญ่ ไม่งั้นแก้มั่ว · ยอดที่แยก:
       คน   = สร้างท่า + วาดเลเยอร์ลูกค้า (people.js)
-      3D   = เรนเดอร์ฉาก Three.js ของของตกแต่ง/ทาก 3D (decor-glb.js)
       ของ  = วาดตู้/ของในร้านทีละชิ้น (drawObject)
       เดิน = simulation ของทากในตู้และลูกค้า
       รอคิว = ระยะเวลาจนข้อความได้รับการประมวลผล รวมเวลารอของเบราว์เซอร์ด้วย ไม่ใช่ CPU time
@@ -36,7 +35,7 @@
   ['ของ', ['drawObject']],
   ['เดิน',['stepTankSlugs','stepPeople']]
  ];
- const BUCKET_KEYS=BUCKETS.map(b=>b[0]).concat(['3D']);
+ const BUCKET_KEYS=BUCKETS.map(b=>b[0]);
  let bucket={}, poseBuilds=0, otherMs=0, chan=null, since=0;
  const hooks=[];                                 // {owner,name,orig} — คืนของเดิมตอนปิดตัววัด
  function resetBuckets(){bucket={};for(const k of BUCKET_KEYS)bucket[k]=0;}
@@ -53,8 +52,6 @@
   if(typeof window.drawFloor==='function'){origDrawFloor=window.drawFloor;window.drawFloor=tag(origDrawFloor);}
   if(typeof window.drawTank==='function'){origDrawTank=window.drawTank;window.drawTank=tag(origDrawTank);}
   for(const [key,names] of BUCKETS)for(const n of names)hookInto(window,n,key);
-  hookInto(window.DecorGLB,'endShop','3D');
-  hookInto(window.DecorGLB,'endTank','3D');
   if(!chan){chan=new MessageChannel();chan.port1.onmessage=e=>{otherMs+=performance.now()-e.data;};}
   wrapped=true;
  }
@@ -115,7 +112,7 @@
    +'p95 '+p95.toFixed(1)+'   p99 '+p99.toFixed(1)+' ms\n'
    +'เกมวาด '+w50.toFixed(1)+' ms (p95 '+w95.toFixed(1)+')'
      +'  รอคิว '+(otherSum/frames).toFixed(1)+'\n'
-   +'คน '+per('คน')+' · 3D '+per('3D')+' · ของ '+per('ของ')+' · เดิน '+per('เดิน')+'\n'
+   +'คน '+per('คน')+' · ของ '+per('ของ')+' · เดิน '+per('เดิน')+'\n'
    +'ท่าใหม่ '+Math.round(builds/secs)+'/วิ · เธรดช่วย '+(workers||'ไม่มี')+'\n'
    +'สะดุด >'+JANK_MS+'ms: '+jank+' ครั้ง/3 วิ';
   since=now;
@@ -156,8 +153,8 @@
   b.className='tbtn';b.id='bFps';b.type='button';
   b.title='โชว์ FPS และเฟรมที่ช้าที่สุด (p95/p99) ไว้หาต้นเหตุอาการกระตุก';
   b.onclick=toggle;
-  /* วางต่อจากปุ่มสลับทาก 3D ถ้ามี — สองอันนี้เป็นเรื่องภาพ/ประสิทธิภาพเหมือนกัน */
-  const after=document.getElementById('bSlug3D');
+  /* วางต่อจากปุ่มจัดกล้อง */
+  const after=document.getElementById('bFit');
   if(after&&after.parentElement===panel)after.after(b);else panel.append(b);
   apply();
  }

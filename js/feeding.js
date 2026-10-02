@@ -124,7 +124,7 @@ function foodStep(s,dt,fw,fh,obstacles,sharedSolid){
   if(d<=Math.max(v,0.12))m.path.shift();
  }else{
   s.state='eat';s.flip=m.food.fx>s.fx;s.ph=(s.ph||0)+dt*0.5;m.eat+=dt;
-  /* ⚠️ 2026-09-17 โมเดล 3D หันตาม s.dir (tank-view ตั้ง _motionHeading=s.dir ตอนกิน) ไม่ใช่ s.flip
+  /* ⚠️ 2026-09-17 ทิศตัว (s.dir) ต้องหันเข้าหาอาหารตอนกิน
      เดิม s.dir ค้างเป็นทิศก้าวสุดท้ายตอนเดินเข้าจุดกินรอบอาหาร → ตัวที่เดินอ้อมมาจากอีกฝั่งกินโดยหันหลังให้อาหาร (ผู้เล่นทัก)
      foodStep คืน true ก่อนถึงโค้ดเลี้ยวของ stepTankSlugs จึงต้องเลี้ยวเข้าหาอาหารเองตรงนี้ (นุ่มเท่าการเลี้ยวปกติ) */
   const want=Math.atan2(m.food.fy-s.fy,m.food.fx-s.fx),turn=((want-s.dir+Math.PI*3)%(Math.PI*2))-Math.PI;

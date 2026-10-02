@@ -130,16 +130,35 @@
  function wholesalePickAll(id){
   var o=TRADE_OFFERS.find(function(o){return o.id===id;}); if(!o||!o.wholesale) return;
   o.picks=eligibleInventory(o).slice(0,o.max||WHOLESALE_MAX).map(function(s){return s.id;});
-  renderTradeOffers(true);
+  syncWholesalePicks(o);
  }
  function wholesalePickNone(id){
   var o=TRADE_OFFERS.find(function(o){return o.id===id;}); if(!o||!o.wholesale) return;
-  o.picks=[]; renderTradeOffers(true);
+  o.picks=[]; syncWholesalePicks(o);
+ }
+ /* ⚠️ 2026-10-03 ผู้เล่น: "กดเลือกทากแล้วหน้าจอเด้งขึ้นบน" — เดิมติ๊กทีไร renderTradeOffers(true) สร้างการ์ดใหม่ทั้งใบ
+    กริดทากที่เลื่อนลงไปแล้วกลับไปบนสุด โฟกัสหลุด และวาดพอร์เทรตทุกตัวใหม่ · ตอนนี้แก้เฉพาะช่องติ๊ก/ปุ่มขายในการ์ดเดิม
+    แล้วตั้ง _sig ให้ตรงกับการ์ดที่ควรเป็น รอบอัปเดตทุกวินาทีของ trade.js จึงไม่สร้างใหม่ทับอีก */
+ function syncWholesalePicks(o){
+  var card=document.querySelector('#tradeOffers details.trade-offer[data-offer="'+o.id+'"]');
+  if(!card){ renderTradeOffers(true); return; }
+  var max=o.max||WHOLESALE_MAX, count=o.picks.length;
+  card.querySelectorAll('input[data-wholesale-pick]').forEach(function(input){
+   var on=o.picks.indexOf(input.value)>=0;
+   input.checked=on; input.toggleAttribute('checked',on);
+   input.disabled=!on&&count>=max; input.toggleAttribute('disabled',input.disabled);
+   input.closest('.wholesale-slug').classList.toggle('picked',on);
+  });
+  var t=document.createElement('template');
+  t.innerHTML='<details class="trade-offer" data-offer="'+o.id+'"><summary>'+offerSummary(o)+'</summary>'+wholesaleOfferCard(o)+'</details>';
+  var fresh=t.content.firstElementChild;
+  patchTradeCard(card,fresh); card._sig=tradeCardSignature(fresh);
  }
 
  /* ---------- ทาสีพอร์เทรตในการ์ด + ผูกช่องติ๊กเลือก (ห่อ renderTradeOffers แทนแก้ trade.js ทั้งก้อน) ---------- */
  function paintWholesaleCanvases(){
-  document.querySelectorAll('canvas[data-wholesale-slug]').forEach(function(c){
+  document.querySelectorAll('canvas[data-wholesale-slug]:not([data-painted])').forEach(function(c){   // การ์ดเดิมวาดแล้ว ไม่วาดซ้ำทุกรอบ
+   c.dataset.painted='1';
    var s=(G.inv||[]).find(function(s){return s.id===c.dataset.wholesaleSlug;});
    if(s&&typeof drawSlugPortrait==='function'){ drawSlugPortrait(c,s); SlugHover.mark(c.closest('.wholesale-slug'),s); }
   });
@@ -156,7 +175,7 @@
    var idx=o.picks.indexOf(input.value);
    if(input.checked){ if(idx<0){ if(o.picks.length<(o.max||WHOLESALE_MAX)) o.picks.push(input.value); else input.checked=false; } }
    else if(idx>=0) o.picks.splice(idx,1);
-   renderTradeOffers(true);
+   syncWholesalePicks(o);
   });
  }
 
@@ -187,7 +206,11 @@
     ห่อเพิ่มอีกชั้นเพื่อวาด canvas[data-wholesale-slug] ของการ์ดนี้ด้วย โดยไม่แก้ trade.js */
  var _origRenderTradeOffers=window.renderTradeOffers;
  window.renderTradeOffers=function(force){
+  /* การ์ดถูกสร้างใหม่ได้จริง (คลังทากเปลี่ยน) — จำตำแหน่งเลื่อนของกริดไว้คืนให้ ไม่ให้เด้งขึ้นบน */
+  var scroll={};
+  document.querySelectorAll('#tradeOffers details.trade-offer .wholesale-grid').forEach(function(g){ scroll[g.closest('details').dataset.offer]=g.scrollTop; });
   if(typeof _origRenderTradeOffers==='function') _origRenderTradeOffers(force);
+  document.querySelectorAll('#tradeOffers details.trade-offer .wholesale-grid').forEach(function(g){ var v=scroll[g.closest('details').dataset.offer]; if(v&&g.scrollTop!==v) g.scrollTop=v; });
   paintWholesaleCanvases();
  };
 

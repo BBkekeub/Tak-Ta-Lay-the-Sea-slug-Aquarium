@@ -4,7 +4,7 @@ import fs from 'node:fs';import path from 'node:path';import http from 'node:htt
 import {fileURLToPath} from 'node:url';import {createRequire} from 'node:module';import assert from 'node:assert/strict';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),out=path.join(root,'tools/qa/tug-team');fs.mkdirSync(out,{recursive:true});
 const {chromium}=createRequire(import.meta.url)('C:/Users/ACER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
-const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://local').pathname,f=path.resolve(root,'.'+(p==='/'?'/index.html':decodeURIComponent(p)));if(!f.startsWith(root+path.sep)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404).end();return;}res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.json':'application/json','.glb':'model/gltf-binary'})[path.extname(f)]||'application/octet-stream');fs.createReadStream(f).pipe(res);});
+const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://local').pathname,f=path.resolve(root,'.'+(p==='/'?'/index.html':decodeURIComponent(p)));if(!f.startsWith(root+path.sep)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404).end();return;}res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.json':'application/json'})[path.extname(f)]||'application/octet-stream');fs.createReadStream(f).pipe(res);});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;const errors=[],report={};
 const only=process.argv[2];
 try{
@@ -14,7 +14,7 @@ try{
   const ctx=await browser.newContext({viewport:{width:1280,height:800}}),page=await ctx.newPage();page.setDefaultTimeout(30000);
   page.on('pageerror',e=>errors.push(name+': '+e.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/`,{waitUntil:'load'});
-  await page.waitForFunction(()=>!window.BOOTING&&window.DecorGLB?.ready&&window.Slug3D?.ready,null,{timeout:90000});
+  await page.waitForFunction(()=>!window.BOOTING&&typeof engineReady!=='undefined'&&engineReady,null,{timeout:90000});
   await page.evaluate(([ids,foeGirth])=>{
    const t=G.objs.find(o=>o.type==='tank');t.def=CATALOG.tank_tug;t._key='tank_tug';t.decor=[];t.foods=[];
    const mk=(girth,len,mainC)=>makeSlug({...SlugEngine.randGene(),girth,len,mainC,gillN:60});
@@ -37,7 +37,7 @@ try{
   const ctx=await browser.newContext({viewport:{width:1280,height:800}}),page=await ctx.newPage();page.setDefaultTimeout(30000);
   page.on('pageerror',e=>errors.push('modal: '+e.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/`,{waitUntil:'load'});
-  await page.waitForFunction(()=>!window.BOOTING&&window.DecorGLB?.ready,null,{timeout:90000});
+  await page.waitForFunction(()=>!window.BOOTING&&typeof engineReady!=='undefined'&&engineReady,null,{timeout:90000});
   await page.evaluate(()=>{
    const t=G.objs.find(o=>o.type==='tank');t.def=CATALOG.tank_tug;t._key='tank_tug';t.decor=[];
    t.slugs=[0,100,30,60,10].map((g,i)=>makeSlug({...SlugEngine.randGene(),girth:g,len:g,mainC:40+i*70}));
@@ -56,20 +56,20 @@ try{
   // จำนวนตัวมากับคำท้า (size:3) — ต้องไม่มีปุ่มให้เลือกโหมด
   assert.equal(await modal.getByRole('button',{name:'1 ต่อ 1'}).count(),0);
   report.badge=await modal.locator('.tug-chip').textContent();assert.match(report.badge,/3 ต่อ 3/);
-  report.modal3={pressed:await modal.locator('.slug-pick[aria-pressed=true]').count(),start:await modal.locator('button.tbtn').filter({hasText:'จ่าย'}).textContent(),
-   disabled:await modal.locator('button.tbtn').filter({hasText:'จ่าย'}).isDisabled(),verdict:await modal.locator('.tug-verdict-box').textContent()};
+  report.modal3={pressed:await modal.locator('.slug-pick[aria-pressed=true]').count(),start:await modal.locator('button.tbtn').filter({hasText:'เริ่มแข่ง'}).textContent(),
+   disabled:await modal.locator('button.tbtn').filter({hasText:'เริ่มแข่ง'}).isDisabled(),verdict:await modal.locator('.tug-verdict-box').textContent()};
   assert.equal(report.modal3.pressed,3);
   await page.screenshot({path:path.join(out,'modal-3v3.png')});
   // คลิกตัวที่เลือกอยู่ = เอาออก → ปุ่มเริ่มต้องกดไม่ได้
   await modal.locator('.slug-pick[aria-pressed=true]').first().click();
-  report.modalRemove={pressed:await modal.locator('.slug-pick[aria-pressed=true]').count(),disabled:await modal.locator('button.tbtn').filter({hasText:'จ่าย'}).isDisabled()};
+  report.modalRemove={pressed:await modal.locator('.slug-pick[aria-pressed=true]').count(),disabled:await modal.locator('button.tbtn').filter({hasText:'เริ่มแข่ง'}).isDisabled()};
   assert.equal(report.modalRemove.pressed,2);assert.ok(report.modalRemove.disabled);
   await modal.locator('.slug-pick[aria-pressed=false]').last().click();
   const coinBefore=await page.evaluate(()=>G.coin);
-  await modal.locator('button.tbtn').filter({hasText:'จ่าย'}).click();
+  await modal.locator('button.tbtn').filter({hasText:'เริ่มแข่ง'}).click();
   await page.waitForFunction(()=>tankMode&&document.getElementById('tugTankHUD'),null,{timeout:10000});
   report.started=await page.evaluate(()=>({size:G.tug.active.size,team:G.tug.active.me.team.length,foes:G.tug.active.foe.team.length,coin:G.coin}));
-  assert.equal(report.started.team,3);assert.equal(report.started.coin,coinBefore-900);
+  assert.equal(report.started.team,3);assert.equal(report.started.coin,coinBefore,'ค่าสมัครไม่หักตอนเริ่ม — หักเฉพาะตอนแพ้ (settle)');
   // กดดึงจริงให้เห็นว่าแต้มขยับ
   await page.waitForTimeout(3500);
   for(let i=0;i<10;i++){await page.keyboard.press(i%2?'KeyK':'KeyF');}

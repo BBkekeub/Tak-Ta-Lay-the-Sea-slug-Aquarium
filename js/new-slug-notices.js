@@ -6,7 +6,8 @@
 (()=>{
  'use strict';
  const MAX=5,genes=SlugEngine.GENES;
- const cleanGenes=g=>Object.fromEntries(genes.map(({k})=>[k,Number.isFinite(g?.[k])?g[k]:DEFAULT_GENE[k]]));
+ /* เก็บสายพันธุ์ (sp) ไปด้วย ไม่งั้นการ์ดวาดโอรีโอเป็นทากตัวเดิม */
+ const cleanGenes=g=>{const o=Object.fromEntries(genes.map(({k})=>[k,Number.isFinite(g?.[k])?g[k]:DEFAULT_GENE[k]]));if(typeof g?.sp==='string'&&/^[a-z][a-z0-9_]{1,23}$/.test(g.sp)&&g.sp!=='legacy')o.sp=g.sp;return o;};
  G.newSlugNotices=(G.newSlugNotices||[]).filter(n=>n&&typeof n.id==='string'&&['box','grown'].includes(n.source))
    .slice(-MAX).map(n=>({id:n.id,source:n.source,at:Number.isFinite(n.at)?n.at:Date.now(),seen:!!n.seen,
      genes:cleanGenes(n.genes),nickname:typeof n.nickname==='string'?Array.from(n.nickname).slice(0,32).join(''):'',favorite:!!n.favorite}));
@@ -101,6 +102,8 @@
  }
  function open(id){
    const n=G.newSlugNotices.find(n=>n.id===id);if(!n)return;
+   /* การ์ดที่บันทึกก่อนแก้ไม่มี sp → เอาพันธุ์จากทากตัวจริงมาเติม */
+   const live=find(id);if(!n.genes.sp&&live?.genes?.sp)n.genes.sp=live.genes.sp;
    current=n;n.seen=true;portrait={genes:{...n.genes}};
    const hero=renderCard();if(!card.open)card.showModal();renderTray();saveGame();fireworks(hero);close.focus();
  }

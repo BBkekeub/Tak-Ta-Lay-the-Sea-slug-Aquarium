@@ -17,6 +17,7 @@ function startBreeding(o,ids){
  if(b.phase!=='idle'||parents.length!==2||parents.some(s=>!s)){toast('เลือกทากว่าง 2 ตัวในตู้นี้','bad');return false;}
  if(parents.some(s=>(s.breedLife??50)<5)){toast('พลังผสมพันธุ์ไม่พอ','bad');return false;}
  if(b.larvae.length>=50){toast('พื้นที่ตัวอ่อนเต็ม','bad');return false;}
+ if(slugSpecies(parents[0])!==slugSpecies(parents[1])){toast('ผสมข้ามสายพันธุ์ไม่ได้ ('+slugSpeciesName(parents[0])+' × '+slugSpeciesName(parents[1])+')','bad');return false;}
  /* ทากที่มีลูกค้าเสนอซื้อค้างอยู่ เอามาผสมได้แล้ว — แต่ต้องสละข้อเสนอนั้นไป
     (ตัวมันย้ายเข้าโซนผสม ลูกค้าที่รออยู่หน้าเคาน์เตอร์ซื้อไม่ได้แล้ว) */
  if(typeof releaseSlugOffers==='function')releaseSlugOffers(parents,'เอาทากไปผสมพันธุ์');
@@ -121,9 +122,8 @@ function breederVisualSlugs(o){
  b.parents.forEach(s=>{if(!o.slugs.includes(s)){s.breedZone=true;o.slugs.push(s);}});
  b.larvae.forEach((l,i)=>{const s=l.slug;if(!Number.isFinite(s.fx)||s.fx<25||s.fx>=30){s.fx=25.5+i%5;s.fy=.5+Math.floor(i/5);}s._breedVisual=true;s._breedScale=.5;out.push(s);});return out;
 }
-/* ⚠️ 2026-09-18 สายไข่เคยวาดรวมอยู่ในนี้ ซึ่งถูกเรียกหลัง DecorGLB.splitTankBackground()
-   = วาดบนแคนวาสชั้นหน้า ซึ่งอยู่ "เหนือ" ทาก 3D → สายไข่ทับตัวทากในโซนผสม (ผู้เล่นทัก)
-   ตอนนี้แยกเป็น drawBreederEggs() ที่ tank-view เรียกก่อนแยกชั้น (อยู่ใต้ตัวทาก แบบเชือกชักเย่อ)
+/* ⚠️ 2026-09-18 สายไข่เคยวาดรวมอยู่ในนี้ = ทับตัวทากในโซนผสม (ผู้เล่นทัก)
+   ตอนนี้แยกเป็น drawBreederEggs() ที่ tank-view เรียกตอนวาดพื้น ก่อนตัวทาก (อยู่ใต้ตัวทาก)
    ส่วนนี้เหลือแต่ผนังกั้นกับป้ายนับตัว ซึ่งเป็น UI ควรอยู่ชั้นบนสุดตามเดิม */
 function drawBreederInterior(o){
  if(!isBreeder(o))return;const b=breederState(o),sandT=SAND_CELLS;

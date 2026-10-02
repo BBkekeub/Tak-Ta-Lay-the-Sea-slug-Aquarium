@@ -22,9 +22,6 @@
 
 | ส่วน | สิ่งที่มีอยู่จริง |
 | --- | --- |
-| geometry ตัวบังของตกแต่ง | fillDepth ขยาย buffer เมื่อความจุไม่พอ ไม่ dispose ทุกเฟรม; updateShopOcclusion อัปเดต furniture เมื่อ layout key เปลี่ยน |
-| ฝูงทาก | SlugCrowd ใช้ InstancedMesh และ bone texture; ระบบแชร์ pose มีแล้ว |
-| ทากหงอน/สีกระจก | โค้ดปัจจุบันใช้ uniform crowdGlass แทนเพิ่ม vertex attribute; ยังไม่ได้ตรวจภาพสดซ้ำในรอบนี้ |
 | หน้าเล่นกับทาก | frame เช็ก dialog.open/document.hidden และ visibilitychange หยุด/เริ่ม rAF |
 | คราบตู้ | มีแคชและ next-change time; พื้นผิวสีสร้างเมื่อจำเป็น; ไม่ rebuild คราบทุกเฟรม |
 | การ์ดข้อเสนอ | patchTradeCard เปลี่ยน live fields โดยรักษาการ์ดเดิม |

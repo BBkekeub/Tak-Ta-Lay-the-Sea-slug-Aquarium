@@ -34,7 +34,17 @@
 
  /* ยีนชุดกลางไว้วาดเงาช่องที่ยังไม่เจอ — รู้แค่ขั้นหงอน ยังไม่รู้ยีนอื่นของตัวจริง */
  const GHOST_GILLN=[50,38,27,16,6,0];
- const ghostGene=k=>({bodyDepth:45,gillDepth:45,mainC:200,accC:200,len:50,girth:50,gillLen:50,tentLen:50,vigor:50,gillN:GHOST_GILLN[k],spotN:50});
+ const ghostGene=(k,sp)=>{const g={bodyDepth:45,gillDepth:45,mainC:200,accC:200,len:50,girth:50,gillLen:50,tentLen:50,vigor:50,gillN:GHOST_GILLN[k],spotN:50};if(sp&&sp!=='legacy')g.sp=sp;return g;};
+
+ /* ---- แยกหน้าตามสายพันธุ์ ----
+    ตัวเดิมใช้คีย์ 'i-j-k' แบบเดิม (เซฟเก่าไม่ต้องย้าย) · พันธุ์อื่นนำหน้าด้วย '<พันธุ์>:' เช่น 'oreo:4-2-1'
+    แต่ละพันธุ์มี 486 ช่องของตัวเอง ผังแผนที่ชุดเดียวกัน */
+ const SP_RE=/^[a-z][a-z0-9_]{1,23}$/;
+ const spOfG=g=>(g&&typeof g.sp==='string'&&SP_RE.test(g.sp)&&g.sp!=='legacy')?g.sp:'legacy';
+ const PFX=sp=>sp==='legacy'?'':sp+':';
+ const spOfKey=key=>{const c=key.indexOf(':');return c<0?'legacy':key.slice(0,c);};
+ const speciesList=()=>SlugEngine.species?SlugEngine.species():[{key:'legacy',th:'ตัวเดิม'}];
+ const countOf=sp=>{let n=0;for(const k in G.codex) if(spOfKey(k)===sp) n++;return n;};
 
  /* ยีนจากเซฟอาจเพี้ยน (NaN/Infinity/หายไปบางตัว) — drawSlug() เจอค่าแบบนั้นแล้ววาดเละหรือโยน error
     กันไว้ตรงทางเข้าทางเดียว ทั้งตอนบันทึกและตอนอ่านกลับมาวาด */
@@ -45,13 +55,14 @@
    const v=Number(g&&g[k]);
    out[k]=Number.isFinite(v)?clamp(v,0,(k==='mainC'||k==='accC')?400:100):base[k];
   }
+  const sp=spOfG(g); if(sp!=='legacy') out.sp=sp;   // ไม่งั้นช่องของโอรีโอวาดเป็นทากตัวเดิม
   return out;
  }
 
  function keyOf(s){
   const g=s&&s.genes; if(!g) return null;
   if(purity(clamp(g.mainC,0,400))<PURITY_MIN||purity(clamp(g.accC,0,400))<PURITY_MIN) return null;
-  return bodyIdx(g.mainC)+'-'+bodyIdx(g.accC)+'-'+gillStep(g.gillN);
+  return PFX(spOfG(g))+bodyIdx(g.mainC)+'-'+bodyIdx(g.accC)+'-'+gillStep(g.gillN);
  }
 
  /* ---- บันทึก ----
@@ -85,6 +96,7 @@
  }
  window.slugCodexScan=scan;
  window.slugCodexCount=()=>Object.keys(G.codex||{}).length;
+ window.slugCodexTotal=()=>486*speciesList().length;
 
  /* ---- ผังพุ่ม (คำนวณครั้งเดียว) ---- */
  const C=1850, HUB=300, ROW=[820,1180,1540], COL=[-13.5,0,13.5], LBL_R=1760;
@@ -135,9 +147,10 @@
   }catch(e){}
   return c;
  }
- const ghostSprite=k=>{                                            // เงาต้องเห็นว่ามีช่องอยู่ ไม่ใช่จมหายไปกับพื้น
-  if(!ghosts.has(k)) ghosts.set(k,render(ghostGene(k),'#1d363c'));
-  return ghosts.get(k);
+ const ghostSprite=(k,sp=cur)=>{                                   // เงาต้องเห็นว่ามีช่องอยู่ ไม่ใช่จมหายไปกับพื้น
+  const id=sp+'|'+k;                                              // เงาตามรูปร่างของพันธุ์นั้น (6 ตัวต่อพันธุ์ ไม่โดนทิ้ง)
+  if(!ghosts.has(id)) ghosts.set(id,render(ghostGene(k,sp),'#1d363c'));
+  return ghosts.get(id);
  };
  function evict(){
   for(const [m,max] of [[cache,CACHE_MAX],[hiCache,HI_MAX]])
@@ -188,24 +201,32 @@
 
  /* ---- หน้าต่าง ---- */
  let dlg=null,cv=null,ctx=null,span=3720,camx=C,camy=C,sel=null;
+ let cur='legacy', view='map';                  // พันธุ์ที่กำลังดู · 'pick' = หน้าเลือกพันธุ์ / 'map' = แผนที่ของพันธุ์นั้น
+ const E=key=>G.codex[PFX(cur)+key];            // ช่องของพันธุ์ที่กำลังดู
  const FULL=3720, MINSPAN=200;   // 2026-09-23 ผู้เล่นขอซูมได้ใกล้กว่านี้ (เดิม 520)
  function build(){
   if(dlg) return;
   dlg=document.createElement('dialog'); dlg.id='slugCodex';
   dlg.style.cssText='width:min(1000px,96vw);padding:0;background:#0a1518;color:#eadcc4;border:1px solid #b59859;border-radius:14px;color-scheme:dark;overflow:hidden';
   dlg.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid #1d3439">'
-   +'<b style="font-weight:600">📓 สมุดบันทึกสายพันธุ์</b>'
+   +'<button class="tbtn" data-back style="padding:2px 9px;font-size:12px">← เลือกพันธุ์</button>'
+   +'<b style="font-weight:600">📓 สมุดบันทึกสายพันธุ์<span data-spname></span></b>'
    +'<span data-count style="font-size:12px;color:#7d9ca1;margin-right:auto"></span>'
-   +'<button class="tbtn" data-zo style="padding:2px 9px">−</button><button class="tbtn" data-zi style="padding:2px 9px">+</button>'
-   +'<button class="tbtn" data-fit style="padding:2px 9px;font-size:12px">เต็มแผนที่</button>'
+   +'<span data-mapctl style="display:contents"><button class="tbtn" data-zo style="padding:2px 9px">−</button><button class="tbtn" data-zi style="padding:2px 9px">+</button>'
+   +'<button class="tbtn" data-fit style="padding:2px 9px;font-size:12px">เต็มแผนที่</button></span>'
    +'<button class="tbtn" data-close aria-label="ปิด">✕</button></div>'
    +'<div data-wrap style="position:relative;background:#0a1518;touch-action:none;cursor:grab">'
    +'<canvas data-cv style="display:block;width:100%;height:min(66vh,560px)"></canvas>'
    +'<div data-card style="position:absolute;left:0;right:0;bottom:0;padding:8px 12px;background:linear-gradient(transparent,#0a1518 55%);font-size:12.5px;line-height:1.6;pointer-events:none;min-height:38px"></div>'
+   +'<div data-pick style="position:absolute;inset:0;overflow:auto;background:#0a1518;cursor:default;padding:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;align-content:start"></div>'
    +'</div>';
   document.body.append(dlg);
   cv=dlg.querySelector('[data-cv]'); ctx=cv.getContext('2d');
   dlg.querySelector('[data-close]').onclick=()=>dlg.close();
+  dlg.querySelector('[data-back]').onclick=()=>showPick();
+  /* การ์ดพันธุ์ไม่ต้องให้ลากแผนที่ตามนิ้ว — กันไม่ให้ pointerdown ทะลุไปที่ wrap */
+  dlg.querySelector('[data-pick]').addEventListener('pointerdown',e=>e.stopPropagation());
+  dlg.querySelector('[data-pick]').addEventListener('wheel',e=>e.stopPropagation());
   dlg.querySelector('[data-zi]').onclick=()=>{span=Math.max(MINSPAN,span*0.7);draw();};
   dlg.querySelector('[data-zo]').onclick=()=>{span=Math.min(FULL,span*1.4);draw();};
   dlg.querySelector('[data-fit]').onclick=()=>{span=FULL;camx=camy=C;draw();};
@@ -236,7 +257,7 @@
  function w2s(x,y,S){ return {x:(x-camx)/S.u+S.w/2, y:(y-camy)/S.u+S.h/2}; }
 
  function draw(){
-  if(!dlg||!dlg.open||document.hidden) return;      // เอกสารถูกซ่อน = ไม่ต้องวาดอะไรเลย
+  if(!dlg||!dlg.open||document.hidden||view!=='map') return;      // เอกสารถูกซ่อน / อยู่หน้าเลือกพันธุ์ = ไม่ต้องวาดแผนที่
   const S=fit(), u=S.u, K=S.dpr;
   hiReq=0;
   ctx.fillStyle='#0a1518'; ctx.fillRect(0,0,S.w,S.h);
@@ -274,13 +295,13 @@
   for(let i=0;i<9;i++){
    for(let j=0;j<9;j++) for(let k=0;k<6;k++){
     const l=P3[i][j][k]; if(!vis(l)) continue;
-    const key=i+'-'+j+'-'+k, e=G.codex[key], p=w2s(l.x,l.y,S);
-    blit((e&&spriteFor(key,e,wid3))||ghostSprite(k), p.x, p.y, wid3, !!e, !!sel&&sel.t==='leaf'&&sel.k===key, K); drew++;
+    const key=i+'-'+j+'-'+k, e=E(key), p=w2s(l.x,l.y,S);
+    blit((e&&spriteFor(PFX(cur)+key,e,wid3))||ghostSprite(k), p.x, p.y, wid3, !!e, !!sel&&sel.t==='leaf'&&sel.k===key, K); drew++;
    }
    for(let j=0;j<9;j++){
     const s=P2[i][j]; if(!vis(s)) continue;
     const p=w2s(s.x,s.y,S);
-    let rep=null; for(let k=0;k<6;k++){ const e=G.codex[i+'-'+j+'-'+k]; if(e){rep=[i+'-'+j+'-'+k,e];break;} }
+    let rep=null; for(let k=0;k<6;k++){ const e=E(i+'-'+j+'-'+k); if(e){rep=[PFX(cur)+i+'-'+j+'-'+k,e];break;} }
     blit((rep&&spriteFor(rep[0],rep[1],wid2))||ghostSprite(0), p.x, p.y, wid2, !!rep, false, K); drew++;
     if(showName){
      ctx.fillStyle=rep?'#a8c2bd':'#4a686d'; ctx.font=Math.round(11*K)+'px "IBM Plex Sans Thai",system-ui,sans-serif';
@@ -289,7 +310,7 @@
    }
    const h=P1[i], p=w2s(h.x,h.y,S);
    let rep=null,bn=0;
-   for(let j=0;j<9;j++)for(let k=0;k<6;k++){ const e=G.codex[i+'-'+j+'-'+k]; if(e){ bn++; if(!rep)rep=[i+'-'+j+'-'+k,e]; } }
+   for(let j=0;j<9;j++)for(let k=0;k<6;k++){ const e=E(i+'-'+j+'-'+k); if(e){ bn++; if(!rep)rep=[PFX(cur)+i+'-'+j+'-'+k,e]; } }
    if(vis(h)){ blit((rep&&spriteFor(rep[0],rep[1],wid1))||ghostSprite(0), p.x, p.y, wid1, !!rep, false, K); drew++; }
    ctx.fillStyle=bn?'#c9bda2':'#55757a'; ctx.font=Math.round(13*K)+'px "IBM Plex Sans Thai",system-ui,sans-serif';
    ctx.textAlign='center';
@@ -300,7 +321,7 @@
   }
   const cs=w2s(C,C,S);
   blit(ghostSprite(0), cs.x, cs.y, sizePx(200,18,u,K), true, false, K);
-  const n=Object.keys(G.codex).length;
+  const n=countOf(cur);
   dlg.querySelector('[data-count]').textContent=n+' / 486 ช่อง'+(span>2900?' · ระดับกิ่ง':span>1400?' · เห็นครบทุกตัว':' · ระยะใกล้');
   window.__codexDrew=drew;                            // ไว้วัดผลการคัดของนอกจอตอนทดสอบ
  }
@@ -337,13 +358,13 @@
   const box=dlg.querySelector('[data-card]');
   if(!h){ box.innerHTML='<span style="color:#7d9ca1">แตะทากตัวไหนก็ได้เพื่อดูรายละเอียด · ลากเพื่อเลื่อน เลื่อนล้อเพื่อซูม · แตะดุมกิ่งเพื่อบินไปดูทั้งพุ่ม</span>'; return; }
   if(h.t==='sp'){                       // กดชั้นสาย = สรุปว่าสายนี้เก็บขั้นหงอนได้ถึงไหนแล้ว
-   const rows=LAD.map((n,k)=>{ const e=G.codex[h.i+'-'+h.j+'-'+k];
+   const rows=LAD.map((n,k)=>{ const e=E(h.i+'-'+h.j+'-'+k);
     return '<span style="color:'+(e?'#f1c66d':'#5c7c80')+';margin-right:12px">'+n+' หงอน '+(e?'✓':(k<4?'—':'✕'))+'</span>'; }).join('');
    box.innerHTML='<b style="color:#f1c66d">'+BN()[h.i].n+' / '+GN()[h.j].n+'</b><br>'+rows
     +'<br><span style="color:#7d9ca1;font-size:11.5px">✕ = ขั้นที่กล่องสุ่มให้ไม่ได้ ต้องเพาะเอง</span>';
    return;
   }
-  const key=h.k, [i,j,k]=key.split('-').map(Number), e=G.codex[key];
+  const key=h.k, [i,j,k]=key.split('-').map(Number), e=E(key);
   const head='<b style="color:#f1c66d">'+BN()[i].n+' / '+GN()[j].n+' · '+LAD[k]+' หงอน</b>';
   if(!e){ box.innerHTML=head+' <span style="color:#6d8a8e">— ยังไม่เคยเจอ'
     +(k>=4?' · ขั้นนี้ไม่มีในกล่องสุ่มทุกระดับ ต้องเพาะเอง':'')+'</span>'; return; }
@@ -393,9 +414,59 @@
   wrap.addEventListener('wheel',e=>{ e.preventDefault(); span=clamp(span*(e.deltaY>0?1.18:0.85),MINSPAN,FULL); draw(); },{passive:false});
  }
 
+ /* ---- หน้าเลือกพันธุ์ ----
+    เจอพันธุ์นั้นแล้ว (มีช่องในสมุด หรือมีตัวอยู่ในร้านตอนนี้) = วาดทากตัวจริงพร้อมแสงทอง
+    ยังไม่เจอ = เงาถมดำตามรูปร่างพันธุ์นั้น เหมือนช่องที่ยังไม่เจอในแผนที่
+    รูปไอคอนอบครั้งเดียวต่อ (พันธุ์, ตัวแทน) — เปลี่ยนตัวแทนเมื่อไรค่อยอบใหม่แล้วคืนบิตแมปเก่า */
+ const pickIcons=new Map();
+ function pickIcon(sp,repId,genes){
+  const old=pickIcons.get(sp);
+  if(old&&old.id===repId) return old.c;
+  if(old) old.c.width=0;
+  const c=genes?render(genes,null,1.6):render(ghostGene(2,sp),'#1d363c',1.6);
+  pickIcons.set(sp,{id:repId,c}); return c;
+ }
+ function repOf(sp){
+  for(const k of Object.keys(G.codex)) if(spOfKey(k)===sp) return {id:'c-'+k,g:G.codex[k].g};
+  const s=ownedSlugs().find(s=>spOfG(s.genes)===sp);     // มีตัวอยู่แต่สีคร่อมหลัก (ยังไม่ลงช่องไหน) ก็นับว่าเจอพันธุ์แล้ว
+  return s?{id:'s-'+s.id,g:sane(s.genes)}:null;
+ }
+ function setHead(){
+  const pick=view==='pick', name=(speciesList().find(o=>o.key===cur)||{}).th||'';
+  dlg.querySelector('[data-back]').style.display=(pick||speciesList().length<2)?'none':'';
+  dlg.querySelector('[data-mapctl]').style.display=pick?'none':'contents';
+  dlg.querySelector('[data-pick]').style.display=pick?'grid':'none';
+  dlg.querySelector('[data-card]').style.display=pick?'none':'';
+  dlg.querySelector('[data-spname]').textContent=pick?'':' · '+name;
+  dlg.querySelector('[data-count]').textContent=pick?Object.keys(G.codex).length+' / '+slugCodexTotal()+' ช่องทุกพันธุ์':'';
+ }
+ function showPick(){
+  view='pick'; sel=null; setHead();
+  const host=dlg.querySelector('[data-pick]'); host.replaceChildren();
+  for(const o of speciesList()){
+   const rep=repOf(o.key), n=countOf(o.key), found=!!rep;
+   const b=document.createElement('button'); b.type='button'; b.className='tbtn';
+   b.style.cssText='display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px;border-radius:12px;background:'
+    +(found?'radial-gradient(ellipse at 50% 40%,#2a4a4a,#10232a 70%)':'#0f1f24')+';border:1px solid '+(found?'#b59859':'#1d3439');
+   const ic=pickIcon(o.key,rep?rep.id:'ghost',rep&&rep.g); const c=document.createElement('canvas');
+   c.width=ic.width; c.height=ic.height; c.getContext('2d').drawImage(ic,0,0); c.setAttribute('aria-hidden','true');
+   c.style.cssText='width:100%;max-width:190px;height:auto'+(found?';filter:drop-shadow(0 0 10px #f1c66d99) drop-shadow(0 0 3px #f1c66d)':'');
+   const t=document.createElement('b'); t.textContent=o.th; t.style.color=found?'#f1c66d':'#55757a';
+   const m=document.createElement('small'); m.textContent=found?n+' / 486 ช่อง':'ยังไม่เคยเจอ'; m.style.color=found?'#a8c2bd':'#4a686d';
+   b.setAttribute('aria-label',o.th+' · '+m.textContent);
+   b.append(c,t,m); b.onclick=()=>openSpecies(o.key); host.append(b);
+  }
+ }
+ function openSpecies(sp){
+  if(cur!==sp){ cur=sp; span=FULL; camx=camy=C; }       // เปลี่ยนพันธุ์ = เริ่มที่ภาพรวมทั้งแผนที่
+  view='map'; sel=null; setHead(); card(null); draw(); setTimeout(draw,60);
+ }
+
  window.openSlugCodex=function(){
   build(); scan();
   if(!dlg.open) dlg.showModal();
+  if(speciesList().length>1){ showPick(); return; }       // มีพันธุ์เดียว = เข้าแผนที่เลยเหมือนเดิม
+  cur='legacy'; view='map'; setHead();
   card(sel); draw();
   /* วาดซ้ำอีกที เผื่อ dialog ยังไม่ได้ layout ตอนเรียกครั้งแรก (rect เป็น 0)
      ⚠️ ห้ามพึ่ง requestAnimationFrame อย่างเดียว — แท็บที่ถูกซ่อนอยู่จะไม่ยิง rAF เลย แล้วสมุดจะว่างเปล่า */

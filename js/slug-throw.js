@@ -147,15 +147,12 @@
  }
  const heldStalk=new WeakMap();   // ทาก → ก้านหงอนที่ถือหิน (ทางสำรอง 2D)
  function loadedStone(a){
-   const s=sprites[a.turn],tip=s&&window.DecorGLB?.throwCrown?.(s);
-   if(tip)return {x:tip.x,y:tip.y,z:tip.z+6*.8/ZH};
-   const screen=s&&window.Slug3D?.throwCrownScreen?.(s);
-   if(screen){const base=S(START_CM/CM_PER_CELL,LANE_Y,SAND_CELLS);return {x:START_CM/CM_PER_CELL+(screen.x-base.x)/(CELLW*tankCam.zoom),y:LANE_Y,z:SAND_CELLS+(base.y-screen.y+6*.8*tankCam.zoom)/(ZH*tankCam.zoom)};}
+   const s=sprites[a.turn];
    if(s&&typeof slugPartsOf==='function'){
      const P=slugPartsOf(s),len=TANK_SLUG_VIEW_SCALE*slugCm(s.genes)*depthPxPerCm();
      if(P){const scale=len/(P.bw*P.s),k=P.s*scale,base=S(START_CM/CM_PER_CELL,LANE_Y,SAND_CELLS);
        const cx=base.x-((P.L+P.R)/2-P.bw/2)*k,cy=base.y-P.h*scale*.44;
-       // ล็อกก้านที่ถือหินไว้ก้านเดียว เหมือนฝั่ง 3D — กันหินกระโดดข้ามก้านตอนเอียงสุด
+       // ล็อกก้านที่ถือหินไว้ก้านเดียว — กันหินกระโดดข้ามก้านตอนเอียงสุด
        const held=heldStalk.get(s);let top=null,topIdx=-1;
        P.stalks.forEach((st,idx)=>{if(held!=null&&idx!==held)return;const rot=st.rot0+(s.throwLean??0),h=st.ay*.94;
          const px=st.px+Math.sin(rot)*h,py=st.py-Math.cos(rot)*h;
@@ -715,14 +712,10 @@
    line(START_CM/CM_PER_CELL,'rgba(255,211,107,.95)',3);
    c.restore();
  }
- const glSlugs=()=>!!(engineReady&&window.DecorGLB?.ready&&window.Slug3D?.ready&&Slug3D.enabled);
  function drawSlugAt(s,x,y,heading,st){
-   s.fx=x;s.fy=y;s.wall=null;s.climbZ=0;s._motionHeading=s.dir=s.turn=heading;s.state=st;
+   s.fx=x;s.fy=y;s.wall=null;s.climbZ=0;s.dir=s.turn=heading;s.state=st;
    s.flip=Math.cos(heading)*CELLW+Math.sin(heading)*DEPX>0;
-   if(glSlugs()&&DecorGLB.drawSlug(s))return;
    const len=TANK_SLUG_VIEW_SCALE*slugCm(s.genes)*depthPxPerCm(),p=S(x,y,SAND_CELLS);
-   const dir={x:CELLW*Math.cos(heading)+DEPX*Math.sin(heading),y:-DEPY*Math.sin(heading)};
-   if(engineReady&&window.Slug3D?.draw(tctx,s,p.x,p.y,len,false,dir))return;
    const P=slugPartsOf(s);if(!P)return;
    const scale=len/(P.bw*P.s),h=P.h*scale;
    drawTankSlug(s,P,scale,p.x-((P.L+P.R)/2-P.bw/2)*P.s*scale,p.y-h*.44,false);
@@ -754,7 +747,6 @@
      if(preparing)s.throwLean=.15+aimAngle(a)/90*.8;
      else if(active&&a.phase==='boost'&&a.clock<.3)s.throwLean=-.25*(1-a.clock/.3);
      else delete s.throwLean;
-     // 2D renderer uses its existing appendage pose; 3D uses radians directly.
      if(s.throwLean!==undefined)s.tugLean=clamp(s.throwLean/.6,-1,1);else delete s.tugLean;
      const st='rest';
      drawSlugAt(s,sp.x,sp.y,0,st);

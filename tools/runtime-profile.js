@@ -41,8 +41,6 @@
  function begin(){
   if(window.BOOTING){setTimeout(begin,1000);return;}
   for(const key of ['drawFloor','drawObject','drawPerson','beginPersonBatch','endPersonBatch','drawPersonBatchGL','poseVertsOf','flattenFaces','drawPersonShadow','personFurnitureFaces','personGlassFaces','personClusters','stepPeople','stepPeopleSlice','stepTankSlugs','drawTankSlug','drawCaustics','drawTankHygiene','drawWallSlug','drawCarriedSlugs','drawCatSeller','saveGame'])hook(window,key);
-  for(const key of ['beginShop','endShop','queuePeople','draw'])hook(window.DecorGLB,key,'DecorGLB.'+key);
-  for(const key of ['beginFrame','endFrame','draw'])hook(window.Slug3D,key,'Slug3D.'+key);
   for(const key of ['slugSprite','slugPartsOf','foodPrepare','foodStep','foodPath','foodDecay','decorSolidSet','decorCellSet','freeSpotNear','slugPoseTimers','slugFaceAndCreep'])hook(window,key);
   if(typeof SlugEngine!=='undefined')for(const key of ['drawSlug','parts','render'])hook(SlugEngine,key,'SlugEngine.'+key);
   try{observer=new PerformanceObserver(list=>{for(const f of list.getEntries())if(longFrames.length<30)longFrames.push({duration:f.duration,blockingDuration:f.blockingDuration,scripts:f.scripts?.map(s=>({source:s.sourceURL?.split('/').pop(),function:s.sourceFunctionName,duration:s.duration,forcedStyleAndLayoutDuration:s.forcedStyleAndLayoutDuration}))});});observer.observe({type:'long-animation-frame',buffered:false});}catch{}

@@ -172,6 +172,7 @@ function breed(dad, mom, L, seed){
     if(applied[k] !== roll.d[k]) capped.push(k);
   });
   /* บัญชีหนี้จดเฉพาะที่ขยับจริง ตัวที่ชนขอบจึงไม่ถูกจดเกินจริง */
+  if(dad.sp) child.sp = dad.sp;
   BKEYS.forEach(k => L.debt[k] = L.debt[k]*C.decay + applied[k]);
   L.count++;
   return {child, base, delta:roll.d, applied, capped,
@@ -185,6 +186,8 @@ function copyGene(o){
     const fallback=legacy?(Number.isFinite(o[legacy])?o[legacy]*100:45):gr(k).mid;
     r[k]=Number.isFinite(o[k])?o[k]:fallback;
     r[k]=Math.max(gr(k).min,Math.min(gr(k).max,r[k]));
-  }return r;
+  }
+  if(typeof o.sp==='string'&&o.sp&&o.sp!=='legacy')r.sp=o.sp;   // สายพันธุ์ (ไม่มี = ตัวเดิม) — ผสมได้เฉพาะพันธุ์เดียวกัน ลูกได้พันธุ์พ่อแม่
+  return r;
 }
 return {breed,newLab,copyGene};})();

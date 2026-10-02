@@ -1,9 +1,8 @@
 /* ชักเย่อทากทะเล — ตู้ 100×50 ซม. หนึ่งตู้ต่อร้าน · MVP: 1v1 แมตช์เดียว
  *
  * โครงเดียวกับ slug-race.js (ลูกค้ามาท้า → โมดอล → เข้าตู้เต็มจอ → ผลแพ้ชนะ)
- * ต่างกันที่การวาดตัวแข่ง: ที่นี่วาดเองด้วย drawSlugAt() ซึ่งลอง Slug3D ก่อนแล้วตกไป 2D
- * จึงคุมตำแหน่ง/ทิศ/ท่าได้ตรง ๆ ตามแรงดึง และได้โมเดล 3D ทั้งสองฝั่งเหมือนกัน
- * (slug-race.js ใช้สไปรต์ 2D ล้วน เพราะตอนนั้นยังไม่มีทาง 3D)
+ * ต่างกันที่การวาดตัวแข่ง: ที่นี่วาดเองด้วย drawSlugAt() (สไปรต์ 2D จาก slug-engine.js)
+ * จึงคุมตำแหน่ง/ทิศ/ท่าได้ตรง ๆ ตามแรงดึง
  *
  * กติกา: กด F / K สลับกันให้มีแต้มนำอีกฝั่ง WIN แต้ม (นิ้วชี้สองมือวางบนปุ่มนูน F กับ K ได้พอดี)
  *   แรงดึง  = ความสมบูรณ์ + ขนาดตัว + จำนวนหงอน   → 1..4 แต้มต่อการกด
@@ -481,7 +480,7 @@
    /* เวลาทุกตัวอิง performance.now() ซึ่งรีเซ็ตทุกครั้งที่โหลดหน้า — ต้องล้างตอนต่อเกม */
    a.freezeUntil=0;a.freezeSide=null;a.me.sneezeUntil=0;a.foe.sneezeUntil=0;a.foe.nextPressAt=0;a.me.nextPressAt=0;
    a.view=a.view||layoutAt(a.rope);
-   /* id ต่างกันทุกตัว — Slug3D แยกโครงกระดูก/แอนิเมชันตาม id (ซ้ำกัน = สองตัวขยับเป็นตัวเดียว) */
+   /* id ต่างกันทุกตัว (ซ้ำกัน = แยกตัวไม่ออกตอนคลิก/วาดตามคิว) */
    foeSprites=teamOf(a.foe).map((m,i)=>({id:'tug-foe'+(i?'-'+i:''),genes:m.genes,flip:false,state:'rest',ph:i*1.7,noBob:true}));
    meSprites=a.me.bot?teamOf(a.me).map((m,i)=>({id:'tug-left'+(i?'-'+i:''),genes:m.genes,flip:true,state:'rest',ph:i*1.3,noBob:true})):[];
    tugUI=element('div');tugUI.id='tugTankHUD';document.body.classList.add('tug-in-tank');
@@ -620,7 +619,7 @@
  }
  function complete(){
    const t=tankOf(),wasPractice=state.active?.practice;
-   if(t)for(const s of t.slugs){delete s._tugSpot;delete s.tugLean;delete s.tugStrain;s.state='rest';s.stt=.5;}   // tugLean ค้าง = หงอนเอียงค้าง/ทากไม่เข้าโครงแชร์ (slug-3d.js)
+   if(t)for(const s of t.slugs){delete s._tugSpot;delete s.tugLean;delete s.tugStrain;s.state='rest';s.stt=.5;}   // tugLean ค้าง = หงอนเอียงค้าง
    /* ซ้อม: ไม่ยุ่งกับคำท้าที่ค้างอยู่ ไม่รีเซ็ตนาฬิกา และอยู่ในตู้ต่อ */
    if(wasPractice){state.active=null;close();saveGame();return;}
    state.active=null;state.offer=null;leave();close();exitTank();reschedule();saveGame();
@@ -628,7 +627,6 @@
 
  /* ---------- คัทซีนท่าไม้ตาย (สไตล์สั่งท่าโปเกม่อน) ----------
     ภาพทาก 2D ตัวใหญ่สไลด์เข้ามาชิดขอบจอ — ฝั่งเราเข้าซ้าย คู่แข่งเข้าขวา — ระหว่างช่วงฟรีซ 1 วิ
-    ใช้สไปรต์ 2D เสมอแม้ตัวในตู้จะเป็นโมเดล 3D อยู่ เพราะเป็นภาพพอร์ตเทรตแยกจากฉาก
     ท่าที่วาดคือ 'sneeze' ซึ่งเอนจิน 2D มีอยู่แล้ว (สั่นหงอน+หนวดรัว ๆ ที่ slug-engine.js) */
  function showCutscene(side,now){
    if(!tugUI||document.hidden||!state.active)return;
@@ -754,8 +752,7 @@
      s.wall=null;s.climbZ=0;s.stt=1;
      /* ยังเดินเข้าที่อยู่ = ท่าเดิน · ถึงที่แล้ว = ยืนนิ่งดู (ท่า rest) */
      s.state=Math.abs(sp.x-s.fx)+Math.abs(sp.y-s.fy)>.25?'walk':'rest';
-     /* 'rest'/'walk' ไม่อยู่ใน FACE_STATES → โค้ดวาดจะไม่แตะ flip และบังคับ _motionHeading=s.dir ให้เอง
-        ตั้ง dir ชี้เข้ากลางเลน ทั้ง 2D และ 3D จึงหันหน้าดูการแข่งตรงกัน */
+     /* 'rest'/'walk' ไม่อยู่ใน FACE_STATES → โค้ดวาดจะไม่แตะ flip · ตั้ง dir/flip ชี้เข้ากลางเลนเอง = หันหน้าดูการแข่ง */
      s.dir=s.turn=Math.atan2(cy-s.fy,cx-s.fx);
      s.flip=Math.cos(s.dir)*CELLW+Math.sin(s.dir)*DEPX>0;
      s.ph=(s.ph||0)+dt*.6;
@@ -788,30 +785,20 @@
  /* ออกแรงอยู่ = เพิ่งกดดึงภายใน 0.45 วิ (กดรัว = ตา ＞＜ ค้างตลอด · หยุดกด = ตากลับเป็นปกติ)
     ⚠️ pullAt เป็นเวลา performance.now() — ต่อเกมจากเซฟแล้วค่าเพี้ยน จึงเช็กอายุติดลบด้วย */
  function strainOf(o,now){const age=now-(o.pullAt||0);return !!o.pullAt&&age>=0&&age<450&&!state.active?.settled;}
- /* ทาก 3D วาดผ่านตัวเรนเดอร์ของตู้ (DecorGLB) ชุดเดียวกับทากปกติ — ฉาก WebGL เดียว ไม่มีการก๊อปภาพ
-    ⚠️ 2026-09-16 เดิมเรียก Slug3D.draw (ทาง atlas): เรนเดอร์ลงเรนเดอเรอร์แยก → drawImage ทั้ง atlas ลงแคนวาส 2D
-       → ขึ้น GPU ใหม่ทุกเฟรม วัดในตู้ชักเย่อ 3 ต่อ 3: เฟรมกลาง 24ms · 99% ที่ 108ms · texSubImage2D 84ms/วิ = กระตุกชัด
-    ทางนี้ต้องวาดเชือก/ผ้าไว้ในชั้นพื้นหลัง (drawUnder) ไม่งั้นเชือกบนแคนวาส 2D จะทับตัวทาก 3D */
- const glSlugs=()=>!!(engineReady&&window.DecorGLB?.ready&&window.Slug3D?.ready&&Slug3D.enabled);
  function drawSlugAt(s,fx,fy,heading){
-   s._motionHeading=heading;
-   if(glSlugs()){s.fx=fx;s.fy=fy;s.climbZ=0;s.wall=null;if(DecorGLB.drawSlug(s))return;}
    const len=TANK_SLUG_VIEW_SCALE*slugCm(s.genes)*depthPxPerCm();
    const p=S(fx,fy,SAND_CELLS);
-   const dir={x:CELLW*Math.cos(heading)+DEPX*Math.sin(heading),y:-DEPY*Math.sin(heading)};
-   if(engineReady&&window.Slug3D?.draw(tctx,s,p.x,p.y,len,false,dir))return;
    const P=slugPartsOf(s);if(!P)return;
    const scale=len/(P.bw*P.s),h=P.h*scale;
    const cx=p.x-((P.L+P.R)/2-P.bw/2)*P.s*scale, cy=p.y-h*.44;
    drawTankSlug(s,P,scale,cx,cy,false);
-   /* 2D: ตา ＞＜ ใช้ drawDashFace ตัวเดียวกับท่าพุ่ง (tank-view.js) — 3D ใช้เมช EyeStrain_ แทน */
+   /* ตา ＞＜ ใช้ drawDashFace ตัวเดียวกับท่าพุ่ง (tank-view.js) */
    if(s.tugStrain)drawDashFace(P,cx,cy,s.flip,P.s*scale,slugBaseHex(s.genes),0,2.2);   // 2.2 เท่า: ขนาดตาเดิมในตู้เหลือ ~3px อ่านไม่ออก
    else drawDefaultEyes(P,cx,cy,s.flip,P.s*scale);
  }
- const TUG_ITEMS_2D=[{sortY:TUG_LANE_MID+.06,kind:'tug',part:'rope'},{sortY:TUG_LANE_MID+.05,kind:'tug',part:'cloth'},
+ /* เชือก/ผ้าแดงเรียงลึกรวมกับทากและของอื่นในตู้ (เชือกมาก่อน = ช่วงที่ลอดใต้ตัวโดนตัวบัง) */
+ const TUG_ITEMS=[{sortY:TUG_LANE_MID+.06,kind:'tug',part:'rope'},{sortY:TUG_LANE_MID+.05,kind:'tug',part:'cloth'},
    {sortY:TUG_LANE_MID,kind:'tug',part:'foe'},{sortY:TUG_LANE_MID,kind:'tug',part:'me'}];
- const TUG_ITEMS_GL=TUG_ITEMS_2D.slice(2);
- /* ทาก 3D: เชือกกับผ้าย้ายไปวาดในชั้นพื้นหลังแล้ว (drawUnder) · ทาก 2D: เรียงลึกรวมกับของอื่นเหมือนเดิม */
  /* เส้นโค้งเชือกบนจอ (ใช้ร่วมกันระหว่างเชือกกับผ้าแดง) */
  function ropeCurve(a,v){
    const mt=teamOf(a.me),ft=teamOf(a.foe),mb=teamBack(mt),fb=teamBack(ft);
@@ -819,8 +806,7 @@
    const A=S(v.meX-mb[mb.length-1],TUG_LANE_MID,SAND_CELLS+lift(mt)),B=S(v.foeX+fb[fb.length-1],TUG_LANE_MID,SAND_CELLS+lift(ft));
    return {A,B,mx:(A.x+B.x)/2,my:(A.y+B.y)/2+Math.max(3,7*tankCam.zoom)};   // จุดควบคุมต่ำกว่ากลาง = เชือกหย่อนนิด ๆ ให้ดูมีน้ำหนัก
  }
- function tugItems(){return glSlugs()?TUG_ITEMS_GL:TUG_ITEMS_2D;}
- function drawUnder(){if(glSlugs()){drawPart(TUG_ITEMS_2D[0]);drawPart(TUG_ITEMS_2D[1]);}}
+ function tugItems(){return TUG_ITEMS;}
  function drawPart(it){
    const a=state.active,v=a&&a.view;if(!a||!v)return;
    if(it.part==='rope'){
@@ -830,7 +816,7 @@
            แต่ตัวเล็ก (ยาว < 1 ช่องในตู้) เห็นช่องว่างระหว่างปลายเชือกกับตัว ดูเหมือนเชือกขาดก่อนถึงทาก */
      const {A,B,mx,my}=ropeCurve(a,v);
      /* ยกเชือกขึ้นมา "กลางลำตัว" ไม่ใช่ระดับทราย — ⚠️ 2026-09-17 เดิมผูกที่ SAND_CELLS
-        วัดจากภาพจริง: ขอบล่างตัวทาก 3D ต่ำกว่าจุดทราย ~13px ส่วนลำตัวสูงขึ้นไป เชือกเลยวิ่งเลียขอบล่างตัว ดูไม่ตรงเส้น
+        ผูกที่ระดับทรายแล้วเชือกวิ่งเลียขอบล่างตัว ดูไม่ตรงเส้น
         ความสูงลำตัวแปรตามขนาด จึงยกตามความยาวตัวที่เห็นจริง (bodyCells) ของตัวท้ายแถวแต่ละฝั่ง
         (คำนวณใน ropeCurve — ผ้าแดงใช้เส้นโค้งเดียวกันเพื่อเกาะเชือกพอดี) */
      tctx.save();tctx.lineCap='round';
@@ -870,7 +856,7 @@
        const s=team[i];if(!s)continue;
        s.state=sneeze?'sneeze':'rest';
        s.flip=true;                                   // ฝั่งเราอยู่ซ้าย หันไปทางคู่แข่ง (ขวา)
-       s.tugLean=v.meLean||0;                         // หงอนสะบัดตามปุ่ม (ตัววาด 2D/3D อ่านค่านี้)
+       s.tugLean=v.meLean||0;                         // หงอนสะบัดตามปุ่ม (ตัววาดอ่านค่านี้)
        s.tugStrain=strain;                            // ตา ＞＜ ตอนออกแรง (จามใช้ตาของท่าจามเอง)
        drawSlugAt(s,v.meX-back[i],TUG_LANE_MID,0);
      }
@@ -1280,7 +1266,7 @@
    /* ผู้ท้าแข่ง (1 ต่อ 1) ยืนรออยู่ที่ตู้ หรือกำลังมีทัวร์นาเมนต์ = ตู้นี้ไม่ให้ลูกค้าปกติมาดู */
    reserved:o=>!!o?.def?.tug&&(tourOn()||visitors.some(p=>PEOPLE.includes(p))),tour:()=>state.tour,
    isPulling:t=>!!tugUI&&!!state.active&&(!t||t.id===state.active.tankId),
-   spectatorSlugs,stepSpectators,tugItems,drawUnder,drawPart,updateTankFrame,pull,resist,net,botCps,REF_CPS,WIN};
+   spectatorSlugs,stepSpectators,tugItems,drawPart,updateTankFrame,pull,resist,net,botCps,REF_CPS,WIN};
 
  /* แมตช์ค้างจากเซฟเก่า: ต้องมีครบทั้งสองฝั่งไม่งั้นทิ้ง */
  if(!state.active||!state.active.me||!state.active.foe||!Number.isFinite(state.active.rope))state.active=null;

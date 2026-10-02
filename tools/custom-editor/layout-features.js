@@ -5,6 +5,7 @@ const UI_KEY='custom-editor-ui-v1',RAIL_MIN=260,RAIL_MAX=720,RAIL_DEFAULT=360;
 let ui={};try{ui=JSON.parse(localStorage.getItem(UI_KEY)||'{}')||{}}catch{ui={}}
 const saveUI=()=>{try{localStorage.setItem(UI_KEY,JSON.stringify(ui))}catch{}};
 ui.fold=ui.fold&&typeof ui.fold==='object'?ui.fold:{};
+if('พรีวิวสีตามยีน' in ui.fold&&!('พรีวิวยีน' in ui.fold)){ui.fold['พรีวิวยีน']=ui.fold['พรีวิวสีตามยีน'];delete ui.fold['พรีวิวสีตามยีน']}   // การ์ดพรีวิวเปลี่ยนชื่อ 2026-09-26 — คงสถานะพับเดิม
 
 const css=document.createElement('style');css.textContent=`
 @media (min-width:900px){
@@ -70,7 +71,7 @@ document.addEventListener('keydown',e=>{if(e.key!=='\\'||e.ctrlKey||e.metaKey||e
 /* ---------- card order, grouping and folding ---------- */
 const cards=[...rail.querySelectorAll(':scope>.card')],title=c=>(c.querySelector(':scope>h2')?.firstChild?.textContent||'').trim();
 const find=t=>cards.find(c=>title(c)===t);
-const CORE=['ชิ้นส่วน','ที่เลือกอยู่','ชั้นเลเยอร์'],TOOLS=['ดัดรูปทรง / ลาย','โค้งลายหุ้มผิวกลม','กระดูก 2D','ชิ้นนี้เป็นของตัวไหน'],FILES=['ชิ้นส่วนของฉัน','ชุด Oreo สีขาว','ส่งออกผัง'];
+const CORE=['ชิ้นส่วน','ที่เลือกอยู่','ชั้นเลเยอร์'],TOOLS=['สายพันธุ์','ตารางสีหลัก','พรีวิวยีน','ชิ้นนี้เป็นของตัวไหน','ดัดรูปทรง / ลาย','โค้งลายหุ้มผิวกลม','กระดูก 2D'],FILES=['ชิ้นส่วนของฉัน','ชุด Oreo สีขาว','ส่งออกผัง'];
 const OPEN_BY_DEFAULT=new Set(CORE);
 const head=document.createElement('div');head.className='card';head.innerHTML='<div class="rail-head"><input type="text" id="railSearch" class="thai" placeholder="ค้นหาเครื่องมือ… เช่น กระดูก" spellcheck="false"><button id="railFoldAll" class="mini" title="พับทุกการ์ด">พับหมด</button><button id="railOpenAll" class="mini" title="กางทุกการ์ด">กางหมด</button></div>';
 const group=t=>{const g=document.createElement('div');g.className='card-group';g.textContent=t;return g};

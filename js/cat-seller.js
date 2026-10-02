@@ -147,8 +147,7 @@ function showcaseDecorPosition(key){const b=decorRequiredBounds(key,0,0,0);if(!b
 function drawCounterShowcase(o){const tray=counterBlock(o,9,12,5,5);isoBox(tray.x,tray.y,tray.w,tray.h,14*ZUNIT,.4*ZUNIT,'#cec5ab','#777361','#96907c');
  const selected=o.showcase||{},def=TANK_DECOR[selected.decorKey],pos=def&&showcaseDecorPosition(selected.decorKey);
  if(pos){const q=counterLocal(o.def,o.rot,9+pos.x,12+pos.y);
-  if(def.model)window.DecorGLB?.queueShowcase(o,selected.decorKey,o.cx+q[0],o.cy+q[1]);
-  else{const im=decorImg(selected.decorKey),p=P(o.cx+q[0],o.cy+q[1],14.5*ZUNIT),w=def.wCm/CM_PER_CELL*TW*cam.zoom;if(im.ok){const h=w*im.img.naturalHeight/im.img.naturalWidth,a=def.anchor||{x:.5,y:.9};ctx.drawImage(im.img,p.x-w*a.x,p.y-h*a.y,w,h);}}}
+  {const im=decorImg(selected.decorKey),p=P(o.cx+q[0],o.cy+q[1],14.5*ZUNIT),w=def.wCm/CM_PER_CELL*TW*cam.zoom;if(im.ok){const h=w*im.img.naturalHeight/im.img.naturalWidth,a=def.anchor||{x:.5,y:.9};ctx.drawImage(im.img,p.x-w*a.x,p.y-h*a.y,w,h);}}}
  const sample=showcaseSlugs().find(s=>s.id===selected.slugId);if(sample){const sp=slugSprite(sample),q=counterLocal(o.def,o.rot,11.5,15.2),p=P(o.cx+q[0],o.cy+q[1],15*ZUNIT),w=3.2*TW*cam.zoom,h=w*sp.c.height/sp.c.width;ctx.drawImage(sp.c,p.x-w/2,p.y-h/2,w,h);}
  isoBox(tray.x,tray.y,tray.w,tray.h,14.4*ZUNIT,4*ZUNIT,'#aacdd0','#76a4ae','#8bbac0',.18);
  const pts=[P(tray.x,tray.y,18.4*ZUNIT),P(tray.x+tray.w,tray.y,18.4*ZUNIT),P(tray.x+tray.w,tray.y+tray.h,14.4*ZUNIT),P(tray.x,tray.y+tray.h,14.4*ZUNIT)];o._showcaseHit={x:Math.min(...pts.map(p=>p.x))-8,y:Math.min(...pts.map(p=>p.y))-8,right:Math.max(...pts.map(p=>p.x))+8,bottom:Math.max(...pts.map(p=>p.y))+8};

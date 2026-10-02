@@ -206,7 +206,7 @@ kbd{font-family:"IBM Plex Mono",monospace; font-size:10.5px; background:#0C0C0F;
   min-height:48px;            /* ล็อกความสูง — ถ้าแถบนี้สูงเปลี่ยน แคนวาสจะถูก resize แล้วกล้องจัดใหม่ทั้งฉาก */
 }
 #dFlip{min-width:112px; text-align:center}
-#dRemove{min-width:104px; text-align:center}
+#dRemove,#dSell{min-width:104px; text-align:center}
 .ov-decor .dlabel{
   color:var(--accent-dim); font-family:"IBM Plex Mono",monospace;
   font-size:9.5px; letter-spacing:.18em; text-transform:uppercase;
@@ -281,3 +281,6 @@ kbd{font-family:"IBM Plex Mono",monospace; font-size:10.5px; background:#0C0C0F;
 
 /* คอมพิวเตอร์ร้าน — ปุ่มแท็บห้ามตัดคำกลางปุ่ม จะได้เรียงเป็นแถวเดียว */
 #counterComputer .tbtn{white-space:nowrap}
+/* คลิกตัวพ่อค้าบนพื้นร้าน → การ์ดของคนนั้นกะพริบกรอบให้รู้ว่าเป็นใบไหน (trade.js openTradeOffer) */
+#tradeOffers details.trade-offer.trade-offer-focus{animation:tradeOfferFocus 1.4s ease-out}
+@keyframes tradeOfferFocus{0%,40%{box-shadow:0 0 0 3px #ffd46a}100%{box-shadow:0 0 0 0 #ffd46a00}}

@@ -43,7 +43,7 @@ function saveGame(){
       v:1, seenAt:Number.isFinite(G.seenAt)?G.seenAt:Date.now(),   /* ครั้งสุดท้ายที่ร้านยัง "มีคนเฝ้า" — people.js ใช้คิดค่าเข้าย้อนหลังตอนกลับมา */
       racing:G.racing||null, tug:G.tug||null, eat:G.eat||null, throwing:G.throwing||null, sumo:G.sumo||null, computerInbox:G.computerInbox||[], computerLog:G.computerLog||[], market:G.market||null, decorCredit:G.decorCredit||{}, floorTiles:G.floorTiles||null, floorPaint:G.floorPaint||{}, wallPaint:G.wallPaint||{}, coin:G.coin, ck:CoinGuard.ck(), boxStock:G.boxStock||null, slugDeliveries:G.slugDeliveries||[], rep:G.rep||0, questOrderVersion:G.questOrderVersion||0, questCompleted:G.questCompleted||[], questIndex:G.questIndex||0, questDone:!!G.questDone, questBase:G.questBase||null, welcomeGiftAt:G.welcomeGiftAt||0, welcomeGiftDone:!!G.welcomeGiftDone, codex:G.codex||{}, mailSent:G.mailSent||{}, claimed:G.claimed||{}, granted:G.granted||{}, shelf:G.shelf||null, orders:G.orders||[], nextOrderAt:G.nextOrderAt||0, orderSeq:G.orderSeq||0, nextPeddlerAt:G.nextPeddlerAt||0, nextWholesalerAt:G.nextWholesalerAt||0, larvaDeaths:G.larvaDeaths||0, rivalDeathMailSent:!!G.rivalDeathMailSent, rival100MailSent:!!G.rival100MailSent, stats:G.stats||null, bw:G.bw, bh:G.bh, seq:G.seq, door:G.door||null, doors:(G.doors||[]).map(d=>({side:d.side,offset:d.offset,dir:d.dir||'both',allow:d.allow||null,paid:d.paid||0})), shopOpen:peopleOn,
       newSlugNotices:G.newSlugNotices||[],
-      research:{cap:(G.research&&G.research.cap)||0, price:(G.research&&G.research.price)||0, dep:(G.research&&G.research.dep)||{}},
+      research:{cap:(G.research&&G.research.cap)||0, price:(G.research&&G.research.price)||0, dep:(G.research&&G.research.dep)||{}, species:(G.research&&G.research.species)||{}},
       objs:(G.objs||[]).map(_saveObj),
       shelter:(G.shelter||[]).map(_saveObj),
       inv:(G.inv||[]).map(_saveSlug)
@@ -68,6 +68,8 @@ function _cleanGenes(raw){
     const value=Number.isFinite(src[key])?src[key]:Number.isFinite(src[legacy])?src[legacy]*100:DEFAULT_GENE[key];
     g[key]=Math.max(0,Math.min(100,value));
   }
+  // สายพันธุ์ · เก็บไว้แม้เครื่องนี้ยังไม่มีข้อมูลพันธุ์ (วาดเป็นตัวเดิมไปก่อน ไม่ทำให้พันธุ์หาย)
+  if(typeof src.sp==='string'&&/^[a-z][a-z0-9_]{1,23}$/.test(src.sp)&&src.sp!=='legacy')g.sp=src.sp;
   return g;
 }
 function _cleanBuffs(raw){
@@ -139,6 +141,25 @@ function _loadObj(o){
   }
   return t;
 }
+/* ---- ของตกแต่ง 3D ที่เลิกใช้ถาวร (2026-09-26) → เอาออกจากเซฟและคืนเงินตามราคาเต็ม ----
+   ตาราง = ความกว้างจริง (priceCm) ของทุกชิ้นในชุด 3D เดิม (Tidal 50 · reference · mobile pumice · reviewed)
+   ของที่วางในตู้ถูก _loadObj ยกเป็นเครดิตแล้ว (ไม่มีนิยามใน TANK_DECOR) จึงคืนเงินจาก decorCredit ที่เดียว
+   ราคา = สูตรเดียวกับ decorPrice() แบบไม่หักส่วนลดวิจัย (คืนเต็มราคาป้าย) · ทำครั้งเดียว เพราะเครดิตถูกลบหลังคืน */
+const REMOVED_3D_DECOR_CM={"tidal_01":14,"tidal_02":10.291,"tidal_03":15.013,"tidal_04":19,"tidal_05":12.823,"tidal_06":23,"tidal_07":20,"tidal_08":17,"tidal_09":21,"tidal_10":16,"tidal_11":9.632,"tidal_12":13,"tidal_13":15.64,"tidal_14":24,"tidal_15":16,"tidal_16":20,"tidal_17":16,"tidal_18":15,"tidal_19":10.492,"tidal_20":19,"tidal_21":17.036,"tidal_22":12,"tidal_23":11,"tidal_24":11.123,"tidal_25":9.209,"tidal_26":11.21,"tidal_27":7.796,"tidal_28":10.991,"tidal_29":10,"tidal_30":13,"tidal_31":23,"tidal_32":24,"tidal_33":25,"tidal_34":22,"tidal_35":18,"tidal_36":23,"tidal_37":10.571,"tidal_38":12.277,"tidal_39":17,"tidal_40":18.23,"tidal_41":18.255,"tidal_42":18,"tidal_43":13,"tidal_44":12.953,"tidal_45":20,"tidal_46":20,"tidal_47":14.912,"tidal_48":16,"tidal_49":11.349,"tidal_50":17.849,"tidal_reference_01":19.409,"tidal_mobile_pumice_01":19.969,"tidal_mobile_pumice_02":10.555,"tidal_mobile_pumice_03":25.768,"tidal_mobile_pumice_04":14.451,"tidal_mobile_pumice_05":19.121,"tidal_mobile_pumice_06":16.663,"tidal_mobile_pumice_07":23.41,"tidal_mobile_pumice_08":17.981,"tidal_mobile_pumice_09":17.096,"tidal_mobile_pumice_10":22.215,"reviewed_pumice":14,"reviewed_stacked_stone":19,"reviewed_basalt":10.29,"reviewed_stone_arch":27.46,"reviewed_dragon_rock":24.06,
+  /* 2026-10-03 แท็บขอนไม้ Blender (priceCm) — ตัดออกใน config.js */
+  "sprite_driftwood_talawa_sweep":30,"sprite_driftwood_talawa_fork":25,"sprite_driftwood_spider_lean":25,"sprite_driftwood_mopani_bend":25,"sprite_driftwood_river_fan":30};
+function refundRemoved3DDecor(){
+  let pieces=0,coins=0;const credit=G.decorCredit||{};
+  for(const [key,count] of Object.entries(credit)){
+    const cm=REMOVED_3D_DECOR_CM[key];if(cm==null||TANK_DECOR[key])continue;
+    const price=Math.max(1,Math.max(20,Math.round(cm*DECOR_COST_PER_CM)));
+    pieces+=count;coins+=price*count;delete credit[key];
+  }
+  for(const o of (G.objs||[]).concat(G.shelter||[]))if(o.showcase&&o.showcase.decorKey&&!TANK_DECOR[o.showcase.decorKey])o.showcase.decorKey='';
+  if(coins>0)addCoin(coins);
+  return {pieces,coins};
+}
+let _removed3D=null;
 function loadGame(){
   let raw=null;
   try{ raw=localStorage.getItem(SAVE_KEY); }catch(e){ _saveOK=false; return false; }
@@ -172,7 +193,11 @@ function loadGame(){
      const fix=v=>Math.max(0,Math.min(5,Math.round(_NUM(v,0))));
      /* ทากที่ส่งเข้าวิจัยไว้ก่อน (ต่อสาย ต่อกลุ่มโจทย์) — เลขจำนวนเต็ม 0–999 · research.js ตัดส่วนเกินโจทย์เองอีกชั้น */
      const dep={};if(r.dep&&typeof r.dep==='object')for(const k of ['cap','price'])if(Array.isArray(r.dep[k]))dep[k]=r.dep[k].slice(0,8).map(v=>Math.max(0,Math.min(999,Math.floor(_NUM(v,0)))));
-     G.research={cap:fix(r.cap), price:fix(r.price), dep};}
+     /* สายพันธุ์ที่ปลดล็อกแล้ว (จ่ายเหรียญที่โต๊ะวิจัย) — {oreo:true} */
+     /* ⚠️ 2026-10-03 เดิมตัดไว้ 16 คีย์ — ปลดล็อกพันธุ์ที่ 17+ (จ่ายไปแล้วตัวละ 500) หายหลังโหลด · เพดานนี้แค่กันเซฟขยะ
+        ต้องมากกว่าจำนวนพันธุ์ที่จะมีจริงเสมอ (คีย์พันธุ์ที่ยังไม่มีข้อมูลในเครื่องนี้ก็เก็บไว้ ไม่ทิ้งของที่ผู้เล่นจ่ายแล้ว) */
+     const species={};if(r.species&&typeof r.species==='object')for(const k of Object.keys(r.species).slice(0,256))if(/^[a-z][a-z0-9_]{1,23}$/.test(k)&&r.species[k]===true)species[k]=true;
+     G.research={cap:fix(r.cap), price:fix(r.price), dep, species};}
     /* ledger จดหมาย 'ส่งครั้งเดียวตลอดกาล' + สถานะกดรับของ — ต้องคงข้ามรีโหลด ไม่งั้นจดหมายที่ลบไปจะถูกส่งใหม่ / กดรับซ้ำ */
     G.mailSent=(d.mailSent&&typeof d.mailSent==='object')?d.mailSent:{};
     G.claimed=(d.claimed&&typeof d.claimed==='object')?d.claimed:{};
@@ -187,7 +212,9 @@ function loadGame(){
       .map(o=>{const want={};for(const k of o.keys)want[k]=_NUM(o.want[k],0);
         return {id:o.id,at:_NUM(o.at,Date.now()),keys:o.keys.filter(k=>typeof k==='string'),want,genes:_cleanGenes(o.genes),
                 reward:_NUM(o.reward,1500)|0,buyer:String(o.buyer||''),taunt:String(o.taunt||''),
-                done:!!o.done,doneAt:_NUM(o.doneAt,0),slugId:String(o.slugId||'')};});
+                done:!!o.done,doneAt:_NUM(o.doneAt,0),slugId:String(o.slugId||''),
+                /* พันธุ์ที่ออเดอร์ต้องการ (2026-10-03) · ใบเก่าไม่มี = รับทุกพันธุ์ตามเดิม */
+                ...(typeof o.sp==='string'&&/^[a-z][a-z0-9_]{1,23}$/.test(o.sp)?{sp:o.sp}:{})};});
     G.nextOrderAt=_NUM(d.nextOrderAt,0); G.orderSeq=_NUM(d.orderSeq,0)|0;
     G.newSlugNotices=Array.isArray(d.newSlugNotices)?d.newSlugNotices.slice(-5):[];
     G.racing=(d.racing&&typeof d.racing==='object')?d.racing:null;
@@ -249,6 +276,7 @@ function loadGame(){
     G.shelf=(typeof shelfRect==='function'&&shelfRect(d.shelf||null))?{side:d.shelf.side,offset:d.shelf.offset}:(d.shelf&&['north','west'].includes(d.shelf.side)&&Number.isInteger(d.shelf.offset)?{side:d.shelf.side,offset:d.shelf.offset}:null);
     G.objs   =(Array.isArray(d.objs)?d.objs:[]).map(_loadObj).filter(Boolean);
     G.shelter=(Array.isArray(d.shelter)?d.shelter:[]).map(_loadObj).filter(Boolean);
+    _removed3D=refundRemoved3DDecor();
     G.inv    =(Array.isArray(d.inv)?d.inv:[]).map(_loadSlug);
     return true;
   }catch(e){ console.warn('[load] เซฟเสีย อ่านไม่ได้ เริ่มใหม่', e); return false; }
@@ -266,6 +294,7 @@ window.resetGame = function(){
   let ok=false;
   try{ ok=loadGame(); }catch(e){ console.warn('[load] ล้มเหลว เริ่มใหม่', e); ok=false; }
   CoinGuard.lock();                      // ปิดช่องตั้งค่าเงินจากเซฟ — หลังบูตเรียกซ้ำจากคอนโซลไม่ได้แล้ว
+  if(ok&&_removed3D&&_removed3D.pieces){saveGame();const r=_removed3D;setTimeout(()=>{if(typeof toast==='function')toast('ของตกแต่งที่เลิกขายแล้วถูกเอาออก — คืนเงิน '+r.coins+' เหรียญ สำหรับ '+r.pieces+' ชิ้น','good');},1500);}
   if(ok){
     if(typeof syncHUD==='function') syncHUD();
     if(typeof fitCamera==='function') fitCamera();

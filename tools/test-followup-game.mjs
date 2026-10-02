@@ -23,8 +23,8 @@ try{
  page.on('requestfailed',r=>{if(!r.url().includes('fonts.'))console.log('REQUEST FAILED',r.url(),r.failure()?.errorText);});
  page.on('console',m=>{if(m.type()==='error'&&/shader|WebGLProgram/i.test(m.text()))errors.push(m.text());});
  await page.goto(`http://127.0.0.1:${server.address().port}`,{waitUntil:'domcontentloaded',timeout:60000});
- try{await page.waitForFunction(()=>!window.BOOTING&&window.DecorGLB?.ready&&window.Slug3D?.ready,null,{timeout:20000});}
- catch(e){console.log(JSON.stringify(await page.evaluate(()=>({boot:window.BOOTING,decor:window.DecorGLB?.ready,slug:window.Slug3D?.ready,body:document.body.innerText.slice(-500)}))),errors);throw e;}
+ try{await page.waitForFunction(()=>!window.BOOTING&&typeof engineReady!=='undefined'&&engineReady,null,{timeout:20000});}
+ catch(e){console.log(JSON.stringify(await page.evaluate(()=>({boot:window.BOOTING,engine:typeof engineReady!=='undefined'&&engineReady,body:document.body.innerText.slice(-500)}))),errors);throw e;}
 
  const results=await page.evaluate(async()=>{
   openSlugShopDialog();const button=slugShopDialog.querySelector('[data-order]');button.focus();for(let i=0;i<60;i++)renderSlugShop();

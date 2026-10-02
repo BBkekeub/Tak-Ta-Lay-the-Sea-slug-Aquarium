@@ -25,7 +25,7 @@ const server=http.createServer((req,res)=>{
  const pathname=decodeURIComponent(new URL(req.url,'http://local').pathname);
  const file=path.resolve(root,'.'+(pathname==='/'?'/index.html':pathname));
  if(!file.startsWith(root+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.writeHead(404).end();return;}
- res.setHeader('Content-Type',({'.js':'text/javascript','.html':'text/html','.css':'text/css','.png':'image/png','.glb':'model/gltf-binary','.json':'application/json'})[path.extname(file)]||'application/octet-stream');
+ res.setHeader('Content-Type',({'.js':'text/javascript','.html':'text/html','.css':'text/css','.png':'image/png','.json':'application/json'})[path.extname(file)]||'application/octet-stream');
  fs.createReadStream(file).pipe(res);
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
@@ -36,7 +36,7 @@ try{
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto(`http://127.0.0.1:${server.address().port}/`,{waitUntil:'load',timeout:25000});
  console.log('Game page loaded; waiting for startup.');
- await page.waitForFunction(()=>!window.BOOTING&&window.DecorGLB?.ready,null,{timeout:40000});
+ await page.waitForFunction(()=>!window.BOOTING&&typeof engineReady!=='undefined'&&engineReady,null,{timeout:40000});
  console.log('Game ready; checking poses.');
  await page.evaluate(({before,after,rawBefore})=>{
   window.BOOTING=true;window.requestAnimationFrame=()=>0;PEOPLE.length=0;G.objs=[];

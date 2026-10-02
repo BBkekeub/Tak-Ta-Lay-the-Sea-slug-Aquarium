@@ -133,6 +133,10 @@ function spotPlan(v){
   return             {shape:'circle', n:Math.round(((v-30)/40)*NSPOT)};
 }
 
+function fadeSpots(v, N){
+  const t=Math.max(0,Math.min(100,Number.isFinite(v)?v:50))/100*N, full=Math.floor(t+1e-6), f=t-full;
+  return {shape:'own', n:f>0.02?full+1:full, f:f>0.02?f:1};
+}
 const LADDER = [2,3,5,6,8,9];   // จำนวนหงอนตาม floor(|v-50|/10)
 
 /* เอียง/ย่อ-ขยายแบบสุ่มคงที่ต่อช่อง (คนละค่าทุกช่อง แต่ไม่ดิ้นตอนรีเฟรช) */
@@ -208,10 +212,10 @@ function anchorAt(v, T){
   }
   return {D:T[0].D, M:T[0].M, L:T[0].L, P:T[0].L, n:T[0].n};
 }
-function matOf(v){     const a=anchorAt(v,BODY_ANCH); return {d:a.D,m:a.M,l:a.L,n:a.n,k:'b'+Math.round(v)}; }
-function matGillOf(v){ const a=anchorAt(v,GILL_ANCH);
+function matOf(v,T,tag){     const a=anchorAt(v,T||BODY_ANCH); return {d:a.D,m:a.M,l:a.L,n:a.n,k:'b'+Math.round(v)+(tag||'')}; }
+function matGillOf(v,T,tag){ const a=anchorAt(v,T||GILL_ANCH);
   /* s = เงาลึกกว่า D (ตาราง D ของหงอนสว่างเกินไป ร่องระหว่างกิ่งเลยหายหมด) */
-  return {d:a.D, m:a.M, l:a.L, p:a.P, s:a.D.map(v=>v*0.34), n:a.n, k:'g'+Math.round(v)}; }
+  return {d:a.D, m:a.M, l:a.L, p:a.P, s:a.D.map(v=>v*0.34), n:a.n, k:'g'+Math.round(v)+(tag||'')}; }
 const colorName = v => anchorAt(v,BODY_ANCH).n;
 /* ความ "สุดขั้ว" ของสี = ระยะจากกลางสเกล → คุมความมัน/แสง/ประกาย (0 ที่ขาว) */
 /* ความ "พุ้งพริ้ง" ของหงอน — เข้มสุดตรงหลักสี (ทุก ๆ 50) จางสุดที่กึ่งกลางระหว่างหลัก
@@ -415,8 +419,11 @@ function rimLight(img, w, h, col, amt, blurK){
 function paintBody(w,h,D,nSpots,shape){
   /* ตัดระบบแสงเดิมออกหมดแล้ว (gelLight/แถบวาวแนวหลัง/ขอบเรือง/ผงกลิตเตอร์) — ผู้ใช้สั่ง 2026-09-02
      เหลือเท่าที่ทูล color_test_body ทำจริง: gradient map + ร่องลึก + ลาย + ประกาย vigor */
-  const c=cv(w,h), x=c.getContext('2d'), M=D.mat;
-  x.drawImage(gradMap(A.body, w, h, M, 'body', {gamma:1+D.deep*1.8}), 0, 0);
+  const c=cv(w,h), x=c.getContext('2d'), M=D.mat, S=D.species||SPECIES.legacy;
+  const bodyC=gradMap(A[S.body], w, h, M, S.body, {gamma:1+D.deep*1.8});
+  if(S.bodyFlip){ x.save(); x.translate(w,0); x.scale(-1,1); x.drawImage(bodyC,0,0); x.restore(); }
+  else x.drawImage(bodyC, 0, 0);
+  if(S.spotRule==='fade'){ paintOwnSpots(x,w,h,D,S,nSpots); bodySparkle(x,w,h,D); x.globalCompositeOperation='source-over'; return c; }
   /* ลาย — แมปไล่เฉดด้วยวัสดุหมึก (คุมคอนทราสต์กับสีตัวเสมอ) */
   x.globalCompositeOperation='source-atop';
   const key=SPOT_IMG[shape], sm=META[key];
@@ -436,6 +443,20 @@ function paintBody(w,h,D,nSpots,shape){
   bodySparkle(x, w, h, D);
   x.globalCompositeOperation='source-over';
   return c;
+}
+/* ลายของพันธุ์ใหม่: รูปลายในผัง (ต่อดวง) · วางตามผัง + เอียง/ขนาดสุ่มคงที่ · ดวงสุดท้ายหด 45→100% และจางตาม D.spotF */
+function paintOwnSpots(x,w,h,D,S,n){
+  x.globalCompositeOperation='source-atop';
+  const baked={};
+  for(let i=0;i<n;i++){ const P=S.spots[i]; if(!P) break;
+    const sm=META[P.part]; if(!sm||!A[P.part]) continue;
+    const r=P.r*h*(0.92+P.js*0.16), bw0=Math.max(16, Math.min(sm.w, Math.round(r*2*1.25*(sm.w/sm.h)*(P.ar||1))));
+    const k=P.part+'|'+bw0; if(!baked[k]) baked[k]=gradMap(A[P.part], bw0, Math.max(16, Math.round(bw0*sm.h/sm.w)), D.ink, P.part);
+    let e=1; if(i===n-1&&D.spotF<1){ const f=D.spotF; e=f*f*(3-2*f); }
+    const rr=r*(e<1?0.45+0.55*e:1), ww=rr*2*(sm.w/sm.h)*(P.ar||1);
+    x.save(); x.globalAlpha=e; x.translate(P.u*w, P.v*h); x.rotate(((P.rot||0)+6*P.jr)*Math.PI/180); if(P.flip) x.scale(-1,1);
+    x.drawImage(baked[k], -ww/2, -rr, ww, rr*2); x.restore();
+  }
 }
 const GSH=new Map();
 /* แสงระดับพุ่ม — ต้นกลางพุ่มสว่าง ต้นริมจมเข้า ปลายหงอนเข้มลง (เหมือนภาพอ้างอิง) */
@@ -632,7 +653,7 @@ function rhinoPre(key){
     lum[j]=(r*0.2126+g*0.7152+b*0.0722)/255;
     const sat = M1>1 ? (M1-m1)/M1 : 0;
     const v = Math.max(0,Math.min(1,(sat-0.10)/0.28))*255;
-    mp[j*4]=mp[j*4+1]=mp[j*4+2]=v; mp[j*4+3]=255;
+    mp[j*4]=mp[j*4+1]=mp[j*4+2]=v; mp[j*4+3]=p[j*4+3];   // อัลฟาของรูป → เบลอเฉพาะเนื้อหนวด พื้นโปร่งใสไม่ดึงขอบปลายให้กลายเป็นสีตัว
   }
   mx.putImageData(mid,0,0);
   const bc=cv(w,h), bx=bc.getContext('2d',{willReadFrequently:true});
@@ -697,17 +718,19 @@ const BG=[['#08181D','#04090B'],['#17454F','#0D2A32'],['#BFD3D2','#7FA2A6']];
 
 /* ---------- เรนเดอร์ ---------- */
 function derived(gArg){
-  const g=gArg||gene;
+  const g=gArg||gene, S=spOf(g);
   const size = 0.72 + (g.girth/100)*0.56;              // ขนาดตัวรวม (กว้าง+สูงพร้อมกัน)
   const stretch = 0.72 + (g.len/100)*0.56;              // ยืดออกด้านข้างอย่างเดียว
   const bw = CFG.bodyW0 * stretch * size;
-  const bh = CFG.bodyW0 * (META.body.h/META.body.w) * size;
+  const bh = CFG.bodyW0 * (S.bodyAR || META[S.body].h/META[S.body].w) * size;
   const vig = 0.2 + (g.vigor/100)*1.6;      // ประกายตาม vigor จริง (README §4)
   const nGill = LADDER[Math.min(5,Math.floor(Math.abs(g.gillN-50)/10))];
-  const SP = spotPlan(g.spotN), nSpot = SP.n, shape = SP.shape;
+  /* พันธุ์ใหม่: ลายในผังลดต่อเนื่อง 100 → 0 · spotF = ความเต็มของดวงที่กำลังจะหาย (0..1) */
+  const SP = S.spotRule==='fade' ? fadeSpots(g.spotN, S.spots.length) : spotPlan(g.spotN), nSpot = SP.n, shape = SP.shape, spotF = SP.f==null ? 1 : SP.f;
   const gScale = 0.62 + (g.gillLen/100)*0.76;   // ยีน 50 = 100% ของผังที่วางไว้
   const tScale = 0.62 + (g.tentLen/100)*0.76;
-  const mat = matOf(g.mainC), matA = matGillOf(g.accC);     // ยีนสี 0–400 เข้าตารางตรง ๆ
+  const tag = S.key==='legacy' ? '' : '@'+S.key;
+  const mat = matOf(g.mainC,S.bodyAnch,tag), matA = matGillOf(g.accC,S.gillAnch,tag);     // ยีนสี 0–400 เข้าตารางตรง ๆ
   const base = mat.m, acc = matA.m;
   const bMetal = metalOf(g.mainC), aMetal = metalOf(g.accC);
   const aura = Math.max(0,Math.min(100,Number.isFinite(g.vigor)?g.vigor:50))/100;
@@ -717,7 +740,7 @@ function derived(gArg){
   const rdeep = RHINO_DEEP;      // ร่องลึกหนวด
   const bSheen = mat.l, aSheen = matA.l;
   const ink = inkOf(mat, base, bMetal);
-  return {aura,vig,size,stretch,bw,bh,nGill,nSpot,shape,gScale,tScale,base,acc,bMetal,aMetal,aShine,deep,gdeep,rdeep,bSheen,aSheen,mat,matA,ink};
+  return {species:S,spotF,aura,vig,size,stretch,bw,bh,nGill,nSpot,shape,gScale,tScale,base,acc,bMetal,aMetal,aShine,deep,gdeep,rdeep,bSheen,aSheen,mat,matA,ink};
 }
 
 function draw(){
@@ -744,7 +767,7 @@ function draw(){
             rot:(G.rot + (moving ? Math.sin((performance.now()-t0)/700 + i)*1.6 : 0))*Math.PI/180,
             fx:G.flip?-1:1};
   });
-  const rhinos = RHINOS.map((R,i)=>{
+  const rhinos = S.rhinos.map((R,i)=>{
     const m=META[R.part], h=bh*R.hR*D.tScale, w=h*(m.w/m.h)*(R.ar||1);
     /* หูโยกเหมือนหงอน — คาบยาวกว่าและกวาดกว้างกว่านิดหน่อยเพราะก้านยาวกว่า
        จุดหมุนอยู่ที่โคน (ax,ay) อยู่แล้ว ปลายหูจึงกวาดเป็นพัด ไม่ใช่ทั้งอันเลื่อน */
@@ -797,7 +820,7 @@ function draw(){
     /* เก็บทรานส์ฟอร์มหูตัวแรกไว้ให้แฮนเดิลจัดแสงอ้างอิง */
     if(idx===0) RVIEW={px:o.px,py:o.py,ax:o.ax,ay:o.ay,w:o.w,h:o.h,rot:o.rot};
   }
-  stalks.filter(o=>o.back).forEach(drawStalk);
+  stalks.filter(o=>o.back).sort((a,b)=>a.d-b.d).forEach(drawStalk);
   rhinos.forEach((o,i)=>{ if(o.back) drawRhino(o,i); });
   ctx.drawImage(bodyC, 0, 0);
   drawFace(ctx,bw,bh,D);
@@ -832,19 +855,45 @@ const FACE = {
      ถ้าจะเอากลับ ใส่ {u:0.1365, v:0.8778, hR:0.017, ar:1, rot:0, flip:false} */
   mouth: null
 };
-function drawFace(ctx,bw,bh,D,noEyes){
+
+/* ---------- สายพันธุ์ ----------
+   ทากเก็บพันธุ์ไว้ในยีน g.sp (ไม่มี = 'legacy' ตัวเดิม) · ข้อมูลพันธุ์อื่นมาจาก js/slug-species-data.js
+   (สร้างด้วย tools/build-species.mjs จากผังที่ส่งออกจากโต๊ะประกอบร่าง — โหลดก่อนไฟล์นี้)
+   พันธุ์ใหม่ใช้ผังของตัวเองทุกชิ้น: ลำตัว · หงอน 9 ก้าน (ยีนลดก้านตามลำดับทากตัวเดิม = keep) · หนวด · ตา · ลาย
+   ลาย spotRule 'fade': ใช้รูปลายในผังเท่านั้น ยีน 100 = ครบทุกดวง → 0 = ไม่มีลาย ดวงที่กำลังหายหด+จางก่อน */
+const SPECIES = {legacy:{key:'legacy', th:'ตัวเดิม', body:'body', bodyAR:null, bodyFlip:false,
+  gillSet, rhinos:RHINOS, spots:SPOT_SLOTS, spotRule:'game', face:FACE, eye:'eye', bodyAnch:null, gillAnch:null}};
+function addSpecies(d){
+  if(!d || !/^[a-z][a-z0-9_]{1,23}$/.test(d.key) || d.key==='legacy') return;
+  for(const [k,v] of Object.entries(d.art||{})){ if(!SRC[k]){ SRC[k]=v.src; META[k]=v.meta; } }
+  const set9=d.stalks||[], keep=d.keep||{};
+  const spots=(d.spots||[]).map((S,i)=>{   // เรียงตามลำดับเติม (ดวงแรกอยู่นานสุด) · เอียง/ขนาดสุ่มคงที่ต่อลำดับ แบบเดียวกับโต๊ะ
+    const h=n=>{ const x=Math.sin((i+1)*n)*43758.5453; return x-Math.floor(x); };
+    return {...S, jr:h(12.9898)*2-1, js:h(78.233)};
+  });
+  SPECIES[d.key]={key:d.key, th:d.th||d.key, body:d.body, bodyAR:d.bodyAR||null, bodyFlip:!!d.bodyFlip,
+    gillSet:n=>keep[n]?keep[n].map(i=>set9[i]).filter(Boolean):set9.slice(0,n),
+    rhinos:d.rhinos||[], spots, spotRule:'fade', face:{eyes:d.eyes||[], mouth:null}, eye:d.eye||'eye',
+    bodyAnch:d.bodyAnch||null, gillAnch:d.gillAnch||null};
+}
+(typeof window!=='undefined' && Array.isArray(window.SLUG_SPECIES_DATA) ? window.SLUG_SPECIES_DATA : []).forEach(d=>{
+  try{ addSpecies(d); }catch(e){ console.warn('[SlugEngine] species '+(d&&d.key),e); }
+});
+const spOf = g => SPECIES[g && g.sp] || SPECIES.legacy;
+const speciesList = () => Object.values(SPECIES).map(S=>({key:S.key, th:S.th}));
+function drawFace(ctx,bw,bh,D,noEyes,rig){
   ctx.save();
   /* ตา/ปาก: วาดอาร์ตดิบ ไม่แมปสีเลย — ลูกตาต้องดำสนิทและไฮไลท์ต้องขาวเสมอ
      ห้ามส่งเข้า gradMap ด้วยวัสดุผิว (พอตัวเป็นทอง ตากลายเป็นน้ำตาลอ่อน = จางตามสีตัว) */
-  const em=META.eye, eyeC=A.eye;
-  if(!noEyes) FACE.eyes.forEach(E=>{
+  const F=(D&&D.species&&D.species.face)||FACE, eyeC=A[(D&&D.species&&D.species.eye)||'eye']||A.eye;
+  if(!noEyes) F.eyes.forEach(E=>{
     const d=bh*E.hR, ew=d*(E.ar||1);
-    ctx.save(); ctx.translate(E.u*bw, E.v*bh); ctx.rotate((E.rot||0)*Math.PI/180);
+    ctx.save(); if(rig)spineAttach(ctx,rig,E.u*bw,E.v*bh);else ctx.translate(E.u*bw, E.v*bh); ctx.rotate((E.rot||0)*Math.PI/180);
     ctx.drawImage(eyeC, -ew/2, -d/2, ew, d); ctx.restore();
   });
-  const M=FACE.mouth; if(!M){ ctx.restore(); return; }
+  const M=F.mouth; if(!M){ ctx.restore(); return; }
   const mm=META.mouth, mh=bh*M.hR, mw=mh*(mm.w/mm.h)*(M.ar||1);
-  ctx.translate(M.u*bw, M.v*bh); ctx.rotate(M.rot*Math.PI/180); ctx.scale(M.flip?-1:1,1);
+  if(rig)spineAttach(ctx,rig,M.u*bw,M.v*bh);else ctx.translate(M.u*bw, M.v*bh); ctx.rotate(M.rot*Math.PI/180); ctx.scale(M.flip?-1:1,1);
   ctx.drawImage(A.mouth,-mw/2,-mh/2,mw,mh);
   ctx.restore();
 }
@@ -1090,7 +1139,7 @@ function rlightLoadSaved(){
    ส่วนการ "หมุนแล้ววาง" ถูกมาก ทำสดทุกเฟรมได้สบาย
    → ได้ทั้งความเร็วของแคช และท่าทางที่ออกแบบไว้ครบ                       */
 const SPR = new Map();
-function sprKey(g, H){ return GENES.map(G=>g[G.k]).join('-')+'|'+H+'|'+(MAT?1:0)+'|'+(g.deep==null?BODY_DEEP:g.deep)+'|'+(g.gdeep==null?GILL_DEEP:g.gdeep)+'|'+RHINO_DEEP; }
+function sprKey(g, H){ return (g.sp&&SPECIES[g.sp]?g.sp+':':'')+GENES.map(G=>g[G.k]).join('-')+'|'+H+'|'+(MAT?1:0)+'|'+(g.deep==null?BODY_DEEP:g.deep)+'|'+(g.gdeep==null?GILL_DEEP:g.gdeep)+'|'+RHINO_DEEP; }
 
 function slugParts(g, H){
   const key = sprKey(g,H);
@@ -1098,7 +1147,8 @@ function slugParts(g, H){
 
   const D = derived(g);
   const bw=D.bw, bh=D.bh, gm=META.gill;
-  const stalks = gillSet(D.nGill).map((Gs,i)=>{
+  const S = D.species;
+  const stalks = S.gillSet(D.nGill).map((Gs,i)=>{
     const art=Gs.part||'gill', m=META[art];
     const h=bh*Gs.hR*D.gScale, w=h*(m.w/m.h)*(Gs.ar||1);
     return {G:Gs, art, m, i, h, w, ax:(m.ax/m.w)*w, ay:(m.ay/m.h)*h,
@@ -1107,7 +1157,7 @@ function slugParts(g, H){
             /* แสงระดับพุ่ม: ต้นกลางพุ่มสว่าง ต้นริมจมเข้า — คิดครั้งเดียวพอ */
             k: Math.round((1 - 0.62*Math.min(1, Math.abs(Gs.u-0.51)/0.15))*4)/4};  // ปัด 5 ระดับ ลดคีย์แคช
   });
-  const rhinos = RHINOS.map((R,i)=>{
+  const rhinos = S.rhinos.map((R,i)=>{
     const m=META[R.part], h=bh*R.hR*D.tScale, w=h*(m.w/m.h)*(R.ar||1);
     return {R, m, i, h, w, ax:(m.ax/m.w)*w, ay:(m.ay/m.h)*h, fx:R.flip?-1:1, back:!!R.back,
             px:R.u*bw, py:R.v*bh, rot0:R.rot*Math.PI/180};
@@ -1127,7 +1177,7 @@ function slugParts(g, H){
   });
 
   const s = H/(B-T);
-  const P = { D, bw, bh, gm, stalks, rhinos, L, R:Rr, T, B, s,
+  const P = { D, bw, bh, gm, stalks, rhinos, L, R:Rr, T, B, s, face:S.face, species:S.key,
               w:(Rr-L)*s, h:(B-T)*s,
               bodyC: paintBody(bw, bh, D, D.nSpot, D.shape),
               gillCs: {},
@@ -1156,13 +1206,57 @@ function slugParts(g, H){
   for(const k   in P.rhinoPx) P.rhinoC[k]   = paintRhino(k, P.rhinoPx[k][0], P.rhinoPx[k][1], D);
 
   /* กรอง/เรียงครั้งเดียวตอนสร้าง — เดิมทำใหม่ทุกตัวทุกเฟรม (37 ตัว × 60fps = ขยะ GC เพียบ) */
-  P.stalksBack  = stalks.filter(o=>o.back);
+  P.rig=makeSpine(bw,bh,P.bodyC);
+  P.stalksBack  = stalks.filter(o=>o.back).sort((a,b)=>a.d-b.d);   // ตามลำดับชั้นในผัง (หงอนพันธุ์ใหม่อยู่หลังตัวได้ทั้ง 9 ก้าน)
   P.stalksFront = stalks.filter(o=>!o.back).sort((a,b)=>a.d-b.d);
   P.rhinosBack  = rhinos.filter(o=>o.back);
   P.rhinosFront = rhinos.filter(o=>!o.back);
   if(SPR.size > 60) SPR.delete(SPR.keys().next().value);
   SPR.set(key, P);
   return P;
+}
+
+/* Eight-bone 2D spine. Cached bind data, reset pose on every draw. */
+function makeSpine(bw,bh,image){
+ const r={count:8,bw,bh,x:new Float64Array(9),y:new Float64Array(9),restX:new Float64Array(9),restY:new Float64Array(9),bottom:new Float64Array(9),lengths:new Float64Array(8),angles:new Float64Array(8)};
+ const data=image?.getContext('2d').getImageData(0,0,image.width,image.height).data;
+ for(let i=0;i<=8;i++){let top=0,bottom=bh;
+  if(data){const x=Math.max(0,Math.min(image.width-1,Math.round((.025+.95*i/8)*(image.width-1))));let first=-1,last=-1;for(let y=0;y<image.height;y++)if(data[(y*image.width+x)*4+3]>=64){if(first<0)first=y;last=y;}if(first>=0){top=first/image.height*bh;bottom=(last+1)/image.height*bh;}}
+  r.x[i]=r.restX[i]=bw*i/8;r.y[i]=r.restY[i]=(top+bottom)/2;r.bottom[i]=bottom;
+  if(i)r.lengths[i-1]=Math.hypot(r.restX[i]-r.restX[i-1],r.restY[i]-r.restY[i-1]);
+ }return r;
+}
+function poseSpine(r,pose,t,moving,animate){
+ const wave=Number.isFinite(pose.creepT)?pose.creepT:t/700,n=r.count;
+ for(let i=0;i<n;i++){
+  const manual=pose.bones?.[i],head=1-i/(n-1);
+  let a=Number.isFinite(manual)?manual:animate?((moving?Math.sin(wave-i*.5)*.018:0)-Math.max(0,Math.min(1,pose.look||0))*.12*head+Math.max(0,Math.min(1,pose.startle||0))*.16*head):0;
+  r.angles[i]=Math.max(-.6,Math.min(.6,a));
+ }
+ r.x[0]=r.restX[0];r.y[0]=r.restY[0];
+ for(let i=0;i<n;i++){r.x[i+1]=r.x[i]+r.lengths[i]*Math.cos(r.angles[i]+Math.atan2(r.restY[i+1]-r.restY[i],r.restX[i+1]-r.restX[i]));r.y[i+1]=r.y[i]+r.lengths[i]*Math.sin(r.angles[i]+Math.atan2(r.restY[i+1]-r.restY[i],r.restX[i+1]-r.restX[i]));}
+ const dx=r.bw*.5-r.x[n/2],dy=r.restY[n/2]-r.y[n/2];
+ for(let i=0;i<=n;i++){r.x[i]+=dx;r.y[i]+=dy;}
+ if(pose.spinePoints?.length===n+1&&pose.spinePoints.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y))){for(let i=0;i<=n;i++){r.x[i]=pose.spinePoints[i].x;r.y[i]=pose.spinePoints[i].y;}for(let i=0;i<n;i++)r.angles[i]=Math.atan2(r.y[i+1]-r.y[i],r.x[i+1]-r.x[i]);}
+ return r;
+}
+// Hermite skin interpolation gives the neighbouring bones a shared tangent.
+function spinePoint(r,u,rest=false){
+ const q=Math.max(0,Math.min(r.count-1e-8,u*r.count)),i=Math.floor(q),t=q-i;
+ const h00=2*t*t*t-3*t*t+1,h10=t*t*t-2*t*t+t,h01=-2*t*t*t+3*t*t,h11=t*t*t-t*t;
+ const value=A=>{const m0=i?(A[i+1]-A[i-1])/2:A[1]-A[0],m1=i+1<r.count?(A[i+2]-A[i])/2:A[r.count]-A[r.count-1];return h00*A[i]+h10*m0+h01*A[i+1]+h11*m1;};
+ return {x:value(rest?r.restX:r.x),y:value(rest?r.restY:r.y)};
+}
+function spineAttach(ctx,r,x,y){
+ const u=x/r.bw,p=spinePoint(r,u),a=spinePoint(r,u-.001),b=spinePoint(r,u+.001);
+ const bind=spinePoint(r,u,true),ra=spinePoint(r,u-.001,true),rb=spinePoint(r,u+.001,true);
+ ctx.translate(p.x,p.y+y-bind.y);ctx.rotate(Math.atan2(b.y-a.y,b.x-a.x)-Math.atan2(rb.y-ra.y,rb.x-ra.x));
+}
+function spineBody(ctx,P,r){
+ const im=P.bodyC;
+ if(!r.x.some((x,i)=>Math.abs(x-r.restX[i])+Math.abs(r.y[i]-r.restY[i])>1e-7)){ctx.drawImage(im,0,0);return;}
+ const N=24,w=P.bw/N;
+ for(let i=0;i<N;i++){const p=spinePoint(r,i/N),q=spinePoint(r,(i+1)/N),bp=spinePoint(r,i/N,true),bq=spinePoint(r,(i+1)/N,true);ctx.save();ctx.transform((q.x-p.x)/w,((q.y-p.y)-(bq.y-bp.y))/w,0,1,p.x,p.y-bp.y);const overlap=i<N-1?Math.min(3,im.width/100):0;ctx.drawImage(im,i*im.width/N,0,im.width/N+overlap,im.height,0,0,w+overlap*P.bw/im.width,P.bh);ctx.restore();}
 }
 
 /* ---------- ท่ากระดึบ ----------
@@ -1176,7 +1270,7 @@ function drawSlug(ctx, P, cx, cy, flip, phase, scale, detail, moving, pose){
   const D = P.D, gm = P.gm;
   pose = pose || {};
   const mv = (moving===undefined) ? true : !!moving;   // เดินอยู่ไหม (หยุดเดิน→หยุดยืดหด)
-  const t = ANIM ? (performance.now() - t0) + (phase||0) : 0;
+  const t = Number.isFinite(pose.animTime)?pose.animTime:ANIM ? (performance.now() - t0) + (phase||0) : 0;
   const asleep = pose.state==='sleep' ? 1 : 0;
   const wake = Math.max(0,Math.min(1,pose.wake||0));
   const stretch = Math.max(0,Math.min(1,pose.stretch||0));
@@ -1222,6 +1316,7 @@ function drawSlug(ctx, P, cx, cy, flip, phase, scale, detail, moving, pose){
     return (normal*(asleep?0.18:1)+droop+shake+sniff+curious+sneeze+lean*16)*Math.PI/180;
   };
 
+  const rig=poseSpine(P.rig||(P.rig=makeSpine(P.bw,P.bh,P.bodyC)),pose,t,mv,ANIM);
   const _dispK = P.s*(scale||1);            // ตัวคูณขนาดจริงบนจอ
   function stalk(st){
     const base = P.gillCs[st.art];
@@ -1232,7 +1327,7 @@ function drawSlug(ctx, P, cx, cy, flip, phase, scale, detail, moving, pose){
     const img = (MAT && D.aShine>0.01 && st.h*_dispK >= 60)
       ? shadeGill(base, gp[0], gp[1], st.k, D.matA, D.aShine, st.art) : base;
     ctx.save();
-    ctx.translate(st.px, st.py);
+    spineAttach(ctx,rig,st.px,st.py);
     ctx.rotate(st.rot0 + sway(st.i));      // หมุนที่โคน ปลายจึงกวาดเป็นพัด
     ctx.scale(st.fx, 1-retract*0.42);
     ctx.drawImage(img, -st.ax, -st.ay, st.w, st.h);
@@ -1240,7 +1335,7 @@ function drawSlug(ctx, P, cx, cy, flip, phase, scale, detail, moving, pose){
   }
   function rhino(o){
     ctx.save();
-    ctx.translate(o.px, o.py);
+    spineAttach(ctx,rig,o.px,o.py);
     ctx.rotate(o.rot0 + swayR(o.i));
     ctx.scale(o.fx, 1-retract*0.58+look*0.10);
     ctx.drawImage(P.rhinoC[o.R.part], -o.ax, -o.ay, o.w, o.h);
@@ -1248,8 +1343,8 @@ function drawSlug(ctx, P, cx, cy, flip, phase, scale, detail, moving, pose){
   }
   (P.stalksBack||P.stalks.filter(o=>o.back)).forEach(stalk);
   (P.rhinosBack||P.rhinos.filter(o=>o.back)).forEach(rhino);
-  ctx.drawImage(P.bodyC, 0, 0);
-  drawFace(ctx, P.bw, P.bh, D, pose.noEyes);
+  spineBody(ctx,P,rig);
+  drawFace(ctx, P.bw, P.bh, D, pose.noEyes,rig);
   (P.stalksFront||P.stalks.filter(o=>!o.back).sort((a,b)=>a.d-b.d)).forEach(stalk);
   /* ออร่ารอบพุ่มหงอนใช้ radial gradient หลายชั้น แพงเกินจะทำทุกเฟรมกับการ์ดหลายสิบใบ
      เปิดเฉพาะฉากใหญ่ (อ่างผสม) ที่เห็นผลจริง — บนการ์ด 108 px แทบมองไม่ออกอยู่แล้ว */
@@ -1297,7 +1392,7 @@ const ready = Promise.all(Object.entries(SRC).map(([k,s])=> new Promise(res=>{
 }))).then(()=>{ PROF = profile(A.body); return true; });
 function randGene(){ const o={}; GENES.forEach(G=>{ const R=gr(G.k);
   o[G.k]=Math.round(R.min+Math.random()*(R.max-R.min)); }); return o; }
-return { ready, slugParts, drawSlug, derived, GENES, randGene, hex, FACE, eyeImage:A.eye, GILL_SETS, GRANGE, gr, colorName, GILL_STOPS, BODY_ANCH, GILL_ANCH, clearCache(){SPR.clear(); GM.clear();},
+return { makeSpine, poseSpine, spinePoint, ready, species:speciesList, hasSpecies:k=>!!SPECIES[k]&&k!=="legacy", speciesName:k=>(SPECIES[k]||SPECIES.legacy).th, slugParts, drawSlug, derived, GENES, randGene, hex, FACE, eyeImage:A.eye, GILL_SETS, GRANGE, gr, colorName, GILL_STOPS, BODY_ANCH, GILL_ANCH, clearCache(){SPR.clear(); GM.clear();},
          get MAT(){return MAT;}, set MAT(v){MAT=v;},
          get ANIM(){return ANIM;}, set ANIM(v){ANIM=v;} };
 })();

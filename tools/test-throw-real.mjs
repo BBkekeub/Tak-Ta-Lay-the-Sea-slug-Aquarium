@@ -4,7 +4,7 @@ import fs from 'node:fs';import path from 'node:path';import http from 'node:htt
 import {fileURLToPath} from 'node:url';import {createRequire} from 'node:module';import assert from 'node:assert/strict';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),out=path.join(root,'tools/qa/throw-real');fs.mkdirSync(out,{recursive:true});
 const {chromium}=createRequire(import.meta.url)('C:/Users/ACER/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
-const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://local').pathname,f=path.resolve(root,'.'+(p==='/'?'/index.html':decodeURIComponent(p)));if(!f.startsWith(root+path.sep)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404).end();return;}res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.json':'application/json','.glb':'model/gltf-binary'})[path.extname(f)]||'application/octet-stream');fs.createReadStream(f).pipe(res);});
+const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://local').pathname,f=path.resolve(root,'.'+(p==='/'?'/index.html':decodeURIComponent(p)));if(!f.startsWith(root+path.sep)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404).end();return;}res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.json':'application/json'})[path.extname(f)]||'application/octet-stream');fs.createReadStream(f).pipe(res);});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;const errors=[],report={network:[]};
 
 try{
@@ -34,15 +34,12 @@ try{
  await page.evaluate(()=>{G.throwing.active.clock=.32;});await page.keyboard.press('Space');
  assert.equal(await page.evaluate(()=>G.throwing.active.phase),'boost');assert.equal(await page.evaluate(()=>G.throwing.active.shot.angle),locked.angle);
  report.threeClicks=true;
- await page.waitForFunction(()=>window.Slug3D?.ready,null,{timeout:15000}).catch(()=>{});
- report.renderer=await page.evaluate(()=>({gl:window.DecorGLB?.ready,enabled:window.Slug3D?.enabled,crownAPI:!!window.DecorGLB?.throwCrown}));
  for(const width of [1280,480]){
   await page.setViewportSize({width,height:800});
   for(const phase of ['angle','power']){
    await page.evaluate(phase=>{const a=G.throwing.active;a.phase=phase;a.clock=.31;a.lockAngle=phase==='angle'?null:42;a.lockPower=null;for(let i=0;i<60;i++)SlugThrow._qa.camera(qaTank,.05);drawTankFrame();},phase);
    await page.waitForTimeout(250);
-   report[width+'-'+phase]=await page.evaluate(()=>({tip:window.DecorGLB?.throwCrown?.(SlugThrow._qa.getSprites()[0]),loaded:SlugThrow._qa.loadedStone(G.throwing.active),screen:window.Slug3D?.throwCrownScreen?.(SlugThrow._qa.getSprites()[0]),lean:SlugThrow._qa.getSprites()[0].throwLean}));
-   if(report.renderer.gl)assert.ok(report[width+'-'+phase].tip,'3D stone follows sampled crown');
+   report[width+'-'+phase]=await page.evaluate(()=>({loaded:SlugThrow._qa.loadedStone(G.throwing.active),lean:SlugThrow._qa.getSprites()[0].throwLean}));
    await page.screenshot({path:path.join(out,width+'-'+phase+'.png')});
   }
  }
