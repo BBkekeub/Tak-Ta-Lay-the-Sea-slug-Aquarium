@@ -42,11 +42,9 @@ const SpriteDecor=(()=>{
  };
  const oldOptions=flipOptions;flipOptions=key=>SpriteDecor.is(key)?[0,1,2,3]:oldOptions(key);
  const oldCells=decorCellSet;decorCellSet=(o,name)=>SpriteDecor.is(o.key)?SpriteDecor.cellSet(o.key,o.fx,o.fy,o.flip,name):oldCells(o,name);
- const oldSolid=decorSolidSet;decorSolidSet=function(decor){
-  if(!decor?.some(o=>SpriteDecor.is(o.key)))return oldSolid(decor);
-  const result=oldSolid(decor.filter(o=>!SpriteDecor.is(o.key)));
-  for(const o of decor)if(SpriteDecor.is(o.key))for(const k of decorCellSet(o,'solid'))result.add(k);return result;
- };
+ /* ⚠️ 2026-10-03 เคยห่อ decorSolidSet ตรงนี้ด้วย — กรองอาร์เรย์ใหม่ทุกครั้ง (แคชของ tank-view.js ผูกกับอาร์เรย์เลยพลาดตลอด)
+    และตู้ที่มีแต่ชิ้นหลายมุมได้ emptyDecorMask (Set ที่ใช้ร่วม) กลับมาแล้วถูก .add ทับ = ตู้ว่างทุกใบมีหินล่องหน
+    ไม่ต้องห่อแล้ว: decorSolidSet เดิมเรียก decorCellSet ซึ่งถูกแทนด้านบนให้รู้จักชิ้นหลายมุมอยู่แล้ว */
  const oldFootprint=decorFootprint;decorFootprint=(key,x,y,r)=>SpriteDecor.is(key)?SpriteDecor.cellSet(key,x,y,r,'place'):oldFootprint(key,x,y,r);
  const oldBounds=decorRequiredBounds;decorRequiredBounds=(key,x,y,r)=>SpriteDecor.is(key)?SpriteDecor.bounds(key,x,y,r):oldBounds(key,x,y,r);
 }

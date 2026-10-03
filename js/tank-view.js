@@ -28,12 +28,16 @@ function needBox(){
   return { x0:Math.max(b.minX,-tankCam.ox),      y0:Math.max(b.minY,-tankCam.oy),
            x1:Math.min(b.maxX,-tankCam.ox+TCW),  y1:Math.min(b.maxY,-tankCam.oy+TCH), b };
 }
-function layBox(){                                  // เผื่อขอบ LAY_PAD ไว้ แพนนิดหน่อยจะได้ไม่ต้องอบใหม่
-  const n=needBox(), b=n.b;
-  const x0=Math.max(Math.floor(b.minX)-2, Math.floor(n.x0-LAY_PAD));
-  const y0=Math.max(Math.floor(b.minY)-2, Math.floor(n.y0-LAY_PAD));
-  const x1=Math.min(Math.ceil (b.maxX)+2, Math.ceil (n.x1+LAY_PAD));
-  const y1=Math.min(Math.ceil (b.maxY)+2, Math.ceil (n.y1+LAY_PAD));
+/* ⚠️ 2026-10-03 เผื่อขอบแค่ 72px ตายตัว = แพนเกิน 72px ก็อบชั้นตู้ใหม่หมด (วัด: 79–138 ครั้งใน 4 วิของการแพน)
+   เผื่อ 30% ของด้านยาวจอแทน → ซูมพอดีตู้ = ครอบทั้งตู้ แพนแล้วไม่อบใหม่เลย · ซูมเข้า = อบใหม่ทุก ~1/3 จอ
+   เพดานพื้นที่: ไม่เกิน (1.6 เท่าจอ)² ต่อชั้น และไม่เกิน 4096px ต่อด้านตามเดิม */
+function layPad(){ return Math.max(LAY_PAD, Math.round(Math.max(TCW,TCH)*0.3)); }
+function layBox(){                                  // เผื่อขอบ layPad() ไว้ แพนในระยะนี้ใช้ชั้นเดิมได้เลย
+  const n=needBox(), b=n.b, P=layPad();
+  const x0=Math.max(Math.floor(b.minX)-2, Math.floor(n.x0-P));
+  const y0=Math.max(Math.floor(b.minY)-2, Math.floor(n.y0-P));
+  const x1=Math.min(Math.ceil (b.maxX)+2, Math.ceil (n.x1+P));
+  const y1=Math.min(Math.ceil (b.maxY)+2, Math.ceil (n.y1+P));
   return { x:x0, y:y0, w:Math.max(1,x1-x0), h:Math.max(1,y1-y0) };
 }
 function layCovers(){                               // ชั้นที่อบไว้ยังครอบพื้นที่ที่ต้องใช้อยู่ไหม
@@ -41,10 +45,10 @@ function layCovers(){                               // ชั้นที่อ�
   const n=needBox();
   return n.x0>=L.x-0.5 && n.y0>=L.y-0.5 && n.x1<=L.x+L.w+0.5 && n.y1<=L.y+L.h+0.5;
 }
-function newLayer(box, sc){
-  const c=document.createElement('canvas');
-  c.width =Math.max(1,Math.round(box.w*DPR*sc));
-  c.height=Math.max(1,Math.round(box.h*DPR*sc));
+function newLayer(box, sc, old){                   // ใช้แคนวาสเดิมซ้ำ — สร้างใหม่ทุกครั้งที่อบ = จองหน่วยความจำการ์ดจอใหม่ทุกรอบ
+  const c=old||document.createElement('canvas');
+  const w=Math.max(1,Math.round(box.w*DPR*sc)), h=Math.max(1,Math.round(box.h*DPR*sc));
+  if(c.width!==w||c.height!==h){ c.width=w; c.height=h; }
   return c;
 }
 /* วาดลงแคนวาสลูก: ย้ายกล้องไปมุมซ้ายบนของกรอบชั่วคราว แล้วคืนค่าเดิมเสมอ */
@@ -396,37 +400,98 @@ function drawRoomFloor(ctx){
   ctx.beginPath(); ctx.moveTo(q[0].x,q[0].y); ctx.lineTo(q[1].x,q[1].y); ctx.stroke();
 }
 
+/* ⚠️ 2026-10-03 ผู้เล่น: "ขยับกล้องในตู้แล้วกระตุกมาก" — เดิมคีย์แคชมี ox/oy อยู่ด้วย แพน 1px = เทลายผนัง
+   + พื้นร้าน + ไล่แสง + วิกเนตต์ใหม่เต็มจอทุกเฟรม (วัด: 161 ครั้งใน 4 วินาทีของการแพน)
+   ตอนนี้แยก 3 ชั้นตามการเคลื่อนที่จริง แล้วแพนแค่ "เลื่อนภาพที่อบไว้":
+     ผนัง      = เลื่อนตามกล้อง ×BG_PARALLAX · อบเผื่อขอบ BG_WALL_PAD เลื่อนเกินค่อยอบใหม่
+     พื้นร้าน   = เลื่อน 1:1 กับตู้ · อบในพิกัดตู้แบบชั้นตู้ (intoLayer) เผื่อขอบครึ่งจอ
+     ไล่แสง/วิกเนตต์ = นิ่งกับจอ · อบใหม่เฉพาะตอนจอเปลี่ยนขนาด
+   _bgC = ภาพรวมของ 3 ชั้น · เฟรมนิ่ง = blit ใบเดียวเท่าเดิม · เฟรมแพน = ประกอบใหม่ด้วย drawImage 3 ครั้ง ไม่มีการเทลาย
+   เพดานหน่วยความจำ: แคนวาสคงที่ 4 ใบ ใช้ซ้ำ (ปรับขนาดเฉพาะตอนต้องใหญ่ขึ้น/จอเปลี่ยน) */
+const BG_WALL_PAD=160;
 let _bgC=null, _bgX=null, _bgKey='';
-function drawTankBg(ctx){                 // แคชไว้ เปลี่ยนเฉพาะตอนกล้องขยับ/จอเปลี่ยนขนาด/วัสดุเปลี่ยน/ภาพโหลดเสร็จ
+let _bgWall=null, _bgWallKey='', _bgWallPx=0, _bgWallPy=0;
+let _bgFloor=null, _bgFloorKey='', _bgFloorBox=null;
+let _bgOver=null, _bgOverKey='';
+function bgCanvas(c, w, h){
+  if(!c) c=document.createElement('canvas');
+  w=Math.max(1,Math.round(w)); h=Math.max(1,Math.round(h));
+  if(c.width!==w || c.height!==h){ c.width=w; c.height=h; }
+  return c;
+}
+/* พื้นที่พื้นร้านที่ต้องใช้ (พิกัดตู้ ox=oy=0) = กรอบพื้นร้าน ∩ จอ */
+function bgFloorNeed(){
+  const fw=curTank.def.w, fh=curTank.def.h, zf=-STAND_CELLS, ox=tankCam.ox, oy=tankCam.oy;
+  tankCam.ox=0; tankCam.oy=0;
+  const q=[S(-FLOOR_SIDE,fh+FLOOR_BACK,zf),S(fw+FLOOR_SIDE,fh+FLOOR_BACK,zf),S(fw+FLOOR_SIDE,-FLOOR_BACK,zf),S(-FLOOR_SIDE,-FLOOR_BACK,zf)];
+  tankCam.ox=ox; tankCam.oy=oy;
+  const xs=q.map(p=>p.x), ys=q.map(p=>p.y);
+  const f={x0:Math.min(...xs)-2,y0:Math.min(...ys)-2,x1:Math.max(...xs)+2,y1:Math.max(...ys)+2};
+  return {f, x0:Math.max(f.x0,-ox), y0:Math.max(f.y0,-oy), x1:Math.min(f.x1,-ox+TCW), y1:Math.min(f.y1,-oy+TCH)};
+}
+function drawTankBg(ctx){                 // แคชไว้ แพนกล้อง = เลื่อนชั้นที่อบไว้ (ดูหมายเหตุด้านบน)
   /* ⚠️ แคนวาสกว้าง/สูง 0 (เข้าตู้ตอนหน้าต่างยังไม่จัดเลย์เอาต์ / ย่อหน้าต่างจนสุด) → drawImage โยน
      InvalidStateError แล้วลูปวาดตู้ตายทั้งเกม · กันแบบเดียวกับ blitLayer */
   if(!tankCv.width||!tankCv.height)return false;
   const mats=curTank?tankRoomMats(curTank):null;
   if(!mats || !roomPat(ctx,mats.wall)) return false;
-  const k=[TCW,TCH,tankCam.zoom.toFixed(4),Math.round(tankCam.ox),Math.round(tankCam.oy),
-           curTank.def.w, curTank.def.h, mats.wall.id, mats.floor.id, matGen()].join('|');
-  if(k!==_bgKey){
+  const base=[TCW,TCH,DPR,tankCam.zoom.toFixed(4),curTank.def.w,curTank.def.h,matGen()].join('|');
+  let dirty=false;
+  // ผนัง
+  const px=tankCam.ox*BG_PARALLAX, py=tankCam.oy*BG_PARALLAX, wk=base+'|'+mats.wall.id;
+  if(wk!==_bgWallKey || Math.abs(px-_bgWallPx)>BG_WALL_PAD || Math.abs(py-_bgWallPy)>BG_WALL_PAD){
+    _bgWall=bgCanvas(_bgWall,(TCW+BG_WALL_PAD*2)*DPR,(TCH+BG_WALL_PAD*2)*DPR);
+    const x=_bgWall.getContext('2d'); x.setTransform(DPR,0,0,DPR,BG_WALL_PAD*DPR,BG_WALL_PAD*DPR);
+    x.clearRect(-BG_WALL_PAD,-BG_WALL_PAD,TCW+BG_WALL_PAD*2,TCH+BG_WALL_PAD*2);
+    _bgPaintWall(x,px,py);
+    _bgWallKey=wk; _bgWallPx=px; _bgWallPy=py; dirty=true;
+  }
+  // พื้นร้าน
+  const fk=base+'|'+mats.floor.id, need=bgFloorNeed(), B=_bgFloorBox;
+  const covers=B && need.x0>=B.x-0.5 && need.y0>=B.y-0.5 && need.x1<=B.x+B.w+0.5 && need.y1<=B.y+B.h+0.5;
+  if(fk!==_bgFloorKey || !covers){
+    const pad=Math.max(LAY_PAD, Math.max(TCW,TCH)*0.5), f=need.f;
+    const x0=Math.max(f.x0,Math.floor(need.x0-pad)), y0=Math.max(f.y0,Math.floor(need.y0-pad));
+    const x1=Math.min(f.x1,Math.ceil(need.x1+pad)),  y1=Math.min(f.y1,Math.ceil(need.y1+pad));
+    const box={x:x0,y:y0,w:Math.max(1,x1-x0),h:Math.max(1,y1-y0)};
+    const sc=Math.min(1, 4096/(box.w*DPR), 4096/(box.h*DPR));   // ใหญ่เกินเพดานแคนวาส = อบหยาบลงนิด ไม่ใช่อบทุกเฟรม
+    _bgFloor=bgCanvas(_bgFloor, box.w*DPR*sc, box.h*DPR*sc);
+    intoLayer(_bgFloor, box, sc, x=>drawRoomFloor(x));
+    _bgFloorKey=fk; _bgFloorBox=box; dirty=true;
+  }
+  // ไล่แสง + วิกเนตต์ (นิ่งกับจอ)
+  const vk=TCW+'|'+TCH+'|'+DPR;
+  if(vk!==_bgOverKey){
+    _bgOver=bgCanvas(_bgOver,TCW*DPR,TCH*DPR);
+    const x=_bgOver.getContext('2d'); x.setTransform(DPR,0,0,DPR,0,0); x.clearRect(0,0,TCW,TCH);
+    _bgPaintOverlay(x); _bgOverKey=vk; dirty=true;
+  }
+  const k=base+'|'+mats.wall.id+'|'+mats.floor.id+'|'+tankCam.ox.toFixed(1)+'|'+tankCam.oy.toFixed(1);
+  if(dirty || k!==_bgKey){
     _bgKey=k;
-    if(!_bgC){ _bgC=document.createElement('canvas'); _bgX=_bgC.getContext('2d'); }
-    if(_bgC.width!==tankCv.width || _bgC.height!==tankCv.height){ _bgC.width=tankCv.width; _bgC.height=tankCv.height; }
+    _bgC=bgCanvas(_bgC,tankCv.width,tankCv.height); _bgX=_bgC.getContext('2d');
     _bgX.setTransform(DPR,0,0,DPR,0,0); _bgX.clearRect(0,0,TCW,TCH);
-    _bgPaint(_bgX);
+    _bgX.drawImage(_bgWall, -BG_WALL_PAD+(px-_bgWallPx), -BG_WALL_PAD+(py-_bgWallPy), TCW+BG_WALL_PAD*2, TCH+BG_WALL_PAD*2);
+    const fb=_bgFloorBox; _bgX.drawImage(_bgFloor, tankCam.ox+fb.x, tankCam.oy+fb.y, fb.w, fb.h);
+    _bgX.drawImage(_bgOver, 0, 0, TCW, TCH);
   }
   ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(_bgC,0,0); ctx.setTransform(DPR,0,0,DPR,0,0);
   return true;
 }
-function _bgPaint(ctx){
+function _bgPaintWall(ctx, px, py){
   const r=curTank&&roomPat(ctx, tankRoomMats(curTank).wall); if(!r) return false;
   const {pat,img,m}=r;
   if(r.flat) ctx.fillStyle=r.flat;                    // ผนังสีเรียบ (ขาวล้วน) — ไม่มีลายให้สเกล
   else{
     const z=0.75+0.25*tankCam.zoom;                   // ผนังไกล ซูมมีผลน้อยกว่าตัวตู้
     const s=(m.cm*BG_PX_PER_CM*z)/img.naturalWidth;   // ลายใหญ่เท่าของจริง (วัสดุแต่ละตัวบอกขนาดผืนเป็น ซม.)
-    pat.setTransform(new DOMMatrix([s,0,0,s, tankCam.ox*BG_PARALLAX, tankCam.oy*BG_PARALLAX]));
+    pat.setTransform(new DOMMatrix([s,0,0,s, px, py]));
     ctx.fillStyle=pat;
   }
-  ctx.fillRect(0,0,TCW,TCH);
-  drawRoomFloor(ctx);                                 // พื้นจริงของร้านทับครึ่งล่าง = ตู้มีที่ยืน
+  ctx.fillRect(-BG_WALL_PAD,-BG_WALL_PAD,TCW+BG_WALL_PAD*2,TCH+BG_WALL_PAD*2);
+  return true;
+}
+function _bgPaintOverlay(ctx){
   const g=ctx.createLinearGradient(0,0,0,TCH);        // บนสว่างอมทอง ล่างจมมืด
   g.addColorStop(0,'rgba(255,236,205,0.05)');
   /* ไล่มืดเบาลงจากเดิม (0.30/0.72) — ของเดิมจูนกับหินอ่อนดำ พอผนังเป็นวัสดุจริงของร้าน (ส่วนใหญ่สีอ่อน)
@@ -535,7 +600,11 @@ function drawCaustics(ctx, quad, amt, zTop){
   const now=performance.now();
   if(_lay.cauF!==_tankFrame && (!_lay.cauT || now-_lay.cauT >= 1000/CAU_FPS)){
     _lay.cauT=now; _lay.cauF=_tankFrame;
-    const q=[{x:0,y:0},{x:b.w,y:0},{x:b.w,y:b.h},{x:0,y:b.h}];
+    /* อบเฉพาะส่วนที่เห็นบนจอ + เผื่อขอบ 64px (ชั้นใหญ่กว่าจอได้ถึง 1.6 เท่าเพื่อให้แพนไม่ต้องอบชั้นนิ่งใหม่
+       ถ้าอบลายแสงทั้งชั้น 24 ครั้ง/วิ จะแพงขึ้นตามพื้นที่) · แพนระหว่างรอบอบ ≤42ms ยังอยู่ในขอบที่เผื่อไว้ */
+    const M=64, qx0=Math.max(0,-tankCam.ox-b.x-M), qy0=Math.max(0,-tankCam.oy-b.y-M);
+    const qx1=Math.min(b.w,TCW-tankCam.ox-b.x+M), qy1=Math.min(b.h,TCH-tankCam.oy-b.y+M);
+    const q=[{x:qx0,y:qy0},{x:qx1,y:qy0},{x:qx1,y:qy1},{x:qx0,y:qy1}];
     intoLayer(_lay.cau, b, CAU_SCALE, x=> causticPaint(x, q, 1, zTop, ms));
   }
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
@@ -2043,7 +2112,7 @@ function drawTankFrame(){
     const box=layBox();
     if(box.w*DPR<=4096 && box.h*DPR<=4096){
       _lay.key=layKey; _lay.box=box; _lay.cauT=0;
-      _lay.chrome=newLayer(box,1); _lay.glass=newLayer(box,1); _lay.cau=newLayer(box,CAU_SCALE);
+      _lay.chrome=newLayer(box,1,_lay.chrome); _lay.glass=newLayer(box,1,_lay.glass); _lay.cau=newLayer(box,CAU_SCALE,_lay.cau);
       intoLayer(_lay.chrome, box, 1, drawChrome);
       intoLayer(_lay.glass,  box, 1, drawGlass);
     } else { _lay.key=''; _lay.box=null; }
