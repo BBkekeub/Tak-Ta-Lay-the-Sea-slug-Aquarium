@@ -18,3 +18,20 @@ assets/decor/driftwood/*
 
 # Local backups before saving decoration grids
 .local-backups/
+
+# Ship rendered game sprites; keep Blender sources and bake intermediates local.
+!assets/decor/driftwood/variants-v1/
+assets/decor/driftwood/variants-v1/**
+!assets/decor/driftwood/variants-v1/**/
+!assets/decor/driftwood/variants-v1/**/tank-*.png
+!assets/decor/driftwood/variants-v1/**/shop-*.png
+!assets/decor/driftwood/complex-v1/
+assets/decor/driftwood/complex-v1/**
+!assets/decor/driftwood/complex-v1/**/
+!assets/decor/driftwood/complex-v1/**/tank-*.png
+!assets/decor/driftwood/complex-v1/**/shop-*.png
+!assets/decor/driftwood/natural-v1/
+assets/decor/driftwood/natural-v1/**
+!assets/decor/driftwood/natural-v1/**/
+!assets/decor/driftwood/natural-v1/**/tank-*.png
+!assets/decor/driftwood/natural-v1/**/shop-*.png
