@@ -197,7 +197,7 @@ function cleanView(v){const o=blankView();if(!v)return o;o.src=String(v.src||'')
  for(const L of ['state','place']){const m=v[L]&&typeof v[L]==='object'?v[L]:{};for(const [k,val] of Object.entries(m))if(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(k)&&k.split(',').every(n=>Math.abs(+n)<=200)&&(L==='place'?val===1:[1,2,3].includes(val)))o[L][k]=val}
  return o}
 function cleanItem(it){const o=blankItem(String(it.key));o.name=String(it.name||o.name).slice(0,60);o.cat=String(it.cat||o.cat).slice(0,40);o.priceCm=Number.isFinite(+it.priceCm)&&+it.priceCm>0?+it.priceCm:null;
- o.cell=[.1,.2].includes(it.cell)?it.cell:.5;if(typeof it.gridSource==='string')o.gridSource=it.gridSource.slice(0,40);o.uniform=it.uniform!==false;o.ref=[0,1,2,3].includes(it.ref)?it.ref:0;o.frontW=clamp(+it.frontW||28,1,200);o.views=[0,1,2,3].map(i=>cleanView(it.views?.[i]));return o}
+ o.cell=[.1,.2].includes(it.cell)?it.cell:.5;if(typeof it.gridSource==='string')o.gridSource=it.gridSource.slice(0,40);if(typeof it.gameSig==='string')o.gameSig=it.gameSig.slice(0,40);o.uniform=it.uniform!==false;o.ref=[0,1,2,3].includes(it.ref)?it.ref:0;o.frontW=clamp(+it.frontW||28,1,200);o.views=[0,1,2,3].map(i=>cleanView(it.views?.[i]));return o}
 function loadAll(){for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||!k.startsWith(STORE))continue;try{const it=cleanItem(JSON.parse(localStorage.getItem(k)));if(KEY_RE.test(it.key))items[it.key]=it}catch(_){}}}
 let dirty=new Set(),saveTimer=0,quotaWarned=false;
 function persistSoon(key){dirty.add(key);clearTimeout(saveTimer);saveTimer=setTimeout(persistNow,250)}
@@ -472,12 +472,16 @@ addEventListener('keyup',e=>{if(e.code==='Space'){spaceDown=false;cv.style.curso
 /* ---------- เริ่มต้น: โหลดงานเดิม + นำเข้าจากไฟล์เกมและชุดทดลองหินโพรง ---------- */
 loadAll();
 function cellMap(list,val,step=.5){const m={};for(const c of list||[])if(Array.isArray(c))m[keyc(Math.round(+c[0]/step)*step,Math.round(+c[1]/step)*step)]=val;return m}
+/* ลายเซ็นของนิยามในไฟล์เกม — ใช้รู้ว่าไฟล์เกมเปลี่ยนไปจากตอนที่งานร่างดึงมาหรือยัง */
+function defSig(d){const s=JSON.stringify([d.name,d.cat,d.priceCm,d.cell,d.frames]);let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)+':'+s.length}
 function importGameDefs(){let n=0;const D=typeof SPRITE_DECOR_DEFS==='object'&&SPRITE_DECOR_DEFS?SPRITE_DECOR_DEFS:{};
  for(const [key,d] of Object.entries(D)){if(!KEY_RE.test(key)||!Array.isArray(d.frames)||d.frames.length!==4)continue;
-  // กริดที่คำนวณใหม่ในไฟล์เกม (gridSource เปลี่ยน) แทนงานร่างเดิม — เก็บงานร่างเดิมไว้ที่ decor4-backup:<key>
-  if(items[key]){if(!d.gridSource||items[key].gridSource===d.gridSource)continue;try{localStorage.setItem('decor4-backup:'+key,JSON.stringify(items[key]))}catch(_){}}
+  // ไฟล์เกมคือของจริง: ถ้าไฟล์เกมเปลี่ยนไปจากตอนที่งานร่างดึงมา (หรืองานร่างเก่าไม่มีลายเซ็น) ดึงของเกมมาแทน
+  // งานร่างที่แก้ค้างโดยไฟล์เกมยังไม่เปลี่ยนจะอยู่ต่อ · งานร่างที่ถูกแทนเก็บไว้ที่ decor4-backup:<key>
+  const sig=defSig(d);
+  if(items[key]){if(items[key].gameSig===sig)continue;try{localStorage.setItem('decor4-backup:'+key,JSON.stringify(items[key]))}catch(_){}}
   const o=blankItem(key);o.name=d.name||key;o.cat=d.cat||o.cat;o.priceCm=+d.priceCm||null;o.uniform=false;o.frontW=+d.frames[0].wCm||28;
-  o.cell=[.1,.2].includes(d.cell)?d.cell:.5;o.views=d.frames.map(f=>cleanView({src:f.src,wCm:f.wCm,hCm:f.hCm,shearCm:f.shearCm,anchor:f.anchor,place:cellMap(f.place,1,o.cell),state:Object.assign({},cellMap(f.behind,2,o.cell),cellMap(f.front,3,o.cell),cellMap(f.solid,1,o.cell))}));if(d.gridSource)o.gridSource=d.gridSource;
+  o.cell=[.1,.2].includes(d.cell)?d.cell:.5;o.views=d.frames.map(f=>cleanView({src:f.src,wCm:f.wCm,hCm:f.hCm,shearCm:f.shearCm,anchor:f.anchor,place:cellMap(f.place,1,o.cell),state:Object.assign({},cellMap(f.behind,2,o.cell),cellMap(f.front,3,o.cell),cellMap(f.solid,1,o.cell))}));if(d.gridSource)o.gridSource=d.gridSource;o.gameSig=sig;
   items[key]=o;persistSoon(key);n++}return n}
 /* ชุดทดลอง "หินโพรง" จาก tools/decor-shelter-preset.js เดิม เก็บค่าไว้ใน localStorage แยกทีละทิศ → รวมเป็นชิ้นเดียว */
 function importShelterStudy(){const key='sprite_tidal_shelter';if(items[key])return 0;const base='assets/decor-studies/tidal-shelter-original/',files=['front-0','right-90','back-180','left-270'];
@@ -490,4 +494,4 @@ cur=(()=>{let k=null;try{k=localStorage.getItem(LAST)}catch(_){}return items[k]?
 if(!cur){cur='sprite_new';items[cur]=blankItem(cur);persistSoon(cur)}
 for(const item of Object.values(items))for(const v of item.views)imageFor(v.src);
 selectItem(cur);if(imported)toast('นำเข้า '+imported+' ชิ้นจากไฟล์เกม/งานทดลองเดิม');
-</script><script src="js/decor-grid-editor.js?v=image-controls-9"></script><script src="js/decor-grid-color.js?v=5"></script><script src="js/decor-grid-examples.js?v=1"></script></body></html>
+</script><script src="js/decor-grid-editor.js?v=image-controls-10-gamesync"></script><script src="js/decor-grid-color.js?v=5"></script><script src="js/decor-grid-examples.js?v=1"></script></body></html>

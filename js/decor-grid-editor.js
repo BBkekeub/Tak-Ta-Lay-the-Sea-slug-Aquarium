@@ -87,6 +87,8 @@ function buildGridOverride(){
  for(const item of Object.values(items))if(DECOR_GRID_EDITABLE.has(item.key)&&isReady(item))D[item.key]=defOf(item);
  return "// Saved from Dec Grid.html. Keep after authored definitions.\nvar DECOR_GRID_OVERRIDES="+JSON.stringify(D,null,1)+";\nObject.assign(SPRITE_DECOR_DEFS,DECOR_GRID_OVERRIDES);\n";
 }
+// เขียนเข้าไฟล์เกมแล้ว → งานร่างตรงกับไฟล์เกม เปิดครั้งหน้าจะไม่ถูกดึงทับ
+function markSavedToGame(list){for(const item of list){item.gameSig=defSig(defOf(item));persistSoon(item.key)}persistNow()}
 saveButton.onclick=async()=>{
  const list=Object.values(items).filter(i=>DECOR_GRID_EDITABLE.has(i.key));
  if(list.some(i=>!isReady(i))){toast('ยังบันทึกไม่ได้: ตรวจความพร้อมของชิ้นในเกมให้ครบก่อน');return}
@@ -98,12 +100,12 @@ saveButton.onclick=async()=>{
    for(const item of list)data[item.key]=defOf(item);
    const response=await fetch('/api/save-decor-grid',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
    if(!response.ok)throw Error('HTTP '+response.status);
-   const result=await response.json();
+   const result=await response.json();markSavedToGame(list);
    saveButton.textContent='บันทึกเข้าเกมแล้ว '+result.count+' ชิ้น';
    toast('บันทึกเข้าเกมแล้ว '+result.count+' ชิ้น พร้อมสำรองไฟล์เดิม — โหลดเกมใหม่');return;
   }catch(e){toast('บันทึกเข้าเกมไม่สำเร็จ: '+e.message);return}
   finally{saveButton.disabled=false}
  }
- if(window.showSaveFilePicker){try{const handle=await showSaveFilePicker({suggestedName:filename,types:[{description:'กริดของตกแต่งเกม',accept:{'text/javascript':['.js']}}]});const stream=await handle.createWritable();await stream.write(text);await stream.close();toast('บันทึกแล้ว — โหลดเกมใหม่เพื่อใช้กริด');return}catch(e){if(e.name==='AbortError')return;toast('บันทึกไฟล์ไม่ได้ จะดาวน์โหลดให้แทน');}}
+ if(window.showSaveFilePicker){try{const handle=await showSaveFilePicker({suggestedName:filename,types:[{description:'กริดของตกแต่งเกม',accept:{'text/javascript':['.js']}}]});const stream=await handle.createWritable();await stream.write(text);await stream.close();markSavedToGame(list);toast('บันทึกแล้ว — โหลดเกมใหม่เพื่อใช้กริด');return}catch(e){if(e.name==='AbortError')return;toast('บันทึกไฟล์ไม่ได้ จะดาวน์โหลดให้แทน');}}
  const url=URL.createObjectURL(new Blob([text],{type:'text/javascript'})),a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);toast('ดาวน์โหลดแล้ว — วางทับ js/'+filename+' แล้วโหลดเกมใหม่');
 };
