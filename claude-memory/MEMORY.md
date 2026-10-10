@@ -1,0 +1,17 @@
+- [Tournament spec](tournament-spec.md) — tug/race 8-team bracket rules, prizes, invite mail, test cadence
+- [Eat contest spec](eat-contest-spec.md) — 4-slug drag-food-home contest: speed genes, dash, S/M/L/XL chews/points
+- [Race power spec](race-power-spec.md) — race: out-and-back, gauge → J block wall / K boost 2s, block hits all rivals
+- [Throw contest spec](throw-contest-spec.md) — stone throwing with gills: no foul, random waves, glass +10, payout 3×/2×/0/−1×
+- [Practice mode](practice-mode.md) — ซ้อม button in every contest tank, spar against your own slugs, no wager
+- [Crowd attribute limit](crowd-attribute-limit.md) — adding a vertex attribute to SlugCrowd kills all gills (WebGL 16-attr cap); use uniforms
+- [Reward timing](reward-timing-preference.md) — แจกของต้องผูกกับความคืบหน้า ไม่ใช่นาฬิกา และหลังหนักกว่าหน้า
+- [Sumo contest spec](sumo-contest-spec.md) — ตู้ดันวง: ชนข้างให้เดินออกเอง, ชาร์จจากหงอน, 3 นาทีเสมอ
+- [Slug body types roadmap](slug-body-types-roadmap.md) — ออกแบบทากใหม่: รูปร่าง 3 แบบ → หงอน → ลาย/สีร่อง ตามลำดับ
+- [Reply in Thai](reply-in-thai.md) — ตอบผู้ใช้เป็นภาษาไทยเสมอ อ่านไวกว่า
+- [Profiling in browser pane](profiling-in-browser-pane.md) — แพเนลไม่เดิน rAF วัดเฟรมไทม์ไม่ได้ ต้องอ่านจาก Chrome จริง
+- [Decor is 2D only](decor-2d-only.md) — เลิก 3D ของตกแต่งถาวร 2026-09-26 · SpriteDecor/decor-defs · DecorGLB ถอดแล้ว 2026-09-29
+- [Editor must match game](editor-must-match-game.md) — พรีวิวในเครื่องมือไม่ตรงเกม → แก้เครื่องมือ ห้ามเสนอให้ทำอาร์ตใหม่
+- [Custom editor build](custom-editor-build.md) — build แล้วก๊อป Custom.html ไปราก · check-*.mjs ทับ PNG · check-gene-preview เทียบเกม
+- [Species pipeline](species-pipeline.md) — โอรีโอ = ยีน sp · ผังโต๊ะ→build-species.mjs · ปลดล็อก 500 ที่โต๊ะวิจัย · ห้ามผสมข้ามพันธุ์
+- [Chill game goal](chill-game-goal.md) — เกมชิล: ความท้าทายต้องเลือกเล่นได้ ห้ามลงโทษ/รายจ่ายบังคับ/ตกขั้น
+- [Slug 3D removed](slug-3d-not-needed.md) — ลบทาก 3D ทั้งหมดแล้ว 2026-09-29 · PLAY.bat โปรไฟล์ TakTaLay3D = ที่เก็บเซฟ ห้ามเปลี่ยน
